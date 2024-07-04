@@ -8,7 +8,6 @@ FrameResource::FrameResource(ID3D12Device* device, UINT objectCount, UINT timeCo
 
 	ObjectCB = std::make_unique<UploadBuffer<ObjectConstants>>(device, objectCount, true);
 	TimeCB = std::make_unique<UploadBuffer<TimeConstants>>(device, timeCount, true);
-	ParticleCB = std::make_unique<UploadBuffer<ParticleConstants>>(device, particleCount, true);
 }
 
 FrameResource::~FrameResource()

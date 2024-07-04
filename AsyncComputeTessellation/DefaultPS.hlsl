@@ -4,6 +4,7 @@ cbuffer objectData : register(b0)
     matrix world;
     matrix view;
     matrix projection;
+    float3 camPosition;
     float aspectRatio;
 };
 

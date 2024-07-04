@@ -1,9 +1,11 @@
+#include "Noise.hlsl"
 
 cbuffer objectData : register(b0)
 {
     matrix world;
     matrix view;
     matrix projection;
+    float3 camPosition;
     float aspectRatio;
 };
 
@@ -28,7 +30,9 @@ VertexOut main(VertexIn vin)
 	
     float4 posW = mul(float4(vin.PosL, 1.0f), world);
     
-    vout.PosW = posW.xyz;
+    posW = float4(displaceVertex(posW.xyz, camPosition), 1);
+    
+    vout.PosW = posW;
     vout.NormalW = mul(vin.NormalL, (float3x3) world);
     vout.PosH = mul(mul(posW, view), projection);
 	vout.TexC = vin.TexC;

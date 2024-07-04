@@ -133,7 +133,6 @@
     <ClCompile Include="d3dUtil.cpp" />
     <ClCompile Include="DDSTextureLoader.cpp" />
     <ClCompile Include="DXCore.cpp" />
-    <ClCompile Include="Emitter.cpp" />
     <ClCompile Include="FrameResource.cpp" />
     <ClCompile Include="Game.cpp" />
     <ClCompile Include="GeometryGenerator.cpp" />
@@ -193,6 +192,9 @@
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.1</ShaderModel>
     </FxCompile>
+    <None Include="Noise.hlsl">
+      <FileType>Document</FileType>
+    </None>
     <None Include="SimplexNoise.hlsl">
       <FileType>Document</FileType>
     </None>

@@ -221,6 +221,7 @@ void Game::UpdateMainPassCB(const Timer& timer)
 			XMStoreFloat4x4(&objConstants.World, XMMatrixTranspose(world));
 			XMStoreFloat4x4(&objConstants.View, XMMatrixTranspose(view));
 			XMStoreFloat4x4(&objConstants.Projection, XMMatrixTranspose(projection));
+			objConstants.CamPosition = mainCamera->GetPosition();
 			objConstants.AspectRatio = (float)screenWidth / screenHeight;
 
 			currObjectCB->CopyData(e->ObjCBIndex, objConstants);
@@ -297,7 +298,7 @@ void Game::BuildGeometry()
 
 void Game::BuildRootSignature()
 {
-	// geo root signature
+	// root signature
 	{
 		// Root parameter can be a table, root descriptor or root constants.
 		CD3DX12_ROOT_PARAMETER slotRootParameter[1];

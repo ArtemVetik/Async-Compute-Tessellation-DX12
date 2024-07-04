@@ -51,6 +51,7 @@ protected:
 
 	Timer timer;
 
+	Microsoft::WRL::ComPtr<ID3D12InfoQueue> InfoQueue;
 	Microsoft::WRL::ComPtr<IDXGIFactory> DXGIFactory;
 	Microsoft::WRL::ComPtr<IDXGISwapChain> SwapChain;
 	Microsoft::WRL::ComPtr<ID3D12Device> Device;
@@ -103,6 +104,7 @@ protected:
 	void CreateSwapChain();
 
 	void FlushCommandQueue();
+	void PrintInfoMessages();
 
 	ID3D12Resource* CurrentBackBuffer() const;
 	D3D12_CPU_DESCRIPTOR_HANDLE CurrentBackBufferView() const;

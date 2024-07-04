@@ -16,6 +16,7 @@ public:
 	XMFLOAT4X4 GetProjectionMatrix();
 	float GetNear() const;
 	float GetFar() const;
+	DirectX::XMFLOAT3 GetPosition() const;
 
 	void Pitch(float angle);
 	void RotateY(float angle);

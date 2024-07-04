@@ -33,9 +33,6 @@
     <ClCompile Include="DXCore.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Emitter.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="FrameResource.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -195,6 +192,9 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="SimplexNoise.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Noise.hlsl">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

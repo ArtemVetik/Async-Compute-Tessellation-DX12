@@ -420,6 +420,12 @@ bool DXCore::InitDirect3D()
 		D3D_FEATURE_LEVEL_11_0,
 		IID_PPV_ARGS(&Device));
 
+#if defined(DEGUG) || defined(_DEBUG)
+	Device->QueryInterface(IID_PPV_ARGS(&InfoQueue));
+	InfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_CORRUPTION, TRUE);
+	//InfoQueue->SetBreakOnSeverity(D3D12_MESSAGE_SEVERITY_ERROR, TRUE);
+#endif
+
 	ThrowIfFailed(Device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
 		IID_PPV_ARGS(&Fence)));
 
@@ -541,6 +547,21 @@ void DXCore::FlushCommandQueue()
 		// wait until the GPU hits current fence event is fired
 		WaitForSingleObject(eventHandle, INFINITE);
 		CloseHandle(eventHandle);
+	}
+}
+
+void DXCore::PrintInfoMessages()
+{
+	UINT64 messageCount = InfoQueue->GetNumStoredMessagesAllowedByRetrievalFilter();
+	for (UINT64 i = 0; i < messageCount; ++i) {
+		SIZE_T messageLength = 0;
+		InfoQueue->GetMessage(i, nullptr, &messageLength);
+
+		std::vector<char> messageData(messageLength);
+		D3D12_MESSAGE* message = reinterpret_cast<D3D12_MESSAGE*>(messageData.data());
+		InfoQueue->GetMessage(i, message, &messageLength);
+
+		printf("D3D12 Message: %s\n", message->pDescription);
 	}
 }
 

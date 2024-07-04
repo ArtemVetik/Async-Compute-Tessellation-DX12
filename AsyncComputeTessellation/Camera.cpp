@@ -51,6 +51,11 @@ float Camera::GetFar() const
 	return farValue;
 }
 
+DirectX::XMFLOAT3 Camera::GetPosition() const
+{
+	return mPosition;
+}
+
 void Camera::Pitch(float angle)
 {
 	// Rotate up and look vector about the right vector.
