@@ -30,7 +30,6 @@ bool Game::Initialize()
 	ThrowIfFailed(CommandList->Reset(CommandListAllocator.Get(), nullptr));
 
 	BuildGeometry();
-	BuildUAVs();
 	BuildRootSignature();
 	BuildShadersAndInputLayout();
 	BuildFrameResources();
@@ -141,6 +140,9 @@ void Game::Draw(const Timer& timer)
 	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
+	bool changePso;
+	ImGuiDraw(&changePso);
+
 	// done recording commands
 	ThrowIfFailed(CommandList->Close());
 
@@ -159,6 +161,45 @@ void Game::Draw(const Timer& timer)
 	// because we are on the GPU timeline, the new fence point won't be 
 	// set until the GPU finishes processing all the commands prior to this Signal()
 	CommandQueue->Signal(Fence.Get(), currentFence);
+
+	if (changePso)
+	{
+		ThrowIfFailed(CommandList->Reset(CommandListAllocator.Get(), nullptr));
+
+		BuildPSOs();
+
+		// execute the initialization commands
+		ThrowIfFailed(CommandList->Close());
+		ID3D12CommandList* cmdsLists[] = { CommandList.Get() };
+		CommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
+
+		FlushCommandQueue();
+	}
+}
+
+void Game::ImGuiDraw(bool* changePso)
+{
+	ImGui_ImplDX12_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+
+	if (imguiParams.ShowDebugWindow)
+		ImGui::ShowDemoWindow(&imguiParams.ShowDebugWindow);
+
+	static int counter = 0;
+	ImGui::Begin("Tessellation parameters | TEST");
+	ImGui::Text("Test application parameters.");
+	ImGui::Checkbox("Demo Window", &imguiParams.ShowDebugWindow);
+
+	*changePso = false;
+	if (ImGui::Checkbox("Wireframe Mode", &imguiParams.WireframeMode))
+		*changePso = true;
+
+	ImGui::End();
+
+	ImGui::Render();
+	CommandList->SetDescriptorHeaps(1, CBVSRVUAVHeap.GetAddressOf());
+	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), CommandList.Get());
 }
 
 void Game::UpdateMainPassCB(const Timer& timer)
@@ -252,15 +293,6 @@ void Game::BuildGeometry()
 	AllRitems.push_back(std::move(gridRitem));
 }
 
-void Game::BuildUAVs()
-{
-	D3D12_DESCRIPTOR_HEAP_DESC uavHeapDesc = {};
-	uavHeapDesc.NumDescriptors = 6;
-	uavHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-	uavHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-	ThrowIfFailed(Device->CreateDescriptorHeap(&uavHeapDesc, IID_PPV_ARGS(&CBVSRVUAVHeap)));
-}
-
 void Game::BuildRootSignature()
 {
 	// geo root signature
@@ -327,7 +359,8 @@ void Game::BuildPSOs()
 		Shaders["OpaquePS"]->GetBufferSize()
 	};
 	geoOpaquePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	geoOpaquePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+	if (imguiParams.WireframeMode)
+		geoOpaquePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
 	geoOpaquePsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	geoOpaquePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 	geoOpaquePsoDesc.SampleMask = UINT_MAX;

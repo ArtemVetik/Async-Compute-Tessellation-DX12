@@ -9,6 +9,7 @@
 #include "DDSTextureLoader.h"
 #include "Emitter.h"
 #include "RenderItem.h"
+#include "ImguiParams.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -35,8 +36,6 @@ private:
 	ComPtr<ID3D12RootSignature> rootSignature = nullptr;
 	ComPtr<ID3D12RootSignature> particleRootSignature = nullptr;
 	ComPtr<ID3D12CommandSignature> particleCommandSignature = nullptr;
-
-	ComPtr<ID3D12DescriptorHeap> CBVSRVUAVHeap = nullptr;
 
 	ComPtr<ID3D12Resource> RWParticlePool = nullptr;
 	ComPtr<ID3D12Resource> ACDeadList = nullptr;
@@ -79,14 +78,16 @@ private:
 
 	SystemData *systemData;
 
+	ImguiParams imguiParams;
+
 	virtual void Resize()override;
 	virtual void Update(const Timer& timer)override;
 	virtual void Draw(const Timer& timer)override;
 
+	void ImGuiDraw(bool* changePso);
 	void UpdateMainPassCB(const Timer& timer);
 
 	void BuildGeometry();
-	void BuildUAVs();
 	void BuildRootSignature();
 	void BuildShadersAndInputLayout();
 	void BuildPSOs();

@@ -8,6 +8,9 @@
 #include "d3dUtil.h"
 #include "InputManager.h"
 #include "Timer.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_win32.h"
+#include "imgui/imgui_impl_dx12.h"
 
 // link necessary d3d12 libraries
 #pragma comment(lib,"d3dcompiler.lib")
@@ -66,6 +69,7 @@ protected:
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> RTVHeap;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> DSVHeap;
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CBVSRVUAVHeap;
 
 	D3D12_VIEWPORT ScreenViewPort;
 	D3D12_RECT ScissorRect;
@@ -87,13 +91,14 @@ protected:
 	DXCore& operator=(const DXCore& rhs) = delete;
 	virtual ~DXCore();
 
-	virtual void CreateRTVAndDSVDescriptorHeaps();
+	virtual void CreateRTVDSVCBVDescriptorHeaps();
 	virtual void Resize();
 	virtual void Update(const Timer& timer) = 0;
 	virtual void Draw(const Timer& timer) = 0;
 
 	bool InitMainWindow();
 	bool InitDirect3D();
+	bool InitImGui();
 	void CreateCommandObjects();
 	void CreateSwapChain();
 

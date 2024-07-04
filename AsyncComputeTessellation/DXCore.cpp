@@ -106,11 +106,18 @@ bool DXCore::Initialize()
 
 	Resize();
 
+	if (!InitImGui())
+		return false;
+
 	return true;
 }
 
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
 LRESULT DXCore::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
+	ImGui_ImplWin32_WndProcHandler(hwnd, msg, wParam, lParam);
+
 	switch (msg)
 	{
 	// WM_SIZE is sent when the user resizes the window.  
@@ -235,7 +242,7 @@ LRESULT DXCore::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	return DefWindowProc(hwnd, msg, wParam, lParam);
 }
 
-void DXCore::CreateRTVAndDSVDescriptorHeaps()
+void DXCore::CreateRTVDSVCBVDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC RTVHeapDescription;
 	RTVHeapDescription.NumDescriptors = SwapChainBufferCount;
@@ -252,6 +259,12 @@ void DXCore::CreateRTVAndDSVDescriptorHeaps()
 	DSVHeapDescription.NodeMask = 0;
 	ThrowIfFailed(Device->CreateDescriptorHeap(
 		&DSVHeapDescription, IID_PPV_ARGS(DSVHeap.GetAddressOf())));
+
+	D3D12_DESCRIPTOR_HEAP_DESC uavHeapDesc = {};
+	uavHeapDesc.NumDescriptors = 6;
+	uavHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	uavHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	ThrowIfFailed(Device->CreateDescriptorHeap(&uavHeapDesc, IID_PPV_ARGS(&CBVSRVUAVHeap)));
 }
 
 void DXCore::Resize()
@@ -433,8 +446,24 @@ bool DXCore::InitDirect3D()
 
 	CreateCommandObjects();
 	CreateSwapChain();
-	CreateRTVAndDSVDescriptorHeaps();
+	CreateRTVDSVCBVDescriptorHeaps();
 
+	return true;
+}
+
+bool DXCore::InitImGui()
+{
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO();
+	(void)io;
+	ImGui::StyleColorsDark();
+	ImGui_ImplWin32_Init(mainWindowHandle);
+	ImGui_ImplDX12_Init(Device.Get(), SwapChainBufferCount,
+		DXGI_FORMAT_R8G8B8A8_UNORM, CBVSRVUAVHeap.Get(),
+		CBVSRVUAVHeap.Get()->GetCPUDescriptorHandleForHeapStart(),
+		CBVSRVUAVHeap.Get()->GetGPUDescriptorHandleForHeapStart());
+	
 	return true;
 }
 
