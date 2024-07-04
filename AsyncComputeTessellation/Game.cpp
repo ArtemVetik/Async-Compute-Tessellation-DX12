@@ -195,6 +195,8 @@ void Game::ImGuiDraw(bool* changePso)
 	if (ImGui::Checkbox("Wireframe Mode", &imguiParams.WireframeMode))
 		*changePso = true;
 
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+
 	ImGui::End();
 
 	ImGui::Render();
