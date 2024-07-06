@@ -30,6 +30,7 @@ bool Game::Initialize()
 	ThrowIfFailed(CommandList->Reset(CommandListAllocator.Get(), nullptr));
 
 	BuildGeometry();
+	BuildUAVs();
 	BuildRootSignature();
 	BuildShadersAndInputLayout();
 	BuildFrameResources();
@@ -118,7 +119,7 @@ void Game::Draw(const Timer& timer)
 	// specify the buffers we are going to render to
 	CommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
 
-	CommandList->SetGraphicsRootSignature(geoRootSignature.Get());
+	CommandList->SetGraphicsRootSignature(opaqueRootSignature.Get());
 	auto geoObjectCB = currentFrameResource->ObjectCB->Resource();
 
 	UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
@@ -136,12 +137,12 @@ void Game::Draw(const Timer& timer)
 		CommandList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
 	}
 
+	bool changePso;
+	ImGuiDraw(&changePso);
+	
 	// indicate a state transition on the resource usage
 	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
-
-	bool changePso;
-	ImGuiDraw(&changePso);
 
 	// done recording commands
 	ThrowIfFailed(CommandList->Close());
@@ -175,6 +176,8 @@ void Game::Draw(const Timer& timer)
 
 		FlushCommandQueue();
 	}
+
+	PrintInfoMessages();
 }
 
 void Game::ImGuiDraw(bool* changePso)
@@ -296,9 +299,131 @@ void Game::BuildGeometry()
 	AllRitems.push_back(std::move(gridRitem));
 }
 
+void Game::BuildUAVs()
+{
+	int vertexCount = 100;
+
+	// Vertex Pool
+	{
+
+		UINT64 vertexPoolByteSize = sizeof(DirectX::XMFLOAT3) * vertexCount;
+		ThrowIfFailed(Device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(vertexPoolByteSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
+			D3D12_RESOURCE_STATE_COMMON,
+			nullptr,
+			IID_PPV_ARGS(&RWVertexPool)));
+		RWVertexPool->SetName(L"VertexPool");
+
+		D3D12_UNORDERED_ACCESS_VIEW_DESC vertexPoolUAVDescription = {};
+
+		vertexPoolUAVDescription.Format = DXGI_FORMAT_UNKNOWN;
+		vertexPoolUAVDescription.Buffer.FirstElement = 0;
+		vertexPoolUAVDescription.Buffer.NumElements = vertexCount;
+		vertexPoolUAVDescription.Buffer.StructureByteStride = sizeof(DirectX::XMFLOAT3);
+		vertexPoolUAVDescription.Buffer.CounterOffsetInBytes = 0;
+		vertexPoolUAVDescription.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC vertexPoolSRVDescription = {};
+		vertexPoolSRVDescription.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		vertexPoolSRVDescription.Format = DXGI_FORMAT_UNKNOWN;
+		vertexPoolSRVDescription.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+		vertexPoolSRVDescription.Buffer.FirstElement = 0;
+		vertexPoolSRVDescription.Buffer.NumElements = vertexCount;
+		vertexPoolSRVDescription.Buffer.StructureByteStride = sizeof(DirectX::XMFLOAT3);
+
+		VertexPoolCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 1, CBVSRVUAVDescriptorSize);
+		VertexPoolGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 1, CBVSRVUAVDescriptorSize);
+		Device->CreateUnorderedAccessView(RWVertexPool.Get(), nullptr, &vertexPoolUAVDescription, VertexPoolCPUUAV);
+
+		VertexPoolCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 4, CBVSRVUAVDescriptorSize);
+		VertexPoolGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 4, CBVSRVUAVDescriptorSize);
+		Device->CreateShaderResourceView(RWVertexPool.Get(), &vertexPoolSRVDescription, VertexPoolCPUSRV);
+	}
+
+	// Draw List
+	{
+		UINT64 drawListByteSize = sizeof(UINT) * vertexCount;
+		UINT64 countBufferOffset = AlignForUavCounter(drawListByteSize);
+
+		ThrowIfFailed(Device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(countBufferOffset + sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
+			D3D12_RESOURCE_STATE_COMMON,
+			nullptr,
+			IID_PPV_ARGS(&RWDrawList)));
+		RWDrawList->SetName(L"DrawList");
+
+		D3D12_UNORDERED_ACCESS_VIEW_DESC drawlistUAVDescription = {};
+		drawlistUAVDescription.Format = DXGI_FORMAT_UNKNOWN;
+		drawlistUAVDescription.Buffer.FirstElement = 0;
+		drawlistUAVDescription.Buffer.NumElements = vertexCount;
+		drawlistUAVDescription.Buffer.StructureByteStride = sizeof(UINT);
+		drawlistUAVDescription.Buffer.CounterOffsetInBytes = countBufferOffset;
+		drawlistUAVDescription.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+		drawlistUAVDescription.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+
+		DrawListCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 2, CBVSRVUAVDescriptorSize);
+		DrawListGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 2, CBVSRVUAVDescriptorSize);
+		Device->CreateUnorderedAccessView(RWDrawList.Get(), RWDrawList.Get(), &drawlistUAVDescription, DrawListCPUUAV);
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC drawListSRVDescription = {};
+		drawListSRVDescription.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		drawListSRVDescription.Format = DXGI_FORMAT_UNKNOWN;
+		drawListSRVDescription.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+		drawListSRVDescription.Buffer.FirstElement = 0;
+		drawListSRVDescription.Buffer.NumElements = vertexCount;
+		drawListSRVDescription.Buffer.StructureByteStride = sizeof(UINT);
+
+		DrawListCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 5, CBVSRVUAVDescriptorSize);
+		DrawListGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 5, CBVSRVUAVDescriptorSize);
+		Device->CreateShaderResourceView(RWDrawList.Get(), &drawListSRVDescription, DrawListCPUSRV);
+
+		ThrowIfFailed(Device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(countBufferOffset + sizeof(UINT)),
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&DrawListUploadBuffer)));
+		DrawListUploadBuffer->SetName(L"DrawListUploadBuffer");
+	}
+
+	// Draw Args
+	{
+		UINT64 drawArgsByteSize = (sizeof(unsigned int) * 9);
+		UINT64 countBufferOffset = AlignForUavCounter(drawArgsByteSize);
+
+		ThrowIfFailed(Device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(countBufferOffset + sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
+			D3D12_RESOURCE_STATE_COMMON,
+			nullptr,
+			IID_PPV_ARGS(&RWDrawArgs)));
+		RWDrawArgs.Get()->SetName(L"DrawArgs");
+
+		D3D12_UNORDERED_ACCESS_VIEW_DESC drawArgsUAVDescription = {};
+
+		drawArgsUAVDescription.Format = DXGI_FORMAT_UNKNOWN;
+		drawArgsUAVDescription.Buffer.FirstElement = 0;
+		drawArgsUAVDescription.Buffer.NumElements = 9;
+		drawArgsUAVDescription.Buffer.StructureByteStride = sizeof(unsigned int);
+		drawArgsUAVDescription.Buffer.CounterOffsetInBytes = countBufferOffset;
+		drawArgsUAVDescription.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+		drawArgsUAVDescription.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+
+		DrawArgsCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 3, CBVSRVUAVDescriptorSize);
+		DrawArgsGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 3, CBVSRVUAVDescriptorSize);
+		Device->CreateUnorderedAccessView(RWDrawArgs.Get(), RWDrawArgs.Get(), &drawArgsUAVDescription, DrawArgsCPUUAV);
+	}
+}
+
 void Game::BuildRootSignature()
 {
-	// root signature
+	// opaque root signature
 	{
 		// Root parameter can be a table, root descriptor or root constants.
 		CD3DX12_ROOT_PARAMETER slotRootParameter[1];
@@ -328,15 +453,68 @@ void Game::BuildRootSignature()
 			0,
 			serializedRootSig->GetBufferPointer(),
 			serializedRootSig->GetBufferSize(),
-			IID_PPV_ARGS(geoRootSignature.GetAddressOf())));
+			IID_PPV_ARGS(opaqueRootSignature.GetAddressOf())));
 	}
+
+	// tessellation root signature
+	{
+		CD3DX12_DESCRIPTOR_RANGE uavTable;
+		uavTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 0);
+
+		// Root parameter can be a table, root descriptor or root constants.
+		CD3DX12_ROOT_PARAMETER slotRootParameter[2];
+		slotRootParameter[0].InitAsConstantBufferView(0);
+		slotRootParameter[1].InitAsDescriptorTable(1, &uavTable);
+
+		auto staticSamplers = GetStaticSamplers();
+
+		// A root signature is an array of root parameters.
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2, slotRootParameter,
+			(UINT)staticSamplers.size(),
+			staticSamplers.data(),
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		// create a root signature with a single slot which points to a descriptor range consisting of a single constant buffer
+		ComPtr<ID3DBlob> serializedRootSig = nullptr;
+		ComPtr<ID3DBlob> errorBlob = nullptr;
+		HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+			serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+
+		if (errorBlob != nullptr)
+		{
+			::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+		}
+		ThrowIfFailed(hr);
+
+		ThrowIfFailed(Device->CreateRootSignature(
+			0,
+			serializedRootSig->GetBufferPointer(),
+			serializedRootSig->GetBufferSize(),
+			IID_PPV_ARGS(tessellationComputeRootSignature.GetAddressOf())));
+	}
+
+	// tessellation command signature
+	D3D12_INDIRECT_ARGUMENT_DESC Args[1];
+	Args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+
+	D3D12_COMMAND_SIGNATURE_DESC particleCommandSingatureDescription = {};
+	particleCommandSingatureDescription.ByteStride = 36;
+	particleCommandSingatureDescription.NumArgumentDescs = 1;
+	particleCommandSingatureDescription.pArgumentDescs = Args;
+
+	ThrowIfFailed(Device->CreateCommandSignature(
+		&particleCommandSingatureDescription,
+		NULL,
+		IID_PPV_ARGS(tessellationCommandSignature.GetAddressOf())));
 }
 
 void Game::BuildShadersAndInputLayout()
 {
 	Shaders["OpaqueVS"] = d3dUtil::CompileShader(L"DefaultVS.hlsl", nullptr, "main", "vs_5_1");
 	Shaders["OpaquePS"] = d3dUtil::CompileShader(L"DefaultPS.hlsl", nullptr, "main", "ps_5_1");
-
+	Shaders["TessellationUpdate"] = d3dUtil::CompileShader(L"TessellationUpdate.hlsl", nullptr, "main", "cs_5_1");
+	Shaders["TessellationCopyDraw"] = d3dUtil::CompileShader(L"TessellationCopyDraw.hlsl", nullptr, "main", "cs_5_1");
+	
 	geoInputLayout =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -350,7 +528,7 @@ void Game::BuildPSOs()
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC geoOpaquePsoDesc;
 	ZeroMemory(&geoOpaquePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
 	geoOpaquePsoDesc.InputLayout = { geoInputLayout.data(), (UINT)geoInputLayout.size() };
-	geoOpaquePsoDesc.pRootSignature = geoRootSignature.Get();
+	geoOpaquePsoDesc.pRootSignature = opaqueRootSignature.Get();
 	geoOpaquePsoDesc.VS =
 	{
 		reinterpret_cast<BYTE*>(Shaders["OpaqueVS"]->GetBufferPointer()),
@@ -375,6 +553,30 @@ void Game::BuildPSOs()
 	geoOpaquePsoDesc.DSVFormat = DepthStencilFormat;
 	ThrowIfFailed(Device->CreateGraphicsPipelineState(&geoOpaquePsoDesc, IID_PPV_ARGS(&PSOs["Opaque"])));
 	PSOs["Opaque"]->SetName(L"OpaquePSO");
+
+
+	D3D12_COMPUTE_PIPELINE_STATE_DESC tessellationUpdatePSO = {};
+	tessellationUpdatePSO.pRootSignature = tessellationComputeRootSignature.Get();
+	tessellationUpdatePSO.CS =
+	{
+		reinterpret_cast<BYTE*>(Shaders["TessellationUpdate"]->GetBufferPointer()),
+		Shaders["TessellationUpdate"]->GetBufferSize()
+	};
+	tessellationUpdatePSO.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+	ThrowIfFailed(Device->CreateComputePipelineState(&tessellationUpdatePSO, IID_PPV_ARGS(&PSOs["tessellationUpdate"])));
+	PSOs["tessellationUpdate"]->SetName(L"tessellationUpdate");
+
+
+	D3D12_COMPUTE_PIPELINE_STATE_DESC tessellationCopyDrawPSO = {};
+	tessellationCopyDrawPSO.pRootSignature = tessellationComputeRootSignature.Get();
+	tessellationCopyDrawPSO.CS =
+	{
+		reinterpret_cast<BYTE*>(Shaders["TessellationCopyDraw"]->GetBufferPointer()),
+		Shaders["TessellationCopyDraw"]->GetBufferSize()
+	};
+	tessellationCopyDrawPSO.Flags = D3D12_PIPELINE_STATE_FLAG_NONE;
+	ThrowIfFailed(Device->CreateComputePipelineState(&tessellationCopyDrawPSO, IID_PPV_ARGS(&PSOs["tessellationCopyDraw"])));
+	PSOs["tessellationCopyDraw"]->SetName(L"tessellationCopyDraw");
 }
 
 void Game::BuildFrameResources()

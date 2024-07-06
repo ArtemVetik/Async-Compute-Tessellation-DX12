@@ -297,6 +297,7 @@ void DXCore::Resize()
 	{
 		ThrowIfFailed(SwapChain->GetBuffer(i, IID_PPV_ARGS(&SwapChainBuffer[i])));
 		Device->CreateRenderTargetView(SwapChainBuffer[i].Get(), nullptr, RTVHeapHandle);
+		SwapChainBuffer[i]->SetName(L"SwapChain");
 		RTVHeapHandle.Offset(1, RTVDescriptorSize);
 	}
 

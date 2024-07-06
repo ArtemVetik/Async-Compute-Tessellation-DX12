@@ -101,9 +101,6 @@
     <ClInclude Include="DXCore.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="Emitter.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="FrameResource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -182,6 +179,12 @@
       <Filter>Shaders</Filter>
     </FxCompile>
     <FxCompile Include="DefaultVS.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="TessellationUpdate.hlsl">
+      <Filter>Shaders</Filter>
+    </FxCompile>
+    <FxCompile Include="TessellationCopyDraw.hlsl">
       <Filter>Shaders</Filter>
     </FxCompile>
   </ItemGroup>

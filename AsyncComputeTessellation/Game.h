@@ -7,7 +7,6 @@
 #include "GeometryGenerator.h"
 #include "SystemData.h"
 #include "DDSTextureLoader.h"
-#include "Emitter.h"
 #include "RenderItem.h"
 #include "ImguiParams.h"
 
@@ -32,26 +31,21 @@ private:
 	int currentFrameResourceIndex = 0;
 
 	std::vector<D3D12_INPUT_ELEMENT_DESC> geoInputLayout;
-	ComPtr<ID3D12RootSignature> geoRootSignature = nullptr;
-	ComPtr<ID3D12RootSignature> rootSignature = nullptr;
-	ComPtr<ID3D12RootSignature> particleRootSignature = nullptr;
-	ComPtr<ID3D12CommandSignature> particleCommandSignature = nullptr;
+	ComPtr<ID3D12RootSignature> opaqueRootSignature = nullptr;
+	ComPtr<ID3D12RootSignature> tessellationComputeRootSignature = nullptr;
+	ComPtr<ID3D12CommandSignature> tessellationCommandSignature = nullptr;
 
-	ComPtr<ID3D12Resource> RWParticlePool = nullptr;
-	ComPtr<ID3D12Resource> ACDeadList = nullptr;
+	ComPtr<ID3D12Resource> RWVertexPool = nullptr;
 	ComPtr<ID3D12Resource> RWDrawList = nullptr;
 	ComPtr<ID3D12Resource> RWDrawArgs = nullptr;
 
 	ComPtr<ID3D12Resource> DrawListUploadBuffer = nullptr;
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE ParticlePoolCPUSRV;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE ParticlePoolGPUSRV;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE VertexPoolCPUSRV;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE VertexPoolGPUSRV;
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE ParticlePoolCPUUAV;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE ParticlePoolGPUUAV;
-
-	CD3DX12_CPU_DESCRIPTOR_HANDLE ACDeadListCPUUAV;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE ACDeadListGPUUAV;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE VertexPoolCPUUAV;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE VertexPoolGPUUAV;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE DrawListCPUSRV;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE DrawListGPUSRV;
@@ -88,6 +82,7 @@ private:
 	void UpdateMainPassCB(const Timer& timer);
 
 	void BuildGeometry();
+	void BuildUAVs();
 	void BuildRootSignature();
 	void BuildShadersAndInputLayout();
 	void BuildPSOs();
