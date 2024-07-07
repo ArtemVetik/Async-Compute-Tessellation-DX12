@@ -29,8 +29,8 @@ bool Game::Initialize()
 	// reset the command list to prep for initialization commands
 	ThrowIfFailed(CommandList->Reset(CommandListAllocator.Get(), nullptr));
 
-	BuildGeometry();
 	BuildUAVs();
+	UploadMeshData();
 	BuildRootSignature();
 	BuildShadersAndInputLayout();
 	BuildFrameResources();
@@ -100,10 +100,40 @@ void Game::Draw(const Timer& timer)
 	// we can only reset when the associated command lists have finished execution on the GPU
 	ThrowIfFailed(currentCommandListAllocator->Reset());
 
-	ThrowIfFailed(CommandList->Reset(currentCommandListAllocator.Get(), PSOs["Opaque"].Get()));
+	ThrowIfFailed(CommandList->Reset(currentCommandListAllocator.Get(), nullptr));
+
+	CommandList->SetPipelineState(PSOs["tessellationUpdate"].Get());
+	CommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
 
 	ID3D12DescriptorHeap* descriptorHeaps[] = { CBVSRVUAVHeap.Get() };
 	CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+	auto objectCB = currentFrameResource->ObjectCB->Resource();
+	CommandList->SetComputeRootConstantBufferView(0, objectCB->GetGPUVirtualAddress());
+
+	CommandList->SetComputeRootDescriptorTable(1, VertexPoolGPUUAV);
+	CommandList->SetComputeRootDescriptorTable(2, DrawListGPUUAV);
+	CommandList->SetComputeRootDescriptorTable(3, DrawArgsGPUUAV);
+
+	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawList.Get(),
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST));
+
+	CommandList->CopyResource(RWDrawList.Get(), DrawListUploadBuffer.Get());
+
+	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawList.Get(),
+		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+
+	CommandList->SetPipelineState(PSOs["tessellationUpdate"].Get());
+	CommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
+	CommandList->Dispatch(10000, 1, 1);
+
+	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWDrawList.Get()));
+
+	CommandList->SetPipelineState(PSOs["tessellationCopyDraw"].Get());
+	CommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
+	CommandList->Dispatch(1, 1, 1);
+
+	CommandList->SetPipelineState(PSOs["Opaque"].Get());
 
 	CommandList->RSSetViewports(1, &ScreenViewPort);
 	CommandList->RSSetScissorRects(1, &ScissorRect);
@@ -122,20 +152,27 @@ void Game::Draw(const Timer& timer)
 	CommandList->SetGraphicsRootSignature(opaqueRootSignature.Get());
 	auto geoObjectCB = currentFrameResource->ObjectCB->Resource();
 
-	UINT objCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
-	for (size_t i = 0; i < AllRitems.size(); ++i)
-	{
-		auto ri = AllRitems[i].get();
+	CommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		CommandList->IASetVertexBuffers(0, 1, &ri->Geo->VertexBufferView());
-		CommandList->IASetIndexBuffer(&ri->Geo->IndexBufferView());
-		CommandList->IASetPrimitiveTopology(ri->PrimitiveType);
+	D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = geoObjectCB->GetGPUVirtualAddress();
+	CommandList->SetGraphicsRootConstantBufferView(0, objCBAddress);
 
-		D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = geoObjectCB->GetGPUVirtualAddress() + ri->ObjCBIndex * objCBByteSize;
-		CommandList->SetGraphicsRootConstantBufferView(0, objCBAddress);
+	CommandList->SetGraphicsRootDescriptorTable(1, VertexPoolGPUSRV);
+	CommandList->SetGraphicsRootDescriptorTable(2, DrawListGPUSRV);
 
-		CommandList->DrawIndexedInstanced(ri->IndexCount, 1, ri->StartIndexLocation, ri->BaseVertexLocation, 0);
-	}
+	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(),
+		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
+
+	CommandList->ExecuteIndirect(
+		tessellationCommandSignature.Get(),
+		1,
+		RWDrawArgs.Get(),
+		0,
+		nullptr,
+		0);
+
+	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(),
+		D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
 	bool changePso;
 	ImGuiDraw(&changePso);
@@ -165,6 +202,7 @@ void Game::Draw(const Timer& timer)
 
 	if (changePso)
 	{
+		FlushCommandQueue();
 		ThrowIfFailed(CommandList->Reset(CommandListAllocator.Get(), nullptr));
 
 		BuildPSOs();
@@ -173,7 +211,7 @@ void Game::Draw(const Timer& timer)
 		ThrowIfFailed(CommandList->Close());
 		ID3D12CommandList* cmdsLists[] = { CommandList.Get() };
 		CommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
-
+		
 		FlushCommandQueue();
 	}
 
@@ -210,98 +248,23 @@ void Game::ImGuiDraw(bool* changePso)
 void Game::UpdateMainPassCB(const Timer& timer)
 {
 	auto currObjectCB = currentFrameResource->ObjectCB.get();
-	for (auto& e : AllRitems)
-	{
-		// Only update the cbuffer data if the constants have changed.  
-		// This needs to be tracked per frame resource.
-		//if (e->NumFramesDirty > 0)
-		{
-			XMMATRIX world = XMLoadFloat4x4(&e->World);
-			XMMATRIX view = XMLoadFloat4x4(&mainCamera->GetViewMatrix());
-			XMMATRIX projection = XMLoadFloat4x4(&mainCamera->GetProjectionMatrix());
+	XMMATRIX world = XMLoadFloat4x4(&MathHelper::Identity4x4());
+	XMMATRIX view = XMLoadFloat4x4(&mainCamera->GetViewMatrix());
+	XMMATRIX projection = XMLoadFloat4x4(&mainCamera->GetProjectionMatrix());
 
-			ObjectConstants objConstants;
-			XMStoreFloat4x4(&objConstants.World, XMMatrixTranspose(world));
-			XMStoreFloat4x4(&objConstants.View, XMMatrixTranspose(view));
-			XMStoreFloat4x4(&objConstants.Projection, XMMatrixTranspose(projection));
-			objConstants.CamPosition = mainCamera->GetPosition();
-			objConstants.AspectRatio = (float)screenWidth / screenHeight;
+	ObjectConstants objConstants;
+	XMStoreFloat4x4(&objConstants.World, XMMatrixTranspose(world));
+	XMStoreFloat4x4(&objConstants.View, XMMatrixTranspose(view));
+	XMStoreFloat4x4(&objConstants.Projection, XMMatrixTranspose(projection));
+	objConstants.CamPosition = mainCamera->GetPosition();
+	objConstants.AspectRatio = (float)screenWidth / screenHeight;
 
-			currObjectCB->CopyData(e->ObjCBIndex, objConstants);
-
-			// Next FrameResource need to be updated too.
-			e->NumFramesDirty--;
-		}
-	}
-}
-
-void Game::BuildGeometry()
-{
-	GeometryGenerator geoGen;
-	GeometryGenerator::MeshData grid = geoGen.CreateGrid(50.0f, 50.0f, 100, 100);
-
-	SubmeshGeometry gridSubmesh;
-	gridSubmesh.IndexCount = (UINT)grid.Indices32.size();
-	gridSubmesh.StartIndexLocation = 0;
-	gridSubmesh.BaseVertexLocation = 0;
-
-	auto totalVertexCount = grid.Vertices.size();
-
-	std::vector<Vertex> vertices(totalVertexCount);
-
-	UINT k = 0;
-
-	for (size_t i = 0; i < grid.Vertices.size(); ++i, ++k)
-	{
-		vertices[k].Position = grid.Vertices[i].Position;
-		vertices[k].Normal = grid.Vertices[i].Normal;
-		vertices[k].UV = grid.Vertices[i].TexC;
-	}
-
-	std::vector<std::uint16_t> indices;
-	indices.insert(indices.end(), std::begin(grid.GetIndices16()), std::end(grid.GetIndices16()));
-
-	const UINT vbByteSize = (UINT)vertices.size() * sizeof(Vertex);
-	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
-
-	auto geo = std::make_unique<MeshGeometry>();
-	geo->Name = "shapeGeo";
-
-	ThrowIfFailed(D3DCreateBlob(vbByteSize, &geo->VertexBufferCPU));
-	CopyMemory(geo->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
-
-	ThrowIfFailed(D3DCreateBlob(ibByteSize, &geo->IndexBufferCPU));
-	CopyMemory(geo->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
-
-	geo->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(Device.Get(),
-		CommandList.Get(), vertices.data(), vbByteSize, geo->VertexBufferUploader);
-
-	geo->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(Device.Get(),
-		CommandList.Get(), indices.data(), ibByteSize, geo->IndexBufferUploader);
-
-	geo->VertexByteStride = sizeof(Vertex);
-	geo->VertexBufferByteSize = vbByteSize;
-	geo->IndexFormat = DXGI_FORMAT_R16_UINT;
-	geo->IndexBufferByteSize = ibByteSize;
-
-	geo->DrawArgs["grid"] = gridSubmesh;
-
-	Geometries[geo->Name] = std::move(geo);
-
-	auto gridRitem = std::make_unique<RenderItem>();
-	XMStoreFloat4x4(&gridRitem->World, XMMatrixScaling(5.0f, 1.0f, 5.0f) * XMMatrixTranslation(0.0f, 0.0f, 0.0f));
-	gridRitem->ObjCBIndex = 0;
-	gridRitem->Geo = Geometries["shapeGeo"].get();
-	gridRitem->PrimitiveType = D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST;
-	gridRitem->IndexCount = gridRitem->Geo->DrawArgs["grid"].IndexCount;
-	gridRitem->StartIndexLocation = gridRitem->Geo->DrawArgs["grid"].StartIndexLocation;
-	gridRitem->BaseVertexLocation = gridRitem->Geo->DrawArgs["grid"].BaseVertexLocation;
-	AllRitems.push_back(std::move(gridRitem));
+	currObjectCB->CopyData(0, objConstants);
 }
 
 void Game::BuildUAVs()
 {
-	int vertexCount = 100;
+	int vertexCount = 58806; // TODO:
 
 	// Vertex Pool
 	{
@@ -418,21 +381,46 @@ void Game::BuildUAVs()
 		DrawArgsCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 3, CBVSRVUAVDescriptorSize);
 		DrawArgsGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 3, CBVSRVUAVDescriptorSize);
 		Device->CreateUnorderedAccessView(RWDrawArgs.Get(), RWDrawArgs.Get(), &drawArgsUAVDescription, DrawArgsCPUUAV);
-	}
+	}	
+}
+
+void Game::UploadMeshData()
+{
+	GeometryGenerator geoGen;
+	GeometryGenerator::MeshData grid = geoGen.CreateGrid(250.0f, 250.0f, 100, 100);
+
+	VertexPoolUploadBuffer = std::make_unique<UploadBuffer<DirectX::XMFLOAT3>>(Device.Get(), grid.Indices32.size(), false);
+	
+	for (int i = 0; i < grid.Indices32.size(); i++)
+		VertexPoolUploadBuffer->CopyData(i, grid.Vertices[grid.Indices32[i]].Position);
+
+	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWVertexPool.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+
+	CommandList->CopyResource(RWVertexPool.Get(), VertexPoolUploadBuffer->Resource());
+
+	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWVertexPool.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON));
 }
 
 void Game::BuildRootSignature()
 {
 	// opaque root signature
 	{
+		CD3DX12_DESCRIPTOR_RANGE srvTable0;
+		srvTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+
+		CD3DX12_DESCRIPTOR_RANGE srvTable1;
+		srvTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
+
 		// Root parameter can be a table, root descriptor or root constants.
-		CD3DX12_ROOT_PARAMETER slotRootParameter[1];
+		CD3DX12_ROOT_PARAMETER slotRootParameter[3];
 		slotRootParameter[0].InitAsConstantBufferView(0);
+		slotRootParameter[1].InitAsDescriptorTable(1, &srvTable0);
+		slotRootParameter[2].InitAsDescriptorTable(1, &srvTable1);
 
 		auto staticSamplers = GetStaticSamplers();
 
 		// A root signature is an array of root parameters.
-		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(1, slotRootParameter,
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(3, slotRootParameter,
 			(UINT)staticSamplers.size(),
 			staticSamplers.data(),
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -458,18 +446,26 @@ void Game::BuildRootSignature()
 
 	// tessellation root signature
 	{
-		CD3DX12_DESCRIPTOR_RANGE uavTable;
-		uavTable.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 3, 0);
+		CD3DX12_DESCRIPTOR_RANGE uavTable0;
+		uavTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+
+		CD3DX12_DESCRIPTOR_RANGE uavTable1;
+		uavTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
+
+		CD3DX12_DESCRIPTOR_RANGE uavTable2;
+		uavTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 2);
 
 		// Root parameter can be a table, root descriptor or root constants.
-		CD3DX12_ROOT_PARAMETER slotRootParameter[2];
+		CD3DX12_ROOT_PARAMETER slotRootParameter[4];
 		slotRootParameter[0].InitAsConstantBufferView(0);
-		slotRootParameter[1].InitAsDescriptorTable(1, &uavTable);
+		slotRootParameter[1].InitAsDescriptorTable(1, &uavTable0);
+		slotRootParameter[2].InitAsDescriptorTable(1, &uavTable1);
+		slotRootParameter[3].InitAsDescriptorTable(1, &uavTable2);
 
 		auto staticSamplers = GetStaticSamplers();
 
 		// A root signature is an array of root parameters.
-		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2, slotRootParameter,
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(4, slotRootParameter,
 			(UINT)staticSamplers.size(),
 			staticSamplers.data(),
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);

@@ -14,11 +14,6 @@ RWStructuredBuffer<uint> DrawArgs : register(u2);
 [numthreads(32, 1, 1)]
 void main(uint id : SV_DispatchThreadID)
 {
-    if (id.x >= 100)
-        return;
-    
-    VertexPool[id.x] = id.x;
-
-	uint drawIndex = DrawList.IncrementCounter();
-    DrawList[drawIndex] = id.x;
+    uint drawIndex = DrawList.IncrementCounter();
+    DrawList[drawIndex] = drawIndex;
 }
