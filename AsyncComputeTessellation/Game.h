@@ -34,27 +34,30 @@ private:
 	ComPtr<ID3D12RootSignature> tessellationComputeRootSignature = nullptr;
 	ComPtr<ID3D12CommandSignature> tessellationCommandSignature = nullptr;
 
-	ComPtr<ID3D12Resource> RWVertexPool = nullptr;
-	ComPtr<ID3D12Resource> RWDrawList = nullptr;
+	ComPtr<ID3D12Resource> RWMeshData = nullptr;
 	ComPtr<ID3D12Resource> RWDrawArgs = nullptr;
+	ComPtr<ID3D12Resource> RWSubdBuffer = nullptr;
+	ComPtr<ID3D12Resource> RWLeafBuffer = nullptr;
 
-	std::unique_ptr<UploadBuffer<DirectX::XMFLOAT3>> VertexPoolUploadBuffer;
-	ComPtr<ID3D12Resource> DrawListUploadBuffer = nullptr; // TODO: to UploadBuffer<>
+	std::unique_ptr<UploadBuffer<DirectX::XMFLOAT3>> MeshDataUploadBuffer;
+	std::unique_ptr<UploadBuffer<DirectX::XMUINT4>> SubdBufferUploadBuffer;
+	std::unique_ptr<UploadBuffer<IndirectCommand>> IndirectCommandUploadBuffer;
+	std::unique_ptr<MeshGeometry> LeafGeoUpload;
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE VertexPoolCPUSRV;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE VertexPoolGPUSRV;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE MeshDataCPUSRV;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE MeshDataGPUSRV;
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE VertexPoolCPUUAV;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE VertexPoolGPUUAV;
-
-	CD3DX12_CPU_DESCRIPTOR_HANDLE DrawListCPUSRV;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE DrawListGPUSRV;
-
-	CD3DX12_CPU_DESCRIPTOR_HANDLE DrawListCPUUAV;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE DrawListGPUUAV;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE MeshDataCPUUAV;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE MeshDataGPUUAV;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE DrawArgsCPUUAV;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE DrawArgsGPUUAV;
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdBufferCPUSRV;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdBufferGPUSRV;
+								  
+	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdBufferCPUUAV;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdBufferGPUUAV;
 
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> Shaders;
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> PSOs;

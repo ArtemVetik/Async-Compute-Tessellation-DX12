@@ -19,6 +19,12 @@ struct TimeConstants
 	float TotalTime = 0.0f;
 };
 
+struct IndirectCommand
+{
+	D3D12_VERTEX_BUFFER_VIEW VertexBufferView;
+	D3D12_DRAW_ARGUMENTS DrawArguments;
+};
+
 // stores the resources needed for the CPU to build the command lists for a frame 
 struct FrameResource
 {

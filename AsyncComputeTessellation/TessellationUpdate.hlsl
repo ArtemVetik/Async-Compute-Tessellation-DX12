@@ -7,13 +7,12 @@ cbuffer objectData : register(b0)
     float aspectRatio;
 };
 
-RWStructuredBuffer<float3> VertexPool : register(u0);
-RWStructuredBuffer<uint> DrawList : register(u1);
-RWStructuredBuffer<uint> DrawArgs : register(u2);
+RWStructuredBuffer<float3> MeshData : register(u0);
+RWStructuredBuffer<uint> DrawArgs : register(u1);
+RWStructuredBuffer<uint4> SubdBuffer : register(u2);
 
-[numthreads(32, 1, 1)]
+[numthreads(8, 1, 1)]
 void main(uint id : SV_DispatchThreadID)
 {
-    uint drawIndex = DrawList.IncrementCounter();
-    DrawList[drawIndex] = drawIndex;
+    SubdBuffer.IncrementCounter();
 }
