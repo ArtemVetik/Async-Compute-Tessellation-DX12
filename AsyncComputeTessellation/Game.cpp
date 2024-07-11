@@ -8,6 +8,7 @@ Game::Game(HINSTANCE hInstance) : DXCore(hInstance)
 
 	systemData = new SystemData();
 	inputManager = new InputManager();
+	pingPongCounter = 0;
 }
 
 Game::~Game()
@@ -113,21 +114,24 @@ void Game::Draw(const Timer& timer)
 
 	CommandList->SetComputeRootDescriptorTable(1, MeshDataGPUUAV);
 	CommandList->SetComputeRootDescriptorTable(2, DrawArgsGPUUAV);
-	CommandList->SetComputeRootDescriptorTable(3, SubdBufferGPUUAV);
+	CommandList->SetComputeRootDescriptorTable(3 + pingPongCounter, SubdBufferInGPUUAV);
+	CommandList->SetComputeRootDescriptorTable(4 - pingPongCounter, SubdBufferOutGPUUAV);
 
-	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdBuffer.Get(),
+	CommandList->SetComputeRootDescriptorTable(5, SubdCounterGPUUAV);
+
+	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdBufferIn.Get(),
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST));
 
-	CommandList->CopyResource(RWSubdBuffer.Get(), SubdBufferUploadBuffer->Resource());
+	CommandList->CopyResource(RWSubdBufferIn.Get(), SubdBufferInUploadBuffer->Resource());
 
-	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdBuffer.Get(),
+	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdBufferIn.Get(),
 		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
 	CommandList->SetPipelineState(PSOs["tessellationUpdate"].Get());
 	CommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
 	CommandList->Dispatch(3, 1, 1);
 
-	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBuffer.Get()));
+	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferIn.Get()));
 
 	CommandList->SetPipelineState(PSOs["tessellationCopyDraw"].Get());
 	CommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
@@ -159,7 +163,10 @@ void Game::Draw(const Timer& timer)
 	CommandList->SetGraphicsRootConstantBufferView(0, objCBAddress);
 
 	CommandList->SetGraphicsRootDescriptorTable(1, MeshDataGPUSRV);
-	CommandList->SetGraphicsRootDescriptorTable(2, SubdBufferGPUSRV);
+	if (pingPongCounter == 0)
+		CommandList->SetGraphicsRootDescriptorTable(2, SubdBufferOutGPUSRV);
+	else
+		CommandList->SetGraphicsRootDescriptorTable(2, SubdBufferInGPUSRV);
 
 	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(),
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
@@ -216,6 +223,7 @@ void Game::Draw(const Timer& timer)
 		FlushCommandQueue();
 	}
 
+	pingPongCounter = 1 - pingPongCounter;
 	PrintInfoMessages();
 }
 
@@ -301,8 +309,8 @@ void Game::BuildUAVs()
 		MeshDataGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 1, CBVSRVUAVDescriptorSize);
 		Device->CreateUnorderedAccessView(RWMeshData.Get(), nullptr, &meshDataUAVDescription, MeshDataCPUUAV);
 
-		MeshDataCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 4, CBVSRVUAVDescriptorSize);
-		MeshDataGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 4, CBVSRVUAVDescriptorSize);
+		MeshDataCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 2, CBVSRVUAVDescriptorSize);
+		MeshDataGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 2, CBVSRVUAVDescriptorSize);
 		Device->CreateShaderResourceView(RWMeshData.Get(), &meshDataSRVDescription, MeshDataCPUSRV);
 	}
 
@@ -331,23 +339,31 @@ void Game::BuildUAVs()
 
 		DrawArgsCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 3, CBVSRVUAVDescriptorSize);
 		DrawArgsGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 3, CBVSRVUAVDescriptorSize);
-		Device->CreateUnorderedAccessView(RWDrawArgs.Get(), RWDrawArgs.Get(), &drawArgsUAVDescription, DrawArgsCPUUAV);
+		Device->CreateUnorderedAccessView(RWDrawArgs.Get(), nullptr, &drawArgsUAVDescription, DrawArgsCPUUAV);
 	}
 
-	// Subd Buffer
+	// Subd Buffer In/Out
 	{
 		int subdSize = 100; // TODO: size
 		UINT64 subdBufferByteSize = sizeof(XMUINT4) * subdSize;
-		UINT64 countBufferOffset = AlignForUavCounter(subdBufferByteSize);
 
 		ThrowIfFailed(Device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(countBufferOffset + sizeof(UINT), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
+			&CD3DX12_RESOURCE_DESC::Buffer(subdBufferByteSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
 			D3D12_RESOURCE_STATE_COMMON,
 			nullptr,
-			IID_PPV_ARGS(&RWSubdBuffer)));
-		RWSubdBuffer->SetName(L"SubdBuffer");
+			IID_PPV_ARGS(&RWSubdBufferIn)));
+		RWSubdBufferIn->SetName(L"SubdBufferIn");
+
+		ThrowIfFailed(Device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(subdBufferByteSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
+			D3D12_RESOURCE_STATE_COMMON,
+			nullptr,
+			IID_PPV_ARGS(&RWSubdBufferOut)));
+		RWSubdBufferOut->SetName(L"SubdBufferOut");
 
 		D3D12_UNORDERED_ACCESS_VIEW_DESC subdBufferUAVDescription = {};
 
@@ -355,7 +371,7 @@ void Game::BuildUAVs()
 		subdBufferUAVDescription.Buffer.FirstElement = 0;
 		subdBufferUAVDescription.Buffer.NumElements = subdSize;
 		subdBufferUAVDescription.Buffer.StructureByteStride = sizeof(DirectX::XMUINT4);
-		subdBufferUAVDescription.Buffer.CounterOffsetInBytes = countBufferOffset;
+		subdBufferUAVDescription.Buffer.CounterOffsetInBytes = 0;
 		subdBufferUAVDescription.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC subdBufferSRVDescription = {};
@@ -366,15 +382,51 @@ void Game::BuildUAVs()
 		subdBufferSRVDescription.Buffer.NumElements = subdSize;
 		subdBufferSRVDescription.Buffer.StructureByteStride = sizeof(DirectX::XMUINT4);
 
-		SubdBufferCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 6, CBVSRVUAVDescriptorSize);
-		SubdBufferGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 6, CBVSRVUAVDescriptorSize);
-		Device->CreateUnorderedAccessView(RWSubdBuffer.Get(), RWSubdBuffer.Get(), &subdBufferUAVDescription, SubdBufferCPUUAV);
+		SubdBufferInCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 4, CBVSRVUAVDescriptorSize);
+		SubdBufferInGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 4, CBVSRVUAVDescriptorSize);
+		Device->CreateUnorderedAccessView(RWSubdBufferIn.Get(), nullptr, &subdBufferUAVDescription, SubdBufferInCPUUAV);
 
-		SubdBufferCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 7, CBVSRVUAVDescriptorSize);
-		SubdBufferGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 7, CBVSRVUAVDescriptorSize);
-		Device->CreateShaderResourceView(RWSubdBuffer.Get(), &subdBufferSRVDescription, SubdBufferCPUSRV);
+		SubdBufferOutCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 5, CBVSRVUAVDescriptorSize);
+		SubdBufferOutGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 5, CBVSRVUAVDescriptorSize);
+		Device->CreateUnorderedAccessView(RWSubdBufferOut.Get(), nullptr, &subdBufferUAVDescription, SubdBufferOutCPUUAV);
 
-		SubdBufferUploadBuffer = std::make_unique<UploadBuffer<DirectX::XMUINT4>>(Device.Get(), countBufferOffset + sizeof(UINT));
+		SubdBufferInCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 6, CBVSRVUAVDescriptorSize);
+		SubdBufferInGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 6, CBVSRVUAVDescriptorSize);
+		Device->CreateShaderResourceView(RWSubdBufferIn.Get(), &subdBufferSRVDescription, SubdBufferInCPUSRV);
+
+		SubdBufferOutCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 7, CBVSRVUAVDescriptorSize);
+		SubdBufferOutGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 7, CBVSRVUAVDescriptorSize);
+		Device->CreateShaderResourceView(RWSubdBufferOut.Get(), &subdBufferSRVDescription, SubdBufferOutCPUSRV);
+
+		SubdBufferInUploadBuffer = std::make_unique<UploadBuffer<DirectX::XMUINT4>>(Device.Get(), subdBufferByteSize);
+	}
+
+	// Subd Counter
+	{
+		UINT64 subdCounterByteSize = (sizeof(unsigned int) * 2);
+
+		ThrowIfFailed(Device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(subdCounterByteSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
+			D3D12_RESOURCE_STATE_COMMON,
+			nullptr,
+			IID_PPV_ARGS(&RWSubdCounter)));
+		RWSubdCounter.Get()->SetName(L"SubdCounter");
+
+		D3D12_UNORDERED_ACCESS_VIEW_DESC subdCounterUAVDescription = {};
+
+		subdCounterUAVDescription.Format = DXGI_FORMAT_UNKNOWN;
+		subdCounterUAVDescription.Buffer.FirstElement = 0;
+		subdCounterUAVDescription.Buffer.NumElements = 2;
+		subdCounterUAVDescription.Buffer.StructureByteStride = sizeof(unsigned int);
+		subdCounterUAVDescription.Buffer.CounterOffsetInBytes = 0;
+		subdCounterUAVDescription.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
+		subdCounterUAVDescription.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+
+		SubdCounterCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 8, CBVSRVUAVDescriptorSize);
+		SubdCounterGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 8, CBVSRVUAVDescriptorSize);
+		Device->CreateUnorderedAccessView(RWSubdCounter.Get(), 0, &subdCounterUAVDescription, SubdCounterCPUUAV);
 	}
 }
 
@@ -382,7 +434,7 @@ void Game::UploadMeshData()
 {
 	GeometryGenerator geoGen;
 	GeometryGenerator::MeshData grid = geoGen.CreateGrid(250.0f, 250.0f, 4, 4);
-	
+
 	// Vertex Pool 
 	{
 		MeshDataUploadBuffer = std::make_unique<UploadBuffer<DirectX::XMFLOAT3>>(Device.Get(), grid.Indices32.size(), false);
@@ -395,14 +447,26 @@ void Game::UploadMeshData()
 		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWMeshData.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON));
 	}
 
-	// Subd Buffer
+	// Subd In Buffer
 	{
 		for (int i = 0; i < grid.Indices32.size() / 3; i++)
-			SubdBufferUploadBuffer->CopyData(i, XMUINT4(0, 0x1, i, 1));
+			SubdBufferInUploadBuffer->CopyData(i, XMUINT4(0, 0x1, i, 1));
 
-		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdBuffer.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
-		CommandList->CopyResource(RWSubdBuffer.Get(), SubdBufferUploadBuffer->Resource());
-		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdBuffer.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdBufferIn.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+		CommandList->CopyResource(RWSubdBufferIn.Get(), SubdBufferInUploadBuffer->Resource());
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdBufferIn.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+	}
+
+	// Subd Counter
+	{
+		SubdCounterUploadBuffer = std::make_unique<UploadBuffer<UINT>>(Device.Get(), 2, false);
+
+		SubdCounterUploadBuffer->CopyData(0, grid.Indices32.size() / 3);
+		SubdCounterUploadBuffer->CopyData(1, 0);
+
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdCounter.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+		CommandList->CopyResource(RWSubdCounter.Get(), SubdCounterUploadBuffer->Resource());
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdCounter.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 	}
 
 	// Leaf Geometry
@@ -490,17 +554,25 @@ void Game::BuildRootSignature()
 		CD3DX12_DESCRIPTOR_RANGE uavTable2;
 		uavTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 2);
 
+		CD3DX12_DESCRIPTOR_RANGE uavTable3;
+		uavTable3.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 3);
+
+		CD3DX12_DESCRIPTOR_RANGE uavTable4;
+		uavTable4.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 4);
+
 		// Root parameter can be a table, root descriptor or root constants.
-		CD3DX12_ROOT_PARAMETER slotRootParameter[4];
+		CD3DX12_ROOT_PARAMETER slotRootParameter[6];
 		slotRootParameter[0].InitAsConstantBufferView(0);
 		slotRootParameter[1].InitAsDescriptorTable(1, &uavTable0);
 		slotRootParameter[2].InitAsDescriptorTable(1, &uavTable1);
 		slotRootParameter[3].InitAsDescriptorTable(1, &uavTable2);
+		slotRootParameter[4].InitAsDescriptorTable(1, &uavTable3);
+		slotRootParameter[5].InitAsDescriptorTable(1, &uavTable4);
 
 		auto staticSamplers = GetStaticSamplers();
 
 		// A root signature is an array of root parameters.
-		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(4, slotRootParameter,
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(6, slotRootParameter,
 			(UINT)staticSamplers.size(),
 			staticSamplers.data(),
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);

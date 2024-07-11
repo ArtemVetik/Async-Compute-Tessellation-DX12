@@ -36,12 +36,14 @@ private:
 
 	ComPtr<ID3D12Resource> RWMeshData = nullptr;
 	ComPtr<ID3D12Resource> RWDrawArgs = nullptr;
-	ComPtr<ID3D12Resource> RWSubdBuffer = nullptr;
-	ComPtr<ID3D12Resource> RWLeafBuffer = nullptr;
+	ComPtr<ID3D12Resource> RWSubdBufferIn = nullptr;
+	ComPtr<ID3D12Resource> RWSubdBufferOut = nullptr;
+	ComPtr<ID3D12Resource> RWSubdCounter = nullptr;
 
 	std::unique_ptr<UploadBuffer<DirectX::XMFLOAT3>> MeshDataUploadBuffer;
-	std::unique_ptr<UploadBuffer<DirectX::XMUINT4>> SubdBufferUploadBuffer;
+	std::unique_ptr<UploadBuffer<DirectX::XMUINT4>> SubdBufferInUploadBuffer;
 	std::unique_ptr<UploadBuffer<IndirectCommand>> IndirectCommandUploadBuffer;
+	std::unique_ptr<UploadBuffer<UINT>> SubdCounterUploadBuffer;
 	std::unique_ptr<MeshGeometry> LeafGeoUpload;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE MeshDataCPUSRV;
@@ -52,12 +54,21 @@ private:
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE DrawArgsCPUUAV;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE DrawArgsGPUUAV;
-
-	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdBufferCPUSRV;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdBufferGPUSRV;
 								  
-	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdBufferCPUUAV;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdBufferGPUUAV;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdBufferInCPUUAV;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdBufferInGPUUAV;
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdBufferInCPUSRV;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdBufferInGPUSRV;
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdBufferOutCPUSRV;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdBufferOutGPUSRV;
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdBufferOutCPUUAV;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdBufferOutGPUUAV;
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdCounterCPUUAV;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdCounterGPUUAV;
 
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> Shaders;
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> PSOs;
@@ -71,6 +82,8 @@ private:
 	SystemData *systemData;
 
 	ImguiParams imguiParams;
+
+	BYTE pingPongCounter;
 
 	virtual void Resize()override;
 	virtual void Update(const Timer& timer)override;

@@ -25,14 +25,14 @@ struct VertexOut
 };
 
 StructuredBuffer<float3> MeshData : register(t0);
-StructuredBuffer<uint4> SubdBuffer : register(t1);
+StructuredBuffer<uint4> SubdBufferOut : register(t1);
 
 VertexOut main(VertexIn vIn, uint instanceID : SV_InstanceID)
 {
     VertexOut output;
     
     float2 leaf_pos = vIn.PosL.xy;
-    uint4 key = SubdBuffer[instanceID];
+    uint4 key = SubdBufferOut[instanceID];
     
     float3 v1 = MeshData.Load(key.z * 3 + 0);
     float3 v2 = MeshData.Load(key.z * 3 + 1);
@@ -45,7 +45,7 @@ VertexOut main(VertexIn vIn, uint instanceID : SV_InstanceID)
     float2 tree_pos = mul(float3(leaf_pos, 1), xf);
     
     float3 vertex = v1 * (1.0 - tree_pos.x - tree_pos.y) + v3 * tree_pos.x + v2 * tree_pos.y;
-    
+
     float4 posW = mul(float4(vertex, 1.0f), world);
     
     //posW = float4(displaceVertex(posW.xyz, camPosition), 1);
