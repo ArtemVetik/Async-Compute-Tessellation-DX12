@@ -227,7 +227,7 @@ void Game::Draw(const Timer& timer)
 	PrintInfoMessages();
 }
 
-void Game::ImGuiDraw(bool* changePso)
+void Game::ImGuiDraw(bool* changePso) // TODO: optimize for different changes
 {
 	ImGui_ImplDX12_NewFrame();
 	ImGui_ImplWin32_NewFrame();
@@ -249,6 +249,9 @@ void Game::ImGuiDraw(bool* changePso)
 		*changePso = true;
 
 	if (ImGui::SliderInt("GPU Lod Level", &imguiParams.GPULodLevel, 0, 16))
+		*changePso = true;
+
+	if (ImGui::Checkbox("Displace Mapping", &imguiParams.UseDisplaceMapping))
 		*changePso = true;
 
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
@@ -480,7 +483,7 @@ void Game::UploadMeshData()
 	{
 		if (MeshDataVertexUploadBuffer == nullptr)
 			MeshDataVertexUploadBuffer = std::make_unique<UploadBuffer<DirectX::XMFLOAT3>>(Device.Get(), grid.Vertices.size(), false);
-		
+
 		for (int i = 0; i < grid.Vertices.size(); i++)
 			MeshDataVertexUploadBuffer->CopyData(i, grid.Vertices[i].Position);
 
@@ -514,7 +517,7 @@ void Game::UploadMeshData()
 		CommandList->CopyBufferRegion(RWSubdBufferIn.Get(), 0, SubdBufferInUploadBuffer->Resource(), 0, grid.Indices32.size() / 3 * sizeof(XMUINT4));
 		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdBufferIn.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 	}
-	
+
 	// Subd Counter
 	{
 		if (SubdCounterUploadBuffer == nullptr)
@@ -527,7 +530,7 @@ void Game::UploadMeshData()
 		CommandList->CopyResource(RWSubdCounter.Get(), SubdCounterUploadBuffer->Resource());
 		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdCounter.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 	}
-	
+
 	// Leaf Geometry
 	{
 		MeshGeometry* mesh = bintree->BuildLeafMesh(imguiParams.CPULodLevel);
@@ -669,10 +672,16 @@ void Game::BuildRootSignature()
 
 void Game::BuildShadersAndInputLayout()
 {
-	Shaders["OpaqueVS"] = d3dUtil::CompileShader(L"DefaultVS.hlsl", nullptr, "main", "vs_5_1");
-	Shaders["OpaquePS"] = d3dUtil::CompileShader(L"DefaultPS.hlsl", nullptr, "main", "ps_5_1");
-	Shaders["TessellationUpdate"] = d3dUtil::CompileShader(L"TessellationUpdate.hlsl", nullptr, "main", "cs_5_1");
-	Shaders["TessellationCopyDraw"] = d3dUtil::CompileShader(L"TessellationCopyDraw.hlsl", nullptr, "main", "cs_5_1");
+	D3D_SHADER_MACRO macros[] =
+	{
+		{"USE_DISPLACE", imguiParams.UseDisplaceMapping ? "1" : "0"},
+		{NULL, NULL}
+	};
+
+	Shaders["OpaqueVS"] = d3dUtil::CompileShader(L"DefaultVS.hlsl", macros, "main", "vs_5_1");
+	Shaders["OpaquePS"] = d3dUtil::CompileShader(L"DefaultPS.hlsl", macros, "main", "ps_5_1");
+	Shaders["TessellationUpdate"] = d3dUtil::CompileShader(L"TessellationUpdate.hlsl", macros, "main", "cs_5_1");
+	Shaders["TessellationCopyDraw"] = d3dUtil::CompileShader(L"TessellationCopyDraw.hlsl", macros, "main", "cs_5_1");
 
 	geoInputLayout =
 	{

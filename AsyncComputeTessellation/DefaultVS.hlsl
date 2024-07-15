@@ -49,7 +49,9 @@ VertexOut main(VertexIn vIn, uint instanceID : SV_InstanceID)
 
     float4 posW = mul(float4(vertex, 1.0f), world);
     
+#if USE_DISPLACE
     posW = float4(displaceVertex(posW.xyz, camPosition), 1);
+#endif
     
     output.PosW = posW;
     output.NormalW = 1;
