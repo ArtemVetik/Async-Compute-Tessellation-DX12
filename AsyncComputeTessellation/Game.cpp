@@ -118,12 +118,10 @@ void Game::Draw(const Timer& timer)
 	auto tessellationCB = currentFrameResource->TessellationCB->Resource();
 	CommandList->SetComputeRootConstantBufferView(0, tessellationCB->GetGPUVirtualAddress());
 
-	CommandList->SetComputeRootDescriptorTable(1, MeshDataGPUUAV);
-	CommandList->SetComputeRootDescriptorTable(2, DrawArgsGPUUAV);
-	CommandList->SetComputeRootDescriptorTable(3 + pingPongCounter, SubdBufferInGPUUAV);
-	CommandList->SetComputeRootDescriptorTable(4 - pingPongCounter, SubdBufferOutGPUUAV);
-
-	CommandList->SetComputeRootDescriptorTable(5, SubdCounterGPUUAV);
+	CommandList->SetComputeRootDescriptorTable(1, DrawArgsGPUUAV);
+	CommandList->SetComputeRootDescriptorTable(2 + pingPongCounter, SubdBufferInGPUUAV);
+	CommandList->SetComputeRootDescriptorTable(3 - pingPongCounter, SubdBufferOutGPUUAV);
+	CommandList->SetComputeRootDescriptorTable(4, SubdCounterGPUUAV);
 
 	CommandList->SetPipelineState(PSOs["tessellationUpdate"].Get());
 	CommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
@@ -161,11 +159,12 @@ void Game::Draw(const Timer& timer)
 	D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objectCB->GetGPUVirtualAddress();
 	CommandList->SetGraphicsRootConstantBufferView(0, objCBAddress);
 
-	CommandList->SetGraphicsRootDescriptorTable(1, MeshDataGPUSRV);
+	CommandList->SetGraphicsRootDescriptorTable(1, MeshDataVertexGPUSRV);
+	CommandList->SetGraphicsRootDescriptorTable(2, MeshDataIndexGPUSRV);
 	if (pingPongCounter == 0)
-		CommandList->SetGraphicsRootDescriptorTable(2, SubdBufferOutGPUSRV);
+		CommandList->SetGraphicsRootDescriptorTable(3, SubdBufferOutGPUSRV);
 	else
-		CommandList->SetGraphicsRootDescriptorTable(2, SubdBufferInGPUSRV);
+		CommandList->SetGraphicsRootDescriptorTable(3, SubdBufferInGPUSRV);
 
 	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(),
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
@@ -287,45 +286,74 @@ void Game::UpdateMainPassCB(const Timer& timer)
 
 void Game::BuildUAVs()
 {
-	int vertexCount = 6; // TODO:
-
-	// Vertex Pool
+	// Mesh Data Vertices
 	{
-		// TODO: make vertex and index buffer;
-		UINT64 meshDataByteSize = sizeof(DirectX::XMFLOAT3) * vertexCount;
+		int vertexCount = 4; // TODO: calculate the required buffer size
+		UINT64 meshDataVertexByteSize = sizeof(DirectX::XMFLOAT3) * vertexCount;
 		ThrowIfFailed(Device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(meshDataByteSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
+			&CD3DX12_RESOURCE_DESC::Buffer(meshDataVertexByteSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
 			D3D12_RESOURCE_STATE_COMMON,
 			nullptr,
-			IID_PPV_ARGS(&RWMeshData)));
-		RWMeshData->SetName(L"MeshData");
+			IID_PPV_ARGS(&RWMeshDataVertex)));
+		RWMeshDataVertex->SetName(L"MeshDataVertex");
 
-		D3D12_UNORDERED_ACCESS_VIEW_DESC meshDataUAVDescription = {};
+		D3D12_UNORDERED_ACCESS_VIEW_DESC meshDataVertexUAVDescription = {};
 
-		meshDataUAVDescription.Format = DXGI_FORMAT_UNKNOWN;
-		meshDataUAVDescription.Buffer.FirstElement = 0;
-		meshDataUAVDescription.Buffer.NumElements = vertexCount;
-		meshDataUAVDescription.Buffer.StructureByteStride = sizeof(DirectX::XMFLOAT3);
-		meshDataUAVDescription.Buffer.CounterOffsetInBytes = 0;
-		meshDataUAVDescription.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+		meshDataVertexUAVDescription.Format = DXGI_FORMAT_UNKNOWN;
+		meshDataVertexUAVDescription.Buffer.FirstElement = 0;
+		meshDataVertexUAVDescription.Buffer.NumElements = vertexCount;
+		meshDataVertexUAVDescription.Buffer.StructureByteStride = sizeof(DirectX::XMFLOAT3);
+		meshDataVertexUAVDescription.Buffer.CounterOffsetInBytes = 0;
+		meshDataVertexUAVDescription.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
 
-		D3D12_SHADER_RESOURCE_VIEW_DESC meshDataSRVDescription = {};
-		meshDataSRVDescription.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		meshDataSRVDescription.Format = DXGI_FORMAT_UNKNOWN;
-		meshDataSRVDescription.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-		meshDataSRVDescription.Buffer.FirstElement = 0;
-		meshDataSRVDescription.Buffer.NumElements = vertexCount;
-		meshDataSRVDescription.Buffer.StructureByteStride = sizeof(DirectX::XMFLOAT3);
+		D3D12_SHADER_RESOURCE_VIEW_DESC meshDataVertexSRVDescription = {};
+		meshDataVertexSRVDescription.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		meshDataVertexSRVDescription.Format = DXGI_FORMAT_UNKNOWN;
+		meshDataVertexSRVDescription.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+		meshDataVertexSRVDescription.Buffer.FirstElement = 0;
+		meshDataVertexSRVDescription.Buffer.NumElements = vertexCount;
+		meshDataVertexSRVDescription.Buffer.StructureByteStride = sizeof(DirectX::XMFLOAT3);
 
-		MeshDataCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 1, CBVSRVUAVDescriptorSize);
-		MeshDataGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 1, CBVSRVUAVDescriptorSize);
-		Device->CreateUnorderedAccessView(RWMeshData.Get(), nullptr, &meshDataUAVDescription, MeshDataCPUUAV);
+		MeshDataVertexCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 1, CBVSRVUAVDescriptorSize);
+		MeshDataVertexGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 1, CBVSRVUAVDescriptorSize);
+		Device->CreateShaderResourceView(RWMeshDataVertex.Get(), &meshDataVertexSRVDescription, MeshDataVertexCPUSRV);
+	}
 
-		MeshDataCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 2, CBVSRVUAVDescriptorSize);
-		MeshDataGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 2, CBVSRVUAVDescriptorSize);
-		Device->CreateShaderResourceView(RWMeshData.Get(), &meshDataSRVDescription, MeshDataCPUSRV);
+	// Mesh Data Indices
+	{
+		int indexCount = 6; // TODO: calculate the required buffer size
+		UINT64 meshDataVertexByteSize = sizeof(UINT) * indexCount;
+		ThrowIfFailed(Device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(meshDataVertexByteSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
+			D3D12_RESOURCE_STATE_COMMON,
+			nullptr,
+			IID_PPV_ARGS(&RWMeshDataIndex)));
+		RWMeshDataIndex->SetName(L"MeshDataIndex");
+
+		D3D12_UNORDERED_ACCESS_VIEW_DESC meshDataIndexUAVDescription = {};
+
+		meshDataIndexUAVDescription.Format = DXGI_FORMAT_UNKNOWN;
+		meshDataIndexUAVDescription.Buffer.FirstElement = 0;
+		meshDataIndexUAVDescription.Buffer.NumElements = indexCount;
+		meshDataIndexUAVDescription.Buffer.StructureByteStride = sizeof(UINT);
+		meshDataIndexUAVDescription.Buffer.CounterOffsetInBytes = 0;
+		meshDataIndexUAVDescription.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC meshDataIndexSRVDescription = {};
+		meshDataIndexSRVDescription.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		meshDataIndexSRVDescription.Format = DXGI_FORMAT_UNKNOWN;
+		meshDataIndexSRVDescription.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+		meshDataIndexSRVDescription.Buffer.FirstElement = 0;
+		meshDataIndexSRVDescription.Buffer.NumElements = indexCount;
+		meshDataIndexSRVDescription.Buffer.StructureByteStride = sizeof(UINT);
+
+		MeshDataIndexCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 2, CBVSRVUAVDescriptorSize);
+		MeshDataIndexGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 2, CBVSRVUAVDescriptorSize);
+		Device->CreateShaderResourceView(RWMeshDataIndex.Get(), &meshDataIndexSRVDescription, MeshDataIndexCPUSRV);
 	}
 
 	// Draw Args
@@ -448,16 +476,30 @@ void Game::UploadMeshData()
 	GeometryGenerator geoGen;
 	GeometryGenerator::MeshData grid = geoGen.CreateGrid(250.0f, 250.0f, 2, 2);
 
-	// Vertex Pool 
+	// Mesh Data Vertex 
 	{
-		if (MeshDataUploadBuffer == nullptr)
-			MeshDataUploadBuffer = std::make_unique<UploadBuffer<DirectX::XMFLOAT3>>(Device.Get(), grid.Indices32.size(), false);
-		for (int i = 0; i < grid.Indices32.size(); i++)
-			MeshDataUploadBuffer->CopyData(i, grid.Vertices[grid.Indices32[i]].Position);
+		if (MeshDataVertexUploadBuffer == nullptr)
+			MeshDataVertexUploadBuffer = std::make_unique<UploadBuffer<DirectX::XMFLOAT3>>(Device.Get(), grid.Vertices.size(), false);
+		
+		for (int i = 0; i < grid.Vertices.size(); i++)
+			MeshDataVertexUploadBuffer->CopyData(i, grid.Vertices[i].Position);
 
-		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWMeshData.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
-		CommandList->CopyResource(RWMeshData.Get(), MeshDataUploadBuffer->Resource());
-		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWMeshData.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON));
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWMeshDataVertex.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+		CommandList->CopyResource(RWMeshDataVertex.Get(), MeshDataVertexUploadBuffer->Resource());
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWMeshDataVertex.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON));
+	}
+
+	// Mesh Data Index 
+	{
+		if (MeshDataIndexUploadBuffer == nullptr)
+			MeshDataIndexUploadBuffer = std::make_unique<UploadBuffer<UINT>>(Device.Get(), grid.Indices32.size(), false);
+
+		for (int i = 0; i < grid.Indices32.size(); i++)
+			MeshDataIndexUploadBuffer->CopyData(i, grid.Indices32[i]);
+
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWMeshDataIndex.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+		CommandList->CopyResource(RWMeshDataIndex.Get(), MeshDataIndexUploadBuffer->Resource());
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWMeshDataIndex.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON));
 	}
 
 	// Subd In Buffer
@@ -520,16 +562,20 @@ void Game::BuildRootSignature()
 		CD3DX12_DESCRIPTOR_RANGE srvTable1;
 		srvTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
 
+		CD3DX12_DESCRIPTOR_RANGE srvTable2;
+		srvTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2);
+
 		// Root parameter can be a table, root descriptor or root constants.
-		CD3DX12_ROOT_PARAMETER slotRootParameter[3];
+		CD3DX12_ROOT_PARAMETER slotRootParameter[4];
 		slotRootParameter[0].InitAsConstantBufferView(0);
 		slotRootParameter[1].InitAsDescriptorTable(1, &srvTable0);
 		slotRootParameter[2].InitAsDescriptorTable(1, &srvTable1);
+		slotRootParameter[3].InitAsDescriptorTable(1, &srvTable2);
 
 		auto staticSamplers = GetStaticSamplers();
 
 		// A root signature is an array of root parameters.
-		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(3, slotRootParameter,
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(4, slotRootParameter,
 			(UINT)staticSamplers.size(),
 			staticSamplers.data(),
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -567,22 +613,18 @@ void Game::BuildRootSignature()
 		CD3DX12_DESCRIPTOR_RANGE uavTable3;
 		uavTable3.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 3);
 
-		CD3DX12_DESCRIPTOR_RANGE uavTable4;
-		uavTable4.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 4);
-
 		// Root parameter can be a table, root descriptor or root constants.
-		CD3DX12_ROOT_PARAMETER slotRootParameter[6];
+		CD3DX12_ROOT_PARAMETER slotRootParameter[5];
 		slotRootParameter[0].InitAsConstantBufferView(0);
 		slotRootParameter[1].InitAsDescriptorTable(1, &uavTable0);
 		slotRootParameter[2].InitAsDescriptorTable(1, &uavTable1);
 		slotRootParameter[3].InitAsDescriptorTable(1, &uavTable2);
 		slotRootParameter[4].InitAsDescriptorTable(1, &uavTable3);
-		slotRootParameter[5].InitAsDescriptorTable(1, &uavTable4);
 
 		auto staticSamplers = GetStaticSamplers();
 
 		// A root signature is an array of root parameters.
-		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(6, slotRootParameter,
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(5, slotRootParameter,
 			(UINT)staticSamplers.size(),
 			staticSamplers.data(),
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);

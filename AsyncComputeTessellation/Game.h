@@ -35,22 +35,24 @@ private:
 	ComPtr<ID3D12RootSignature> tessellationComputeRootSignature = nullptr;
 	ComPtr<ID3D12CommandSignature> tessellationCommandSignature = nullptr;
 
-	ComPtr<ID3D12Resource> RWMeshData = nullptr;
+	ComPtr<ID3D12Resource> RWMeshDataVertex = nullptr;
+	ComPtr<ID3D12Resource> RWMeshDataIndex = nullptr;
 	ComPtr<ID3D12Resource> RWDrawArgs = nullptr;
 	ComPtr<ID3D12Resource> RWSubdBufferIn = nullptr;
 	ComPtr<ID3D12Resource> RWSubdBufferOut = nullptr;
 	ComPtr<ID3D12Resource> RWSubdCounter = nullptr;
 
-	std::unique_ptr<UploadBuffer<DirectX::XMFLOAT3>> MeshDataUploadBuffer;
+	std::unique_ptr<UploadBuffer<DirectX::XMFLOAT3>> MeshDataVertexUploadBuffer;
+	std::unique_ptr<UploadBuffer<UINT>> MeshDataIndexUploadBuffer;
 	std::unique_ptr<UploadBuffer<DirectX::XMUINT4>> SubdBufferInUploadBuffer;
 	std::unique_ptr<UploadBuffer<IndirectCommand>> IndirectCommandUploadBuffer;
 	std::unique_ptr<UploadBuffer<UINT>> SubdCounterUploadBuffer;
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE MeshDataCPUSRV;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE MeshDataGPUSRV;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE MeshDataVertexCPUSRV;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE MeshDataVertexGPUSRV;
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE MeshDataCPUUAV;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE MeshDataGPUUAV;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE MeshDataIndexCPUSRV;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE MeshDataIndexGPUSRV;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE DrawArgsCPUUAV;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE DrawArgsGPUUAV;

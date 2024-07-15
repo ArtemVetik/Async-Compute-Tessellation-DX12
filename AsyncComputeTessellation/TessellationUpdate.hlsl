@@ -6,11 +6,10 @@ cbuffer tessellationData : register(b0)
     uint3 padding;
 };
 
-RWStructuredBuffer<float3> MeshData : register(u0);
-RWStructuredBuffer<uint> DrawArgs : register(u1);
-RWStructuredBuffer<uint4> SubdBufferIn : register(u2);
-RWStructuredBuffer<uint4> SubdBufferOut : register(u3);
-RWStructuredBuffer<uint> SubdCounter : register(u4);
+RWStructuredBuffer<uint> DrawArgs : register(u0);
+RWStructuredBuffer<uint4> SubdBufferIn : register(u1);
+RWStructuredBuffer<uint4> SubdBufferOut : register(u2);
+RWStructuredBuffer<uint> SubdCounter : register(u3);
 
 void compute_writeKey(uint2 new_nodeID, uint4 current_key)
 {

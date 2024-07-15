@@ -23,8 +23,9 @@ struct VertexOut
 	float2 TexC    : TEXCOORD;
 };
 
-StructuredBuffer<float3> MeshData : register(t0);
-StructuredBuffer<uint4> SubdBufferOut : register(t1);
+StructuredBuffer<float3> MeshDataVertex : register(t0);
+StructuredBuffer<uint> MeshDataIndex : register(t1);
+StructuredBuffer<uint4> SubdBufferOut : register(t2);
 
 VertexOut main(VertexIn vIn, uint instanceID : SV_InstanceID)
 {
@@ -34,9 +35,13 @@ VertexOut main(VertexIn vIn, uint instanceID : SV_InstanceID)
     uint4 key = SubdBufferOut[instanceID];
     uint2 nodeID = key.xy;
     
-    float3 v1 = MeshData.Load(key.z * 3 + 0);
-    float3 v2 = MeshData.Load(key.z * 3 + 1);
-    float3 v3 = MeshData.Load(key.z * 3 + 2);
+    int i1 = MeshDataIndex.Load(key.z * 3 + 0);
+    int i2 = MeshDataIndex.Load(key.z * 3 + 1);
+    int i3 = MeshDataIndex.Load(key.z * 3 + 2);
+    
+    float3 v1 = MeshDataVertex.Load(i1);
+    float3 v2 = MeshDataVertex.Load(i2);
+    float3 v3 = MeshDataVertex.Load(i3);
     
     float2 tree_pos = ts_Leaf_to_Tree_64(leaf_pos, nodeID);
     
