@@ -20,12 +20,18 @@ Game::~Game()
 	systemData = 0;
 
 	delete inputManager;
+	delete mainCamera;
+
+	if (bintree != nullptr)
+		delete bintree;
 }
 
 bool Game::Initialize()
 {
 	if (!DXCore::Initialize())
 		return false;
+
+	bintree = new Bintree(Device.Get(), CommandList.Get());
 
 	// reset the command list to prep for initialization commands
 	ThrowIfFailed(CommandList->Reset(CommandListAllocator.Get(), nullptr));
@@ -109,8 +115,8 @@ void Game::Draw(const Timer& timer)
 	ID3D12DescriptorHeap* descriptorHeaps[] = { CBVSRVUAVHeap.Get() };
 	CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
-	auto objectCB = currentFrameResource->ObjectCB->Resource();
-	CommandList->SetComputeRootConstantBufferView(0, objectCB->GetGPUVirtualAddress());
+	auto tessellationCB = currentFrameResource->TessellationCB->Resource();
+	CommandList->SetComputeRootConstantBufferView(0, tessellationCB->GetGPUVirtualAddress());
 
 	CommandList->SetComputeRootDescriptorTable(1, MeshDataGPUUAV);
 	CommandList->SetComputeRootDescriptorTable(2, DrawArgsGPUUAV);
@@ -119,19 +125,12 @@ void Game::Draw(const Timer& timer)
 
 	CommandList->SetComputeRootDescriptorTable(5, SubdCounterGPUUAV);
 
-	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdBufferIn.Get(),
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST));
-
-	CommandList->CopyResource(RWSubdBufferIn.Get(), SubdBufferInUploadBuffer->Resource());
-
-	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdBufferIn.Get(),
-		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
-
 	CommandList->SetPipelineState(PSOs["tessellationUpdate"].Get());
 	CommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
-	CommandList->Dispatch(3, 1, 1);
+	CommandList->Dispatch(10000, 1, 1);
 
 	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferIn.Get()));
+	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferOut.Get()));
 
 	CommandList->SetPipelineState(PSOs["tessellationCopyDraw"].Get());
 	CommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
@@ -154,12 +153,12 @@ void Game::Draw(const Timer& timer)
 	CommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
 
 	CommandList->SetGraphicsRootSignature(opaqueRootSignature.Get());
-	auto geoObjectCB = currentFrameResource->ObjectCB->Resource();
+	auto objectCB = currentFrameResource->ObjectCB->Resource();
 
 	CommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	//CommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
-	D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = geoObjectCB->GetGPUVirtualAddress();
+	D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objectCB->GetGPUVirtualAddress();
 	CommandList->SetGraphicsRootConstantBufferView(0, objCBAddress);
 
 	CommandList->SetGraphicsRootDescriptorTable(1, MeshDataGPUSRV);
@@ -191,7 +190,6 @@ void Game::Draw(const Timer& timer)
 
 	// done recording commands
 	ThrowIfFailed(CommandList->Close());
-
 	// add the command list to the queue for execution
 	ID3D12CommandList* cmdsLists[] = { CommandList.Get() };
 	CommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
@@ -213,13 +211,16 @@ void Game::Draw(const Timer& timer)
 		FlushCommandQueue();
 		ThrowIfFailed(CommandList->Reset(CommandListAllocator.Get(), nullptr));
 
+		BuildUAVs();
+		UploadMeshData();
+		BuildShadersAndInputLayout();
 		BuildPSOs();
+		pingPongCounter = 1;
 
 		// execute the initialization commands
 		ThrowIfFailed(CommandList->Close());
 		ID3D12CommandList* cmdsLists[] = { CommandList.Get() };
 		CommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
-
 		FlushCommandQueue();
 	}
 
@@ -243,6 +244,12 @@ void Game::ImGuiDraw(bool* changePso)
 
 	*changePso = false;
 	if (ImGui::Checkbox("Wireframe Mode", &imguiParams.WireframeMode))
+		*changePso = true;
+
+	if (ImGui::SliderInt("CPU Lod Level", &imguiParams.CPULodLevel, 0, 4))
+		*changePso = true;
+
+	if (ImGui::SliderInt("GPU Lod Level", &imguiParams.GPULodLevel, 0, 16))
 		*changePso = true;
 
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
@@ -269,15 +276,22 @@ void Game::UpdateMainPassCB(const Timer& timer)
 	objConstants.AspectRatio = (float)screenWidth / screenHeight;
 
 	currObjectCB->CopyData(0, objConstants);
+
+	auto currTessellationCB = currentFrameResource->TessellationCB.get();
+
+	TessellationConstants tessellationConstants;
+	tessellationConstants.SubdivisionLevel = imguiParams.GPULodLevel;
+
+	currTessellationCB->CopyData(0, tessellationConstants);
 }
 
 void Game::BuildUAVs()
 {
-	int vertexCount = 54; // TODO:
+	int vertexCount = 6; // TODO:
 
 	// Vertex Pool
 	{
-
+		// TODO: make vertex and index buffer;
 		UINT64 meshDataByteSize = sizeof(DirectX::XMFLOAT3) * vertexCount;
 		ThrowIfFailed(Device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
@@ -316,7 +330,8 @@ void Game::BuildUAVs()
 
 	// Draw Args
 	{
-		UINT64 drawArgsByteSize = (sizeof(unsigned int) * 8);
+		int drawArgsCount = sizeof(IndirectCommand) / sizeof(UINT);
+		UINT64 drawArgsByteSize = (sizeof(unsigned int) * drawArgsCount);
 
 		ThrowIfFailed(Device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
@@ -331,7 +346,7 @@ void Game::BuildUAVs()
 
 		drawArgsUAVDescription.Format = DXGI_FORMAT_UNKNOWN;
 		drawArgsUAVDescription.Buffer.FirstElement = 0;
-		drawArgsUAVDescription.Buffer.NumElements = 8;
+		drawArgsUAVDescription.Buffer.NumElements = drawArgsCount;
 		drawArgsUAVDescription.Buffer.StructureByteStride = sizeof(unsigned int);
 		drawArgsUAVDescription.Buffer.CounterOffsetInBytes = 0;
 		drawArgsUAVDescription.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
@@ -344,7 +359,7 @@ void Game::BuildUAVs()
 
 	// Subd Buffer In/Out
 	{
-		int subdSize = 100; // TODO: size
+		int subdSize = 1000000; // TODO: find out what size is needed here
 		UINT64 subdBufferByteSize = sizeof(XMUINT4) * subdSize;
 
 		ThrowIfFailed(Device->CreateCommittedResource(
@@ -397,8 +412,6 @@ void Game::BuildUAVs()
 		SubdBufferOutCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 7, CBVSRVUAVDescriptorSize);
 		SubdBufferOutGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 7, CBVSRVUAVDescriptorSize);
 		Device->CreateShaderResourceView(RWSubdBufferOut.Get(), &subdBufferSRVDescription, SubdBufferOutCPUSRV);
-
-		SubdBufferInUploadBuffer = std::make_unique<UploadBuffer<DirectX::XMUINT4>>(Device.Get(), subdBufferByteSize);
 	}
 
 	// Subd Counter
@@ -433,12 +446,12 @@ void Game::BuildUAVs()
 void Game::UploadMeshData()
 {
 	GeometryGenerator geoGen;
-	GeometryGenerator::MeshData grid = geoGen.CreateGrid(250.0f, 250.0f, 4, 4);
+	GeometryGenerator::MeshData grid = geoGen.CreateGrid(250.0f, 250.0f, 2, 2);
 
 	// Vertex Pool 
 	{
-		MeshDataUploadBuffer = std::make_unique<UploadBuffer<DirectX::XMFLOAT3>>(Device.Get(), grid.Indices32.size(), false);
-
+		if (MeshDataUploadBuffer == nullptr)
+			MeshDataUploadBuffer = std::make_unique<UploadBuffer<DirectX::XMFLOAT3>>(Device.Get(), grid.Indices32.size(), false);
 		for (int i = 0; i < grid.Indices32.size(); i++)
 			MeshDataUploadBuffer->CopyData(i, grid.Vertices[grid.Indices32[i]].Position);
 
@@ -449,17 +462,21 @@ void Game::UploadMeshData()
 
 	// Subd In Buffer
 	{
+		if (SubdBufferInUploadBuffer == nullptr)
+			SubdBufferInUploadBuffer = std::make_unique<UploadBuffer<DirectX::XMUINT4>>(Device.Get(), grid.Indices32.size() / 3, false);
+
 		for (int i = 0; i < grid.Indices32.size() / 3; i++)
 			SubdBufferInUploadBuffer->CopyData(i, XMUINT4(0, 0x1, i, 1));
 
 		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdBufferIn.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
-		CommandList->CopyResource(RWSubdBufferIn.Get(), SubdBufferInUploadBuffer->Resource());
+		CommandList->CopyBufferRegion(RWSubdBufferIn.Get(), 0, SubdBufferInUploadBuffer->Resource(), 0, grid.Indices32.size() / 3 * sizeof(XMUINT4));
 		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdBufferIn.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 	}
-
+	
 	// Subd Counter
 	{
-		SubdCounterUploadBuffer = std::make_unique<UploadBuffer<UINT>>(Device.Get(), 2, false);
+		if (SubdCounterUploadBuffer == nullptr)
+			SubdCounterUploadBuffer = std::make_unique<UploadBuffer<UINT>>(Device.Get(), 2, false);
 
 		SubdCounterUploadBuffer->CopyData(0, grid.Indices32.size() / 3);
 		SubdCounterUploadBuffer->CopyData(1, 0);
@@ -468,30 +485,23 @@ void Game::UploadMeshData()
 		CommandList->CopyResource(RWSubdCounter.Get(), SubdCounterUploadBuffer->Resource());
 		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdCounter.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 	}
-
+	
 	// Leaf Geometry
 	{
-		std::vector<XMFLOAT3> vertices = {
-			XMFLOAT3(0, 0, 0),
-			XMFLOAT3(0, 1, 0),
-			XMFLOAT3(1, 0, 0)
-		};
-
-		LeafGeoUpload = std::make_unique<MeshGeometry>();
-		LeafGeoUpload->VertexByteStride = sizeof(XMFLOAT3);
-		LeafGeoUpload->VertexBufferByteSize = (UINT)vertices.size() * sizeof(XMFLOAT3);
-
-		LeafGeoUpload->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(Device.Get(),
-			CommandList.Get(), vertices.data(), LeafGeoUpload->VertexBufferByteSize, LeafGeoUpload->VertexBufferUploader);
+		MeshGeometry* mesh = bintree->BuildLeafMesh(imguiParams.CPULodLevel);
 
 		IndirectCommand command = {};
-		command.VertexBufferView = LeafGeoUpload->VertexBufferView();
-		command.DrawArguments.VertexCountPerInstance = 3;
-		command.DrawArguments.InstanceCount = 12;
+		command.VertexBufferView = mesh->VertexBufferView();
+		command.IndexBufferView = mesh->IndexBufferView();
+		command.DrawArguments.IndexCountPerInstance = mesh->IndexBufferByteSize / sizeof(uint16_t);
+		command.DrawArguments.InstanceCount = 0;
+		command.DrawArguments.StartIndexLocation = 0;
+		command.DrawArguments.BaseVertexLocation = 0;
 		command.DrawArguments.StartInstanceLocation = 0;
-		command.DrawArguments.StartVertexLocation = 0;
 
-		IndirectCommandUploadBuffer = std::make_unique<UploadBuffer<IndirectCommand>>(Device.Get(), 1, false);
+		if (IndirectCommandUploadBuffer == nullptr)
+			IndirectCommandUploadBuffer = std::make_unique<UploadBuffer<IndirectCommand>>(Device.Get(), 1, false);
+
 		IndirectCommandUploadBuffer->CopyData(0, command);
 
 		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
@@ -597,11 +607,12 @@ void Game::BuildRootSignature()
 	}
 
 	// tessellation command signature
-	D3D12_INDIRECT_ARGUMENT_DESC Args[2];
+	D3D12_INDIRECT_ARGUMENT_DESC Args[3];
 
 	Args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_VERTEX_BUFFER_VIEW;
 	Args[0].VertexBuffer.Slot = 0;
-	Args[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW;
+	Args[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_INDEX_BUFFER_VIEW;
+	Args[2].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
 
 	D3D12_COMMAND_SIGNATURE_DESC particleCommandSingatureDescription = {};
 	particleCommandSingatureDescription.ByteStride = sizeof(IndirectCommand);
@@ -624,8 +635,6 @@ void Game::BuildShadersAndInputLayout()
 	geoInputLayout =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
 }
 
@@ -648,6 +657,7 @@ void Game::BuildPSOs()
 	geoOpaquePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	if (imguiParams.WireframeMode)
 		geoOpaquePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
+	geoOpaquePsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 	geoOpaquePsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	geoOpaquePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 	geoOpaquePsoDesc.SampleMask = UINT_MAX;

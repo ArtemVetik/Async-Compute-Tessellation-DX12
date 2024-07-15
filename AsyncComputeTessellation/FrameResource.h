@@ -13,6 +13,12 @@ struct ObjectConstants
 	float AspectRatio = 0.0f;
 };
 
+struct TessellationConstants
+{
+	UINT SubdivisionLevel = 0;
+	DirectX::XMUINT3 Padding;
+};
+
 struct TimeConstants
 {
 	float DeltaTime = 0.0f;
@@ -22,7 +28,8 @@ struct TimeConstants
 struct IndirectCommand
 {
 	D3D12_VERTEX_BUFFER_VIEW VertexBufferView;
-	D3D12_DRAW_ARGUMENTS DrawArguments;
+	D3D12_INDEX_BUFFER_VIEW IndexBufferView;
+	D3D12_DRAW_INDEXED_ARGUMENTS DrawArguments;
 };
 
 // stores the resources needed for the CPU to build the command lists for a frame 
@@ -41,6 +48,7 @@ public:
 	// we cannot update a cbuffer until the GPU is done processing the commands that reference it
 	//so each frame needs their own cbuffers
 	std::unique_ptr<UploadBuffer<ObjectConstants>> ObjectCB = nullptr;
+	std::unique_ptr<UploadBuffer<TessellationConstants>> TessellationCB = nullptr;
 	std::unique_ptr<UploadBuffer<TimeConstants>> TimeCB = nullptr;
 
 	// fence value to mark commands up to this fence point 

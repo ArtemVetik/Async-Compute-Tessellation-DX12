@@ -84,6 +84,9 @@
     <ClCompile Include="imgui\imgui_widgets.cpp">
       <Filter>imgui</Filter>
     </ClCompile>
+    <ClCompile Include="Bintree.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h">
@@ -170,6 +173,9 @@
     <ClInclude Include="ImguiParams.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Bintree.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <FxCompile Include="DefaultPS.hlsl">
@@ -195,6 +201,9 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="Noise.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Common.hlsl">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

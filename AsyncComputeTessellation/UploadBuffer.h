@@ -21,14 +21,18 @@ public:
 		if (isConstantBuffer)
 			mElementByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(T));
 
-		CreateBuffer(device, mElementByteSize * elementCount);
-	}
+		ThrowIfFailed(device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(mElementByteSize * elementCount),
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&mUploadBuffer)));
 
-	UploadBuffer(ID3D12Device* device, UINT64 width) :
-		mIsConstantBuffer(false)
-	{
-		mElementByteSize = sizeof(T);
-		CreateBuffer(device, width);
+		ThrowIfFailed(mUploadBuffer->Map(0, nullptr, reinterpret_cast<void**>(&mMappedData)));
+
+		// We do not need to unmap until we are done with the resource.  However, we must not write to
+		// the resource while it is in use by the GPU (so we must use synchronization techniques).
 	}
 
 	UploadBuffer(const UploadBuffer& rhs) = delete;
@@ -57,20 +61,4 @@ private:
 
 	UINT mElementByteSize = 0;
 	bool mIsConstantBuffer = false;
-
-	void CreateBuffer(ID3D12Device* device, UINT64 width)
-	{
-		ThrowIfFailed(device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD),
-			D3D12_HEAP_FLAG_NONE,
-			&CD3DX12_RESOURCE_DESC::Buffer(width),
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&mUploadBuffer)));
-
-		ThrowIfFailed(mUploadBuffer->Map(0, nullptr, reinterpret_cast<void**>(&mMappedData)));
-
-		// We do not need to unmap until we are done with the resource.  However, we must not write to
-		// the resource while it is in use by the GPU (so we must use synchronization techniques).
-	}
 };

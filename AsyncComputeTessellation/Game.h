@@ -8,6 +8,7 @@
 #include "SystemData.h"
 #include "DDSTextureLoader.h"
 #include "ImguiParams.h"
+#include "Bintree.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -44,7 +45,6 @@ private:
 	std::unique_ptr<UploadBuffer<DirectX::XMUINT4>> SubdBufferInUploadBuffer;
 	std::unique_ptr<UploadBuffer<IndirectCommand>> IndirectCommandUploadBuffer;
 	std::unique_ptr<UploadBuffer<UINT>> SubdCounterUploadBuffer;
-	std::unique_ptr<MeshGeometry> LeafGeoUpload;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE MeshDataCPUSRV;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE MeshDataGPUSRV;
@@ -74,6 +74,8 @@ private:
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> PSOs;
 
 	ObjectConstants MainObjectCB;
+
+	Bintree* bintree;
 
 	Camera* mainCamera;
 

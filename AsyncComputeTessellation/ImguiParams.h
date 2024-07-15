@@ -3,5 +3,7 @@
 struct ImguiParams
 {
 	bool ShowDebugWindow = false;
-	bool WireframeMode = false;
+	bool WireframeMode = true;
+	int CPULodLevel = 0;
+	int GPULodLevel = 0;
 };

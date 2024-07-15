@@ -1,4 +1,5 @@
 #include "Noise.hlsl"
+#include "Common.hlsl"
 
 cbuffer objectData : register(b0)
 {
@@ -11,9 +12,7 @@ cbuffer objectData : register(b0)
 
 struct VertexIn
 {
-	float3 PosL    : POSITION;
-    float3 NormalL : NORMAL;
-	float2 TexC    : TEXCOORD;
+    float3 PosL : POSITION;
 };
 
 struct VertexOut
@@ -33,22 +32,19 @@ VertexOut main(VertexIn vIn, uint instanceID : SV_InstanceID)
     
     float2 leaf_pos = vIn.PosL.xy;
     uint4 key = SubdBufferOut[instanceID];
+    uint2 nodeID = key.xy;
     
     float3 v1 = MeshData.Load(key.z * 3 + 0);
     float3 v2 = MeshData.Load(key.z * 3 + 1);
     float3 v3 = MeshData.Load(key.z * 3 + 2);
     
-    uint2 c1 = uint2(1, 0);
-    uint2 c2 = uint2(0, 1);
-    uint2 c3 = uint2(0, 0);
-    uint3x2 xf = uint3x2(c1, c2, c3);
-    float2 tree_pos = mul(float3(leaf_pos, 1), xf);
+    float2 tree_pos = ts_Leaf_to_Tree_64(leaf_pos, nodeID);
     
     float3 vertex = v1 * (1.0 - tree_pos.x - tree_pos.y) + v3 * tree_pos.x + v2 * tree_pos.y;
 
     float4 posW = mul(float4(vertex, 1.0f), world);
     
-    //posW = float4(displaceVertex(posW.xyz, camPosition), 1);
+    posW = float4(displaceVertex(posW.xyz, camPosition), 1);
     
     output.PosW = posW;
     output.NormalW = 1;

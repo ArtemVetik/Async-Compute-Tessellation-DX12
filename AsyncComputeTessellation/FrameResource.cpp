@@ -7,6 +7,7 @@ FrameResource::FrameResource(ID3D12Device* device, UINT objectCount, UINT timeCo
 		IID_PPV_ARGS(commandListAllocator.GetAddressOf())));
 
 	ObjectCB = std::make_unique<UploadBuffer<ObjectConstants>>(device, objectCount, true);
+	TessellationCB = std::make_unique<UploadBuffer<TessellationConstants>>(device, 1, true);
 	TimeCB = std::make_unique<UploadBuffer<TimeConstants>>(device, timeCount, true);
 }
 
