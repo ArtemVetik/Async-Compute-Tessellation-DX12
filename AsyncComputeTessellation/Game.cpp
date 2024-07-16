@@ -8,6 +8,7 @@ Game::Game(HINSTANCE hInstance) : DXCore(hInstance)
 
 	systemData = new SystemData();
 	inputManager = new InputManager();
+	bintree = nullptr;
 	pingPongCounter = 0;
 }
 
@@ -37,7 +38,7 @@ bool Game::Initialize()
 	ThrowIfFailed(CommandList->Reset(CommandListAllocator.Get(), nullptr));
 
 	BuildUAVs();
-	UploadMeshData();
+	UploadBuffers();
 	BuildRootSignature();
 	BuildShadersAndInputLayout();
 	BuildFrameResources();
@@ -211,7 +212,7 @@ void Game::Draw(const Timer& timer)
 		ThrowIfFailed(CommandList->Reset(CommandListAllocator.Get(), nullptr));
 
 		BuildUAVs();
-		UploadMeshData();
+		UploadBuffers();
 		BuildShadersAndInputLayout();
 		BuildPSOs();
 		pingPongCounter = 1;
@@ -242,6 +243,10 @@ void Game::ImGuiDraw(bool* changePso) // TODO: optimize for different changes
 	ImGui::Checkbox("Demo Window", &imguiParams.ShowDebugWindow);
 
 	*changePso = false;
+	
+	if (ImGui::Combo("Mode", (int*)&imguiParams.MeshMode, "Terrain\0Mesh\0\0"))
+		*changePso = true;
+
 	if (ImGui::Checkbox("Wireframe Mode", &imguiParams.WireframeMode))
 		*changePso = true;
 
@@ -251,8 +256,9 @@ void Game::ImGuiDraw(bool* changePso) // TODO: optimize for different changes
 	if (ImGui::SliderInt("GPU Lod Level", &imguiParams.GPULodLevel, 0, 16))
 		*changePso = true;
 
-	if (ImGui::Checkbox("Displace Mapping", &imguiParams.UseDisplaceMapping))
-		*changePso = true;
+	if (imguiParams.MeshMode == MeshMode::TERRAIN)
+		if (ImGui::Checkbox("Displace Mapping", &imguiParams.UseDisplaceMapping))
+			*changePso = true;
 
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
@@ -289,9 +295,11 @@ void Game::UpdateMainPassCB(const Timer& timer)
 
 void Game::BuildUAVs()
 {
+	bintree->InitMesh(imguiParams.MeshMode);
+
 	// Mesh Data Vertices
 	{
-		int vertexCount = 4; // TODO: calculate the required buffer size
+		int vertexCount = bintree->GetMeshData().Vertices.size();
 		UINT64 meshDataVertexByteSize = sizeof(DirectX::XMFLOAT3) * vertexCount;
 		ThrowIfFailed(Device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
@@ -326,7 +334,7 @@ void Game::BuildUAVs()
 
 	// Mesh Data Indices
 	{
-		int indexCount = 6; // TODO: calculate the required buffer size
+		int indexCount = bintree->GetMeshData().Indices32.size();
 		UINT64 meshDataVertexByteSize = sizeof(UINT) * indexCount;
 		ThrowIfFailed(Device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
@@ -474,85 +482,12 @@ void Game::BuildUAVs()
 	}
 }
 
-void Game::UploadMeshData()
+void Game::UploadBuffers()
 {
-	GeometryGenerator geoGen;
-	GeometryGenerator::MeshData grid = geoGen.CreateGrid(250.0f, 250.0f, 2, 2);
-
-	// Mesh Data Vertex 
-	{
-		if (MeshDataVertexUploadBuffer == nullptr)
-			MeshDataVertexUploadBuffer = std::make_unique<UploadBuffer<DirectX::XMFLOAT3>>(Device.Get(), grid.Vertices.size(), false);
-
-		for (int i = 0; i < grid.Vertices.size(); i++)
-			MeshDataVertexUploadBuffer->CopyData(i, grid.Vertices[i].Position);
-
-		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWMeshDataVertex.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
-		CommandList->CopyResource(RWMeshDataVertex.Get(), MeshDataVertexUploadBuffer->Resource());
-		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWMeshDataVertex.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON));
-	}
-
-	// Mesh Data Index 
-	{
-		if (MeshDataIndexUploadBuffer == nullptr)
-			MeshDataIndexUploadBuffer = std::make_unique<UploadBuffer<UINT>>(Device.Get(), grid.Indices32.size(), false);
-
-		for (int i = 0; i < grid.Indices32.size(); i++)
-			MeshDataIndexUploadBuffer->CopyData(i, grid.Indices32[i]);
-
-		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWMeshDataIndex.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
-		CommandList->CopyResource(RWMeshDataIndex.Get(), MeshDataIndexUploadBuffer->Resource());
-		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWMeshDataIndex.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON));
-	}
-
-	// Subd In Buffer
-	{
-		if (SubdBufferInUploadBuffer == nullptr)
-			SubdBufferInUploadBuffer = std::make_unique<UploadBuffer<DirectX::XMUINT4>>(Device.Get(), grid.Indices32.size() / 3, false);
-
-		for (int i = 0; i < grid.Indices32.size() / 3; i++)
-			SubdBufferInUploadBuffer->CopyData(i, XMUINT4(0, 0x1, i, 1));
-
-		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdBufferIn.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
-		CommandList->CopyBufferRegion(RWSubdBufferIn.Get(), 0, SubdBufferInUploadBuffer->Resource(), 0, grid.Indices32.size() / 3 * sizeof(XMUINT4));
-		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdBufferIn.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
-	}
-
-	// Subd Counter
-	{
-		if (SubdCounterUploadBuffer == nullptr)
-			SubdCounterUploadBuffer = std::make_unique<UploadBuffer<UINT>>(Device.Get(), 2, false);
-
-		SubdCounterUploadBuffer->CopyData(0, grid.Indices32.size() / 3);
-		SubdCounterUploadBuffer->CopyData(1, 0);
-
-		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdCounter.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
-		CommandList->CopyResource(RWSubdCounter.Get(), SubdCounterUploadBuffer->Resource());
-		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWSubdCounter.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
-	}
-
-	// Leaf Geometry
-	{
-		MeshGeometry* mesh = bintree->BuildLeafMesh(imguiParams.CPULodLevel);
-
-		IndirectCommand command = {};
-		command.VertexBufferView = mesh->VertexBufferView();
-		command.IndexBufferView = mesh->IndexBufferView();
-		command.DrawArguments.IndexCountPerInstance = mesh->IndexBufferByteSize / sizeof(uint16_t);
-		command.DrawArguments.InstanceCount = 0;
-		command.DrawArguments.StartIndexLocation = 0;
-		command.DrawArguments.BaseVertexLocation = 0;
-		command.DrawArguments.StartInstanceLocation = 0;
-
-		if (IndirectCommandUploadBuffer == nullptr)
-			IndirectCommandUploadBuffer = std::make_unique<UploadBuffer<IndirectCommand>>(Device.Get(), 1, false);
-
-		IndirectCommandUploadBuffer->CopyData(0, command);
-
-		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
-		CommandList->CopyResource(RWDrawArgs.Get(), IndirectCommandUploadBuffer->Resource());
-		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
-	}
+	bintree->UploadMeshData(RWMeshDataVertex.Get(), RWMeshDataIndex.Get());
+	bintree->UploadSubdivisionBuffer(RWSubdBufferIn.Get());
+	bintree->UploadSubdivisionCounter(RWSubdCounter.Get());
+	bintree->UploadDrawArgs(RWDrawArgs.Get(), imguiParams.CPULodLevel);
 }
 
 void Game::BuildRootSignature()
@@ -674,7 +609,7 @@ void Game::BuildShadersAndInputLayout()
 {
 	D3D_SHADER_MACRO macros[] =
 	{
-		{"USE_DISPLACE", imguiParams.UseDisplaceMapping ? "1" : "0"},
+		{"USE_DISPLACE", imguiParams.UseDisplaceMapping && imguiParams.MeshMode == MeshMode::TERRAIN ? "1" : "0"},
 		{NULL, NULL}
 	};
 

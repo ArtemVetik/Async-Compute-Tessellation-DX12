@@ -8,6 +8,109 @@ Bintree::Bintree(ID3D12Device* device, ID3D12GraphicsCommandList* commandList)
     mCommandList = commandList;
 }
 
+void Bintree::InitMesh(MeshMode mode)
+{
+    GeometryGenerator geoGen;
+
+    if (mode == MeshMode::TERRAIN)
+        mMeshData = geoGen.CreateGrid(250.0f, 250.0f, 2, 2);
+    else
+        mMeshData = geoGen.CreateSphere(100, 5, 5);
+}
+
+void Bintree::UploadMeshData(ID3D12Resource* vertexResource, ID3D12Resource* indexResource)
+{
+    // Mesh Data Vertex 
+    {
+        if (MeshDataVertexUploadBuffer)
+            MeshDataVertexUploadBuffer.reset();
+
+        MeshDataVertexUploadBuffer = std::make_unique<UploadBuffer<DirectX::XMFLOAT3>>(mDevice, mMeshData.Vertices.size(), false);
+
+        for (int i = 0; i < mMeshData.Vertices.size(); i++)
+            MeshDataVertexUploadBuffer->CopyData(i, mMeshData.Vertices[i].Position);
+
+        mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(vertexResource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+        mCommandList->CopyResource(vertexResource, MeshDataVertexUploadBuffer->Resource());
+        mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(vertexResource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON));
+    }
+
+    // Mesh Data Index 
+    {
+        if (MeshDataIndexUploadBuffer)
+            MeshDataIndexUploadBuffer.reset();
+
+        MeshDataIndexUploadBuffer = std::make_unique<UploadBuffer<UINT>>(mDevice, mMeshData.Indices32.size(), false);
+
+        for (int i = 0; i < mMeshData.Indices32.size(); i++)
+            MeshDataIndexUploadBuffer->CopyData(i, mMeshData.Indices32[i]);
+
+        mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(indexResource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+        mCommandList->CopyResource(indexResource, MeshDataIndexUploadBuffer->Resource());
+        mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(indexResource, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_COMMON));
+    }
+}
+
+void Bintree::UploadSubdivisionBuffer(ID3D12Resource* subdivisionBuffer)
+{
+    if (SubdBufferInUploadBuffer)
+        SubdBufferInUploadBuffer.reset();
+
+    SubdBufferInUploadBuffer = std::make_unique<UploadBuffer<DirectX::XMUINT4>>(mDevice, mMeshData.Indices32.size() / 3, false);
+
+    for (int i = 0; i < mMeshData.Indices32.size() / 3; i++)
+        SubdBufferInUploadBuffer->CopyData(i, DirectX::XMUINT4(0, 0x1, i, 1));
+
+    mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(subdivisionBuffer, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+    mCommandList->CopyBufferRegion(subdivisionBuffer, 0, SubdBufferInUploadBuffer->Resource(), 0, mMeshData.Indices32.size() / 3 * sizeof(DirectX::XMUINT4));
+    mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(subdivisionBuffer, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+}
+
+void Bintree::UploadSubdivisionCounter(ID3D12Resource* subdivisionCounter)
+{
+    if (SubdCounterUploadBuffer)
+        SubdCounterUploadBuffer.reset();
+
+    SubdCounterUploadBuffer = std::make_unique<UploadBuffer<UINT>>(mDevice, 2, false);
+
+    SubdCounterUploadBuffer->CopyData(0, mMeshData.Indices32.size() / 3);
+    SubdCounterUploadBuffer->CopyData(1, 0);
+
+    mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(subdivisionCounter, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+    mCommandList->CopyResource(subdivisionCounter, SubdCounterUploadBuffer->Resource());
+    mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(subdivisionCounter, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+}
+
+void Bintree::UploadDrawArgs(ID3D12Resource* drawArgs, int cpuLodLevel)
+{
+    MeshGeometry* mesh = BuildLeafMesh(cpuLodLevel);
+
+    IndirectCommand command = {};
+    command.VertexBufferView = mesh->VertexBufferView();
+    command.IndexBufferView = mesh->IndexBufferView();
+    command.DrawArguments.IndexCountPerInstance = mesh->IndexBufferByteSize / sizeof(uint16_t);
+    command.DrawArguments.InstanceCount = 0;
+    command.DrawArguments.StartIndexLocation = 0;
+    command.DrawArguments.BaseVertexLocation = 0;
+    command.DrawArguments.StartInstanceLocation = 0;
+
+    if (IndirectCommandUploadBuffer)
+        IndirectCommandUploadBuffer.reset();
+
+    IndirectCommandUploadBuffer = std::make_unique<UploadBuffer<IndirectCommand>>(mDevice, 1, false);
+
+    IndirectCommandUploadBuffer->CopyData(0, command);
+
+    mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(drawArgs, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+    mCommandList->CopyResource(drawArgs, IndirectCommandUploadBuffer->Resource());
+    mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(drawArgs, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+}
+
+GeometryGenerator::MeshData Bintree::GetMeshData() const
+{
+    return mMeshData;
+}
+
 MeshGeometry* Bintree::BuildLeafMesh(uint32 cpuTessLevel)
 {
     auto vertices = GetLeafVertices(cpuTessLevel);

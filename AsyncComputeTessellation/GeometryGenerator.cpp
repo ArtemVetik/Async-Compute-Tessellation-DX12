@@ -184,9 +184,9 @@ GeometryGenerator::MeshData GeometryGenerator::CreateSphere(float radius, uint32
 			meshData.Indices32.push_back(baseIndex + i * ringVertexCount + j + 1);
 			meshData.Indices32.push_back(baseIndex + (i + 1)*ringVertexCount + j);
 
-			meshData.Indices32.push_back(baseIndex + (i + 1)*ringVertexCount + j);
-			meshData.Indices32.push_back(baseIndex + i * ringVertexCount + j + 1);
 			meshData.Indices32.push_back(baseIndex + (i + 1)*ringVertexCount + j + 1);
+			meshData.Indices32.push_back(baseIndex + i * ringVertexCount + j + 1);
+			meshData.Indices32.push_back(baseIndex + (i + 1)*ringVertexCount + j);
 		}
 	}
 

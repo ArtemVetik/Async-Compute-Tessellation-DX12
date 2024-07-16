@@ -97,7 +97,7 @@ private:
 	void UpdateMainPassCB(const Timer& timer);
 
 	void BuildUAVs();
-	void UploadMeshData();
+	void UploadBuffers();
 	void BuildRootSignature();
 	void BuildShadersAndInputLayout();
 	void BuildPSOs();
