@@ -1,14 +1,6 @@
+#define COMPUTE_SHADER 1
 
-cbuffer tessellationData : register(b0)
-{
-    uint subdivisionLevel;
-    uint3 padding;
-};
-
-RWStructuredBuffer<uint> DrawArgs : register(u0);
-RWStructuredBuffer<uint4> SubdBufferIn : register(u1);
-RWStructuredBuffer<uint4> SubdBufferOut : register(u2);
-RWStructuredBuffer<uint> SubdCounter : register(u3);
+#include "Common.hlsl"
 
 [numthreads(1, 1, 1)]
 void main(uint3 id : SV_DispatchThreadID)

@@ -1,15 +1,7 @@
-#include "Common.hlsl"
+#define COMPUTE_SHADER 1
 
-cbuffer tessellationData : register(b0)
-{
-    uint subdivisionLevel;
-    uint3 padding;
-};
-
-RWStructuredBuffer<uint> DrawArgs : register(u0);
-RWStructuredBuffer<uint4> SubdBufferIn : register(u1);
-RWStructuredBuffer<uint4> SubdBufferOut : register(u2);
-RWStructuredBuffer<uint> SubdCounter : register(u3);
+#include "LoD.hlsl"
+#include "Noise.hlsl"
 
 void compute_writeKey(uint2 new_nodeID, uint4 current_key)
 {
@@ -21,16 +13,44 @@ void compute_writeKey(uint2 new_nodeID, uint4 current_key)
 }
 
 [numthreads(32, 1, 1)]
-void main(uint id : SV_DispatchThreadID)
+void main(uint id : SV_DispatchThreadID, uint groupId : SV_GroupIndex)
 {
-    if (id.x >= SubdCounter[0])
-        return;
-    
     uint4 key = SubdBufferIn[id.x];
     uint2 nodeID = key.xy;
     
-    int targetLod = subdivisionLevel;
-    int parentLod = subdivisionLevel;
+#if USE_DISPLACE
+    // When subdividing heightfield, we set the plane height to the heightmap
+    // value under the camera for more fidelity.
+    // To avoid computing the procedural height value in each instance, we
+    // store it in a shared variable
+    if (groupId == 0)
+    {
+        cam_height_local = getHeight(camPosition.xz, screenRes);
+    }
+    GroupMemoryBarrierWithGroupSync();
+#endif
+    
+    if (id.x >= SubdCounter[0])
+        return;
+    
+    int targetLod = 0, parentLod = 0;
+    if (subdivisionLevel > 0)
+    {
+        targetLod = subdivisionLevel;
+        parentLod = subdivisionLevel;
+    }
+    else
+    {
+        float parentTargetLevel, targetLevel;
+#if USE_DISPLACE
+        computeTessLvlWithParent(key, cam_height_local, targetLevel, parentTargetLevel);
+#else
+        computeTessLvlWithParent(key, targetLevel, parentTargetLevel);
+#endif
+        targetLod = int(targetLevel);
+        parentLod = int(parentTargetLevel);
+    }
+        
     
     int keyLod = ts_findMSB_64(nodeID);
     

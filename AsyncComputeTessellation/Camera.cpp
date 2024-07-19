@@ -83,7 +83,7 @@ void Camera::RotateY(float angle)
 
 void Camera::SetProjectionMatrix(unsigned int newWidth, unsigned int newHeight)
 {
-	XMMATRIX P = XMMatrixPerspectiveFovLH(45.0f * (3.14f / 180.0f), (float)newWidth / (float)newHeight, nearValue, farValue);
+	XMMATRIX P = XMMatrixPerspectiveFovLH(55.0f * (3.14f / 180.0f), (float)newWidth / (float)newHeight, nearValue, farValue);
 	XMStoreFloat4x4(&projectionMatrix, (P));
 }
 

@@ -187,22 +187,29 @@
     <None Include="Common.hlsl">
       <FileType>Document</FileType>
     </None>
-    <FxCompile Include="DefaultPS.hlsl">
+    <None Include="DefaultPS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.1</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="DefaultVS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="DefaultVS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.1</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="TessellationCopyDraw.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="LoD.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="TessellationCopyDraw.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.1</ShaderModel>
-    </FxCompile>
-    <FxCompile Include="TessellationUpdate.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="TessellationUpdate.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.1</ShaderModel>
-    </FxCompile>
+      <FileType>Document</FileType>
+    </None>
     <None Include="Noise.hlsl">
       <FileType>Document</FileType>
     </None>
@@ -212,6 +219,14 @@
   </ItemGroup>
   <ItemGroup>
     <Image Include="small.ico" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ComputeShaderData.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="DefaultShaderData.hlsl">
+      <FileType>Document</FileType>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

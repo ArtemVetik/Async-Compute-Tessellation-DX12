@@ -178,20 +178,6 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <FxCompile Include="DefaultPS.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="DefaultVS.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="TessellationUpdate.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-    <FxCompile Include="TessellationCopyDraw.hlsl">
-      <Filter>Shaders</Filter>
-    </FxCompile>
-  </ItemGroup>
-  <ItemGroup>
     <Image Include="small.ico">
       <Filter>Resource Files</Filter>
     </Image>
@@ -203,7 +189,28 @@
     <None Include="Noise.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="LoD.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
     <None Include="Common.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="TessellationCopyDraw.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="TessellationUpdate.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="DefaultPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="DefaultVS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="DefaultShaderData.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="ComputeShaderData.hlsl">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

@@ -15,7 +15,10 @@ struct ObjectConstants
 
 struct TessellationConstants
 {
+	DirectX::XMFLOAT4X4 MeshWorld = MathHelper::Identity4x4();
 	UINT SubdivisionLevel = 0;
+	DirectX::XMFLOAT3 CamPosition = {};
+	UINT ScreenRes;
 	DirectX::XMUINT3 Padding;
 };
 

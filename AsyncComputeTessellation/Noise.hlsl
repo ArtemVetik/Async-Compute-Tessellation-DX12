@@ -3,7 +3,7 @@
 #define u_displace_factor 10
 #define H 0.96
 #define lacunarity 1.99
-#define sharpness 0.03
+#define sharpness 0.02
 
 float displace(float2 p, float screen_resolution)
 {

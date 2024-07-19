@@ -1,6 +1,9 @@
 #include "d3dUtil.h"
 #include <comdef.h>
 #include <fstream>
+#if defined(DEBUG) || defined(_DEBUG)  
+#include <iostream>
+#endif
 
 using Microsoft::WRL::ComPtr;
 
@@ -107,6 +110,15 @@ ComPtr<ID3DBlob> d3dUtil::CompileShader(
 	if (errors != nullptr)
 		OutputDebugStringA((char*)errors->GetBufferPointer());
 
+#if defined(DEBUG) || defined(_DEBUG)  
+	if (FAILED(hr))
+	{
+		if (errors)
+			std::cerr << "Shader compilation failed: " << static_cast<const char*>(errors->GetBufferPointer()) << std::endl;
+		else
+			std::cerr << "Shader compilation failed with HRESULT: " << hr << std::endl;
+	}
+#endif
 	ThrowIfFailed(hr);
 
 	return byteCode;

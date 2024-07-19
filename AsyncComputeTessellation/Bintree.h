@@ -20,6 +20,7 @@ public:
 	void UploadSubdivisionBuffer(ID3D12Resource* subdivisionBuffer);
 	void UploadSubdivisionCounter(ID3D12Resource* subdivisionCounter);
 	void UploadDrawArgs(ID3D12Resource* drawArgs, int cpuLodLevel);
+	void UpdateLodFactor(int res, float fov);
 
 	GeometryGenerator::MeshData GetMeshData() const;
 private:
