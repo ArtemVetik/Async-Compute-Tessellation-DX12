@@ -116,15 +116,19 @@ void Game::Draw(const Timer& timer)
 	ID3D12DescriptorHeap* descriptorHeaps[] = { CBVSRVUAVHeap.Get() };
 	CommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
+	auto objectCB = currentFrameResource->ObjectCB->Resource();
 	auto tessellationCB = currentFrameResource->TessellationCB->Resource();
-	CommandList->SetComputeRootConstantBufferView(0, tessellationCB->GetGPUVirtualAddress());
+	auto perFrameCB = currentFrameResource->PerFrameCB->Resource();
+	CommandList->SetComputeRootConstantBufferView(0, objectCB->GetGPUVirtualAddress());
+	CommandList->SetComputeRootConstantBufferView(1, tessellationCB->GetGPUVirtualAddress());
+	CommandList->SetComputeRootConstantBufferView(2, perFrameCB->GetGPUVirtualAddress());
 
-	CommandList->SetComputeRootDescriptorTable(1, MeshDataVertexGPUUAV);
-	CommandList->SetComputeRootDescriptorTable(2, MeshDataIndexGPUUAV);
-	CommandList->SetComputeRootDescriptorTable(3, DrawArgsGPUUAV);
-	CommandList->SetComputeRootDescriptorTable(4 + pingPongCounter, SubdBufferInGPUUAV);
-	CommandList->SetComputeRootDescriptorTable(5 - pingPongCounter, SubdBufferOutGPUUAV);
-	CommandList->SetComputeRootDescriptorTable(6, SubdCounterGPUUAV);
+	CommandList->SetComputeRootDescriptorTable(3, MeshDataVertexGPUUAV);
+	CommandList->SetComputeRootDescriptorTable(4, MeshDataIndexGPUUAV);
+	CommandList->SetComputeRootDescriptorTable(5, DrawArgsGPUUAV);
+	CommandList->SetComputeRootDescriptorTable(6 + pingPongCounter, SubdBufferInGPUUAV);
+	CommandList->SetComputeRootDescriptorTable(7 - pingPongCounter, SubdBufferOutGPUUAV);
+	CommandList->SetComputeRootDescriptorTable(8, SubdCounterGPUUAV);
 
 	CommandList->SetPipelineState(PSOs["tessellationUpdate"].Get());
 	CommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
@@ -154,20 +158,20 @@ void Game::Draw(const Timer& timer)
 	CommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
 
 	CommandList->SetGraphicsRootSignature(opaqueRootSignature.Get());
-	auto objectCB = currentFrameResource->ObjectCB->Resource();
 
 	CommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 	//CommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
-	D3D12_GPU_VIRTUAL_ADDRESS objCBAddress = objectCB->GetGPUVirtualAddress();
-	CommandList->SetGraphicsRootConstantBufferView(0, objCBAddress);
+	CommandList->SetGraphicsRootConstantBufferView(0, objectCB->GetGPUVirtualAddress());
+	CommandList->SetGraphicsRootConstantBufferView(1, tessellationCB->GetGPUVirtualAddress());
+	CommandList->SetGraphicsRootConstantBufferView(2, perFrameCB->GetGPUVirtualAddress());
 
-	CommandList->SetGraphicsRootDescriptorTable(1, MeshDataVertexGPUSRV);
-	CommandList->SetGraphicsRootDescriptorTable(2, MeshDataIndexGPUSRV);
+	CommandList->SetGraphicsRootDescriptorTable(3, MeshDataVertexGPUSRV);
+	CommandList->SetGraphicsRootDescriptorTable(4, MeshDataIndexGPUSRV);
 	if (pingPongCounter == 0)
-		CommandList->SetGraphicsRootDescriptorTable(3, SubdBufferOutGPUSRV);
+		CommandList->SetGraphicsRootDescriptorTable(5, SubdBufferOutGPUSRV);
 	else
-		CommandList->SetGraphicsRootDescriptorTable(3, SubdBufferInGPUSRV);
+		CommandList->SetGraphicsRootDescriptorTable(5, SubdBufferInGPUSRV);
 
 	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(),
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
@@ -245,7 +249,7 @@ void Game::ImGuiDraw(bool* changePso) // TODO: optimize for different changes
 	ImGui::Checkbox("Demo Window", &imguiParams.ShowDebugWindow);
 
 	*changePso = false;
-	
+
 	if (ImGui::Combo("Mode", (int*)&imguiParams.MeshMode, "Terrain\0Mesh\0\0"))
 		*changePso = true;
 
@@ -259,8 +263,19 @@ void Game::ImGuiDraw(bool* changePso) // TODO: optimize for different changes
 		*changePso = true;
 
 	if (imguiParams.MeshMode == MeshMode::TERRAIN)
+	{
 		if (ImGui::Checkbox("Displace Mapping", &imguiParams.UseDisplaceMapping))
 			*changePso = true;
+
+		if (imguiParams.UseDisplaceMapping)
+		{
+			ImGui::SliderFloat("Displace Factor", &imguiParams.DisplaceFactor, 1, 20);
+			ImGui::Checkbox("Waves Animation", &imguiParams.WavesAnimation);
+			ImGui::SliderFloat("Displace Lacunarity", &imguiParams.DisplaceLacunarity, 0.7, 2);
+			ImGui::SliderFloat("Displace PosScale", &imguiParams.DisplacePosScale, 0.01, 0.05);
+			ImGui::SliderFloat("Displace H", &imguiParams.DisplaceH, 0.1, 2);
+		}
+	}
 
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
@@ -278,24 +293,31 @@ void Game::UpdateMainPassCB(const Timer& timer)
 	XMMATRIX view = XMLoadFloat4x4(&mainCamera->GetViewMatrix());
 	XMMATRIX projection = XMLoadFloat4x4(&mainCamera->GetProjectionMatrix());
 
-	ObjectConstants objConstants;
+	ObjectConstants objConstants = {};
 	XMStoreFloat4x4(&objConstants.World, XMMatrixTranspose(world));
 	XMStoreFloat4x4(&objConstants.View, XMMatrixTranspose(view));
 	XMStoreFloat4x4(&objConstants.Projection, XMMatrixTranspose(projection));
-	objConstants.CamPosition = mainCamera->GetPosition();
 	objConstants.AspectRatio = (float)screenWidth / screenHeight;
-
 	currObjectCB->CopyData(0, objConstants);
 
 	auto currTessellationCB = currentFrameResource->TessellationCB.get();
-
-	TessellationConstants tessellationConstants;
+	TessellationConstants tessellationConstants = {};
 	tessellationConstants.ScreenRes = std::max(screenWidth, screenHeight);
 	XMStoreFloat4x4(&tessellationConstants.MeshWorld, XMMatrixTranspose(world));
 	tessellationConstants.SubdivisionLevel = imguiParams.GPULodLevel;
-	tessellationConstants.CamPosition = mainCamera->GetPosition();
-
+	tessellationConstants.DisplaceFactor = imguiParams.DisplaceFactor;
+	tessellationConstants.WavesAnimationFlag = imguiParams.WavesAnimation;
+	tessellationConstants.DisplaceLacunarity = imguiParams.DisplaceLacunarity;
+	tessellationConstants.DisplacePosScale = imguiParams.DisplacePosScale;
+	tessellationConstants.DisplaceH = imguiParams.DisplaceH;
 	currTessellationCB->CopyData(0, tessellationConstants);
+
+	auto currFrameCB = currentFrameResource->PerFrameCB.get();
+	PerFrameConstants perFrameConstants = {};
+	perFrameConstants.CamPosition = mainCamera->GetPosition();
+	perFrameConstants.DeltaTime = timer.GetDeltaTime();
+	perFrameConstants.TotalTime = timer.GetTotalTime();
+	currFrameCB->CopyData(0, perFrameConstants);
 }
 
 void Game::BuildUAVs()
@@ -517,16 +539,18 @@ void Game::BuildRootSignature()
 		srvTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2);
 
 		// Root parameter can be a table, root descriptor or root constants.
-		CD3DX12_ROOT_PARAMETER slotRootParameter[4];
+		CD3DX12_ROOT_PARAMETER slotRootParameter[6];
 		slotRootParameter[0].InitAsConstantBufferView(0);
-		slotRootParameter[1].InitAsDescriptorTable(1, &srvTable0);
-		slotRootParameter[2].InitAsDescriptorTable(1, &srvTable1);
-		slotRootParameter[3].InitAsDescriptorTable(1, &srvTable2);
+		slotRootParameter[1].InitAsConstantBufferView(1);
+		slotRootParameter[2].InitAsConstantBufferView(2);
+		slotRootParameter[3].InitAsDescriptorTable(1, &srvTable0);
+		slotRootParameter[4].InitAsDescriptorTable(1, &srvTable1);
+		slotRootParameter[5].InitAsDescriptorTable(1, &srvTable2);
 
 		auto staticSamplers = GetStaticSamplers();
 
 		// A root signature is an array of root parameters.
-		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(4, slotRootParameter,
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(6, slotRootParameter,
 			(UINT)staticSamplers.size(),
 			staticSamplers.data(),
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -571,19 +595,21 @@ void Game::BuildRootSignature()
 		uavTable5.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 5);
 
 		// Root parameter can be a table, root descriptor or root constants.
-		CD3DX12_ROOT_PARAMETER slotRootParameter[7];
+		CD3DX12_ROOT_PARAMETER slotRootParameter[9];
 		slotRootParameter[0].InitAsConstantBufferView(0);
-		slotRootParameter[1].InitAsDescriptorTable(1, &uavTable0);
-		slotRootParameter[2].InitAsDescriptorTable(1, &uavTable1);
-		slotRootParameter[3].InitAsDescriptorTable(1, &uavTable2);
-		slotRootParameter[4].InitAsDescriptorTable(1, &uavTable3);
-		slotRootParameter[5].InitAsDescriptorTable(1, &uavTable4);
-		slotRootParameter[6].InitAsDescriptorTable(1, &uavTable5);
+		slotRootParameter[1].InitAsConstantBufferView(1);
+		slotRootParameter[2].InitAsConstantBufferView(2);
+		slotRootParameter[3].InitAsDescriptorTable(1, &uavTable0);
+		slotRootParameter[4].InitAsDescriptorTable(1, &uavTable1);
+		slotRootParameter[5].InitAsDescriptorTable(1, &uavTable2);
+		slotRootParameter[6].InitAsDescriptorTable(1, &uavTable3);
+		slotRootParameter[7].InitAsDescriptorTable(1, &uavTable4);
+		slotRootParameter[8].InitAsDescriptorTable(1, &uavTable5);
 
 		auto staticSamplers = GetStaticSamplers();
 
 		// A root signature is an array of root parameters.
-		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(7, slotRootParameter,
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(9, slotRootParameter,
 			(UINT)staticSamplers.size(),
 			staticSamplers.data(),
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -633,7 +659,7 @@ void Game::BuildShadersAndInputLayout()
 		{"USE_DISPLACE", imguiParams.UseDisplaceMapping && imguiParams.MeshMode == MeshMode::TERRAIN ? "1" : "0"},
 		{NULL, NULL}
 	};
-	
+
 	Shaders["OpaqueVS"] = d3dUtil::CompileShader(L"DefaultVS.hlsl", macros, "main", "vs_5_1");
 	Shaders["OpaquePS"] = d3dUtil::CompileShader(L"DefaultPS.hlsl", macros, "main", "ps_5_1");
 	Shaders["TessellationUpdate"] = d3dUtil::CompileShader(L"TessellationUpdate.hlsl", macros, "main", "cs_5_1");

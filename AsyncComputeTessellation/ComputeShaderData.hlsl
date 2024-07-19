@@ -3,15 +3,6 @@
 
 groupshared float cam_height_local;
 
-cbuffer tessellationData : register(b0)
-{
-    matrix meshWorld;
-    uint subdivisionLevel;
-    float3 camPosition;
-    uint screenRes;
-    uint3 padding;
-};
-
 RWStructuredBuffer<float3> MeshDataVertex : register(u0);
 RWStructuredBuffer<uint> MeshDataIndex : register(u1);
 RWStructuredBuffer<uint> DrawArgs : register(u2);

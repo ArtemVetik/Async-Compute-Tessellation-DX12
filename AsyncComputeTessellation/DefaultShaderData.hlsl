@@ -1,15 +1,6 @@
 #ifndef DEFAULT_SHADER_DATA
 #define DEFAULT_SHADER_DATA
 
-cbuffer objectData : register(b0)
-{
-    matrix world;
-    matrix view;
-    matrix projection;
-    float3 camPosition;
-    float aspectRatio;
-};
-
 StructuredBuffer<float3> MeshDataVertex : register(t0);
 StructuredBuffer<uint> MeshDataIndex : register(t1);
 StructuredBuffer<uint4> SubdBufferOut : register(t2);

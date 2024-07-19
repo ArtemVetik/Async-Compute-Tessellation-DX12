@@ -213,5 +213,8 @@
     <None Include="ComputeShaderData.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="ConstantBuffers.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

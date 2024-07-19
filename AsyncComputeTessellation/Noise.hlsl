@@ -1,13 +1,11 @@
+#include "ConstantBuffers.hlsl"
 #include "SimplexNoise.hlsl"
-
-#define u_displace_factor 10
-#define H 0.96
-#define lacunarity 1.99
-#define sharpness 0.02
 
 float displace(float2 p, float screen_resolution)
 {
-    p *= sharpness;
+    p *= displacePosScale;
+    p += totalTime * 0.5 * wavesAnimationFlag;
+    
     const float max_octaves = 16.0;
     float frequency = 1.5;
     float octaves = clamp(log2(screen_resolution) - 2.0, 0.0, max_octaves);
@@ -15,11 +13,11 @@ float displace(float2 p, float screen_resolution)
 
     for (float i = 0.0; i < octaves - 1.0; i += 1.0)
     {
-        value += snoise(p) * pow(frequency, -H);
-        p *= lacunarity;
-        frequency *= lacunarity;
+        value += snoise(p) * pow(frequency, -displaceH);
+        p *= displaceLacunarity;
+        frequency *= displaceLacunarity;
     }
-    value += frac(octaves) * snoise(p) * pow(frequency, -H);
+    value += frac(octaves) * snoise(p) * pow(frequency, -displaceH);
     return value;
 }
 
@@ -33,13 +31,13 @@ float displace(float2 p, float screen_resolution, out float2 gradient)
     for (int i = 0; i < (int) (octaves - 1); i += 1)
     {
         float3 v = snoise3D(float3(p.x, p.y, 0));
-        value += v * pow(frequency, -H)
-		      * float3(1, float2(pow(lacunarity, i), 0));
-        p *= lacunarity;
-        frequency *= lacunarity;
+        value += v * pow(frequency, -displaceH)
+		      * float3(1, float2(pow(displaceLacunarity, i), 0));
+        p *= displaceLacunarity;
+        frequency *= displaceLacunarity;
     }
     value += frac(octaves) * snoise3D(float3(p.x, p.y, 0))
-	      * pow(frequency, -H) * float3(1, pow(lacunarity, octaves).xy);
+	      * pow(frequency, -displaceH) * float3(1, pow(displaceLacunarity, octaves).xy);
     gradient = value.yz;
     return value.x;
 }
@@ -48,7 +46,7 @@ float displace(float2 p, float screen_resolution, out float2 gradient)
 float3 displaceVertex(float3 v, float3 eye)
 {
     float f = 2e4 / distance(v, eye);
-    v.y = displace(v.xz, f) * u_displace_factor;
+    v.y = displace(v.xz, f) * displaceFactor;
     return v;
 }
 
@@ -59,5 +57,5 @@ float4 displaceVertex(float4 v, float3 eye)
 
 float getHeight(float2 v, float f)
 {
-    return displace(v, f) * u_displace_factor;
+    return displace(v, f) * displaceFactor;
 }

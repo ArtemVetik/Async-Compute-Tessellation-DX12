@@ -9,7 +9,6 @@ struct ObjectConstants
 	DirectX::XMFLOAT4X4 World = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 View = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 Projection = MathHelper::Identity4x4();
-	DirectX::XMFLOAT3 CamPosition = {};
 	float AspectRatio = 0.0f;
 };
 
@@ -17,15 +16,21 @@ struct TessellationConstants
 {
 	DirectX::XMFLOAT4X4 MeshWorld = MathHelper::Identity4x4();
 	UINT SubdivisionLevel = 0;
-	DirectX::XMFLOAT3 CamPosition = {};
 	UINT ScreenRes;
-	DirectX::XMUINT3 Padding;
+	float DisplaceFactor = 10.0;
+	UINT WavesAnimationFlag = 0;
+	float DisplaceLacunarity = 1.99;
+	float DisplacePosScale = 0.02;
+	float DisplaceH = 0.96;
+	UINT Padding;
 };
 
-struct TimeConstants
+struct PerFrameConstants
 {
+	DirectX::XMFLOAT3 CamPosition = {};
 	float DeltaTime = 0.0f;
 	float TotalTime = 0.0f;
+	DirectX::XMUINT3 Padding;
 };
 
 struct IndirectCommand
@@ -52,7 +57,7 @@ public:
 	//so each frame needs their own cbuffers
 	std::unique_ptr<UploadBuffer<ObjectConstants>> ObjectCB = nullptr;
 	std::unique_ptr<UploadBuffer<TessellationConstants>> TessellationCB = nullptr;
-	std::unique_ptr<UploadBuffer<TimeConstants>> TimeCB = nullptr;
+	std::unique_ptr<UploadBuffer<PerFrameConstants>> PerFrameCB = nullptr;
 
 	// fence value to mark commands up to this fence point 
 	// this lets us check if these frame resources are still in use by the GPU.

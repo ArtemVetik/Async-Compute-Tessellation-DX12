@@ -3,6 +3,7 @@
 #else
 #include "DefaultShaderData.hlsl"
 #endif
+#include "ConstantBuffers.hlsl"
 
 struct Triangle
 {
