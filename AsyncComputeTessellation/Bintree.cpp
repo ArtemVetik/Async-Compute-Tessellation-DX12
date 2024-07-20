@@ -1,6 +1,7 @@
 #include "Bintree.h"
 
 #include <stdexcept>
+#include <corecrt_math_defines.h>
 
 Bintree::Bintree(ID3D12Device* device, ID3D12GraphicsCommandList* commandList)
 {
@@ -15,7 +16,9 @@ void Bintree::InitMesh(MeshMode mode)
 	if (mode == MeshMode::TERRAIN)
 		mMeshData = geoGen.CreateGrid(250.0f, 250.0f, 2, 2);
 	else
-		mMeshData = geoGen.CreateSphere(100, 5, 5);
+		mMeshData = geoGen.CreateSphere(100, 10, 10);
+
+	mMeshData.InitAvgEdgeLength();
 }
 
 void Bintree::UploadMeshData(ID3D12Resource* vertexResource, ID3D12Resource* indexResource)
@@ -106,9 +109,18 @@ void Bintree::UploadDrawArgs(ID3D12Resource* drawArgs, int cpuLodLevel)
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(drawArgs, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 }
 
-void Bintree::UpdateLodFactor(int res, float fov)
+void Bintree::UpdateLodFactor(ImguiParams* settings, int res, float fov)
 {
-	// TODO: implement dynamic lod factor
+	float l = 2.0f * tan(fov * (M_PI / 180) / 2.0f)
+		* settings->TargetLength
+		* (1 << settings->CPULodLevel)
+		/ float(res);
+
+	const float cap = 0.43f;
+	if (l > cap) {
+		l = cap;
+	}
+	settings->LodFactor = l / float(mMeshData.GetAvgEdgeLength());
 }
 
 GeometryGenerator::MeshData Bintree::GetMeshData() const

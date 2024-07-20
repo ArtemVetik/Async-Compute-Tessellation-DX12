@@ -16,6 +16,7 @@ public:
 	XMFLOAT4X4 GetProjectionMatrix();
 	float GetNear() const;
 	float GetFar() const;
+	float GetFov() const;
 	DirectX::XMFLOAT3 GetPosition() const;
 
 	void Pitch(float angle);
@@ -37,6 +38,7 @@ private:
 	DirectX::XMFLOAT3 mRight = { 1.0f, 0.0f, 0.0f };
 	DirectX::XMFLOAT3 mUp = { 0.0f, 1.0f, 0.0f };
 	DirectX::XMFLOAT3 mLook = { 0.0f, 0.0f, 1.0f };
+	float fov = 55.0f;
 
 	XMFLOAT4X4 viewMatrix;
 	XMFLOAT4X4 projectionMatrix;

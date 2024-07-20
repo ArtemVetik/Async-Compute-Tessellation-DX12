@@ -76,6 +76,12 @@ void Game::Resize()
 	DXCore::Resize();
 
 	mainCamera->SetProjectionMatrix(screenWidth, screenHeight);
+
+	if (bintree)
+	{
+		bintree->InitMesh(imguiParams.MeshMode);
+		bintree->UpdateLodFactor(&imguiParams, std::max(screenWidth, screenHeight), mainCamera->GetFov());
+	}
 }
 
 void Game::Update(const Timer& timer)
@@ -132,7 +138,7 @@ void Game::Draw(const Timer& timer)
 
 	CommandList->SetPipelineState(PSOs["tessellationUpdate"].Get());
 	CommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
-	CommandList->Dispatch(10000, 1, 1);
+	CommandList->Dispatch(10000, 1, 1); // TODO: figure out how many threads group to run
 
 	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferIn.Get()));
 	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferOut.Get()));
@@ -212,7 +218,7 @@ void Game::Draw(const Timer& timer)
 	// set until the GPU finishes processing all the commands prior to this Signal()
 	CommandQueue->Signal(Fence.Get(), currentFence);
 
-	if (changePso)
+	if (changePso) // TODO: optimize to avoid rebuilding all resources and PSOs every time
 	{
 		FlushCommandQueue();
 		ThrowIfFailed(CommandList->Reset(CommandListAllocator.Get(), nullptr));
@@ -234,7 +240,7 @@ void Game::Draw(const Timer& timer)
 	PrintInfoMessages();
 }
 
-void Game::ImGuiDraw(bool* changePso) // TODO: optimize for different changes
+void Game::ImGuiDraw(bool* changePso)
 {
 	ImGui_ImplDX12_NewFrame();
 	ImGui_ImplWin32_NewFrame();
@@ -277,6 +283,13 @@ void Game::ImGuiDraw(bool* changePso) // TODO: optimize for different changes
 		}
 	}
 
+	float expo = log2(imguiParams.TargetLength);
+	if (ImGui::SliderFloat("Edge Length (2^x)", &expo, 2, 10))
+	{
+		imguiParams.TargetLength = std::pow(2, expo);
+		bintree->UpdateLodFactor(&imguiParams, std::max(screenWidth, screenHeight), mainCamera->GetFov());
+	}
+
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
 	ImGui::End();
@@ -288,6 +301,8 @@ void Game::ImGuiDraw(bool* changePso) // TODO: optimize for different changes
 
 void Game::UpdateMainPassCB(const Timer& timer)
 {
+	// TODO: optimize loading of constant buffers (load only when needed, not every frame)
+
 	auto currObjectCB = currentFrameResource->ObjectCB.get();
 	XMMATRIX world = XMLoadFloat4x4(&MathHelper::Identity4x4());
 	XMMATRIX view = XMLoadFloat4x4(&mainCamera->GetViewMatrix());
@@ -310,6 +325,7 @@ void Game::UpdateMainPassCB(const Timer& timer)
 	tessellationConstants.DisplaceLacunarity = imguiParams.DisplaceLacunarity;
 	tessellationConstants.DisplacePosScale = imguiParams.DisplacePosScale;
 	tessellationConstants.DisplaceH = imguiParams.DisplaceH;
+	tessellationConstants.LodFactor = imguiParams.LodFactor;
 	currTessellationCB->CopyData(0, tessellationConstants);
 
 	auto currFrameCB = currentFrameResource->PerFrameCB.get();
@@ -323,6 +339,7 @@ void Game::UpdateMainPassCB(const Timer& timer)
 void Game::BuildUAVs()
 {
 	bintree->InitMesh(imguiParams.MeshMode);
+	bintree->UpdateLodFactor(&imguiParams, std::max(screenWidth, screenHeight), mainCamera->GetFov());
 
 	// Mesh Data Vertices
 	{
@@ -433,7 +450,7 @@ void Game::BuildUAVs()
 
 	// Subd Buffer In/Out
 	{
-		int subdSize = 1000000; // TODO: find out what size is needed here
+		int subdSize = 10000000; // TODO: find out what size is needed here
 		UINT64 subdBufferByteSize = sizeof(XMUINT4) * subdSize;
 
 		ThrowIfFailed(Device->CreateCommittedResource(
@@ -690,7 +707,7 @@ void Game::BuildPSOs()
 	geoOpaquePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	if (imguiParams.WireframeMode)
 		geoOpaquePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
-	geoOpaquePsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+	geoOpaquePsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE; // TODO: use D3D12_CULL_MODE_FRONT (tessellation algorithm will need to be modified)
 	geoOpaquePsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	geoOpaquePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 	geoOpaquePsoDesc.SampleMask = UINT_MAX;
@@ -732,8 +749,7 @@ void Game::BuildFrameResources()
 {
 	for (int i = 0; i < gNumberFrameResources; ++i)
 	{
-		FrameResources.push_back(std::make_unique<FrameResource>(Device.Get(),
-			1, 1, 1));
+		FrameResources.push_back(std::make_unique<FrameResource>(Device.Get(), 1, 1, 1));
 	}
 }
 

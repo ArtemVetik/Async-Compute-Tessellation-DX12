@@ -17,6 +17,9 @@
 #include <cstdint>
 #include <DirectXMath.h>
 #include <vector>
+#include <algorithm>
+#include <iterator>
+#include "MeshUtils.h"
 
 class GeometryGenerator
 {
@@ -70,8 +73,25 @@ public:
 			return mIndices16;
 		}
 
+		float GetAvgEdgeLength() const { return mAvgEdgeLength; }
+
+		void InitAvgEdgeLength()
+		{
+			MeshUtils mUtils;
+
+			std::vector<DirectX::XMFLOAT3> positions;
+			positions.reserve(Vertices.size());
+			std::transform(Vertices.begin(), Vertices.end(), std::back_inserter(positions),
+				[](const Vertex& vertex) {
+					return vertex.Position;
+				});
+
+			mAvgEdgeLength = mUtils.CalculateAverageEdgeLength(positions, Indices32);
+		}
+
 	private:
 		std::vector<uint16> mIndices16;
+		float mAvgEdgeLength;
 	};
 
 	///<summary>

@@ -17,6 +17,8 @@ struct ImguiParams
 	float DisplaceLacunarity = 1.99;
 	float DisplacePosScale = 0.02;
 	float DisplaceH = 0.96;
+	float TargetLength = 25;
+	float LodFactor = 1;
 	int CPULodLevel = 0;
 	int GPULodLevel = 0;
 };

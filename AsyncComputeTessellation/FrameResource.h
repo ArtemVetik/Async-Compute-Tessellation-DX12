@@ -22,7 +22,7 @@ struct TessellationConstants
 	float DisplaceLacunarity = 1.99;
 	float DisplacePosScale = 0.02;
 	float DisplaceH = 0.96;
-	UINT Padding;
+	float LodFactor;
 };
 
 struct PerFrameConstants

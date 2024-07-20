@@ -12,7 +12,7 @@ void compute_writeKey(uint2 new_nodeID, uint4 current_key)
     SubdBufferOut[idx] = new_key;
 }
 
-[numthreads(32, 1, 1)]
+[numthreads(512, 1, 1)]
 void main(uint id : SV_DispatchThreadID, uint groupId : SV_GroupIndex)
 {
     uint4 key = SubdBufferIn[id.x];

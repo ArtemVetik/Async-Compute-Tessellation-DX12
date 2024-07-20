@@ -20,7 +20,7 @@ cbuffer tessellationData : register(b1)
     float displaceLacunarity;
     float displacePosScale;
     float displaceH;
-    uint Padding1;
+    float lodFactor;
 };
 
 cbuffer perFrameData : register(b2)

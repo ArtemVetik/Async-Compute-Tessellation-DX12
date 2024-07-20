@@ -2,12 +2,11 @@
 #include "Common.hlsl"
 
 static const float2 triangle_centroid = float2(0.5, 0.5);
-static const float u_lod_factor = 6e-5; // TODO: calculate this value
 
 float distanceToLod(float3 pos)
 {
     float d = distance(pos, camPosition);
-    float lod = (d * u_lod_factor);
+    float lod = (d * lodFactor);
     lod = clamp(lod, 0.0, 1.0);
     return -2.0 * log2(lod);
 }
