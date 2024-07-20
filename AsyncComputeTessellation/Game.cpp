@@ -147,7 +147,10 @@ void Game::Draw(const Timer& timer)
 	CommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
 	CommandList->Dispatch(1, 1, 1);
 
-	CommandList->SetPipelineState(PSOs["Opaque"].Get());
+	if (imguiParams.WireframeMode)
+		CommandList->SetPipelineState(PSOs["Wireframe"].Get());
+	else
+		CommandList->SetPipelineState(PSOs["Opaque"].Get());
 
 	CommandList->RSSetViewports(1, &ScreenViewPort);
 	CommandList->RSSetScissorRects(1, &ScissorRect);
@@ -193,8 +196,8 @@ void Game::Draw(const Timer& timer)
 	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(),
 		D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 
-	bool changePso;
-	ImGuiDraw(&changePso);
+	ImguiOutput imguiOutput;
+	ImGuiDraw(imguiOutput);
 
 	// indicate a state transition on the resource usage
 	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
@@ -218,16 +221,25 @@ void Game::Draw(const Timer& timer)
 	// set until the GPU finishes processing all the commands prior to this Signal()
 	CommandQueue->Signal(Fence.Get(), currentFence);
 
-	if (changePso) // TODO: optimize to avoid rebuilding all resources and PSOs every time
+	if (imguiOutput.HasChanges())
 	{
 		FlushCommandQueue();
 		ThrowIfFailed(CommandList->Reset(CommandListAllocator.Get(), nullptr));
 
-		BuildUAVs();
-		UploadBuffers();
-		BuildShadersAndInputLayout();
-		BuildPSOs();
-		pingPongCounter = 1;
+		if (imguiOutput.RebuildMesh)
+			BuildUAVs();
+
+		if (imguiOutput.ReuploadBuffers)
+		{
+			UploadBuffers();
+			pingPongCounter = 1;
+		}
+
+		if (imguiOutput.RecompileShaders)
+		{
+			BuildShadersAndInputLayout();
+			BuildPSOs();
+		}
 
 		// execute the initialization commands
 		ThrowIfFailed(CommandList->Close());
@@ -240,7 +252,7 @@ void Game::Draw(const Timer& timer)
 	PrintInfoMessages();
 }
 
-void Game::ImGuiDraw(bool* changePso)
+void Game::ImGuiDraw(ImguiOutput& output)
 {
 	ImGui_ImplDX12_NewFrame();
 	ImGui_ImplWin32_NewFrame();
@@ -254,30 +266,37 @@ void Game::ImGuiDraw(bool* changePso)
 	ImGui::Text("Test application parameters.");
 	ImGui::Checkbox("Demo Window", &imguiParams.ShowDebugWindow);
 
-	*changePso = false;
+	output = {};
 
 	if (ImGui::Combo("Mode", (int*)&imguiParams.MeshMode, "Terrain\0Mesh\0\0"))
-		*changePso = true;
+	{
+		output.RebuildMesh = true;
+	}
 
-	if (ImGui::Checkbox("Wireframe Mode", &imguiParams.WireframeMode))
-		*changePso = true;
+	ImGui::Checkbox("Wireframe Mode", &imguiParams.WireframeMode);
 
 	if (ImGui::SliderInt("CPU Lod Level", &imguiParams.CPULodLevel, 0, 4))
-		*changePso = true;
+		output.ReuploadBuffers = true;
 
-	if (ImGui::SliderInt("GPU Lod Level", &imguiParams.GPULodLevel, 0, 16))
-		*changePso = true;
+	if (ImGui::Checkbox("Uniform", &imguiParams.Uniform))
+		output.RecompileShaders = true;
+
+	if (imguiParams.Uniform)
+	{
+		if (ImGui::SliderInt("GPU Lod Level", &imguiParams.GPULodLevel, 0, 16))
+			output.ReuploadBuffers = true;
+	}
 
 	if (imguiParams.MeshMode == MeshMode::TERRAIN)
 	{
 		if (ImGui::Checkbox("Displace Mapping", &imguiParams.UseDisplaceMapping))
-			*changePso = true;
+			output.RecompileShaders = true;
 
 		if (imguiParams.UseDisplaceMapping)
 		{
 			ImGui::SliderFloat("Displace Factor", &imguiParams.DisplaceFactor, 1, 20);
 			ImGui::Checkbox("Waves Animation", &imguiParams.WavesAnimation);
-			ImGui::SliderFloat("Displace Lacunarity", &imguiParams.DisplaceLacunarity, 0.7, 2);
+			ImGui::SliderFloat("Displace Lacunarity", &imguiParams.DisplaceLacunarity, 0.7, 3);
 			ImGui::SliderFloat("Displace PosScale", &imguiParams.DisplacePosScale, 0.01, 0.05);
 			ImGui::SliderFloat("Displace H", &imguiParams.DisplaceH, 0.1, 2);
 		}
@@ -674,12 +693,14 @@ void Game::BuildShadersAndInputLayout()
 	D3D_SHADER_MACRO macros[] =
 	{
 		{"USE_DISPLACE", imguiParams.UseDisplaceMapping && imguiParams.MeshMode == MeshMode::TERRAIN ? "1" : "0"},
+		{"UNIFORM_TESSELLATION", imguiParams.Uniform ? "1" : "0"},
 		{NULL, NULL}
 	};
 
 	Shaders["OpaqueVS"] = d3dUtil::CompileShader(L"DefaultVS.hlsl", macros, "main", "vs_5_1");
 	Shaders["OpaquePS"] = d3dUtil::CompileShader(L"DefaultPS.hlsl", macros, "main", "ps_5_1");
-	Shaders["OpaqueGS"] = d3dUtil::CompileShader(L"DefaultGS.hlsl", macros, "main", "gs_5_1");
+	Shaders["WireframeGS"] = d3dUtil::CompileShader(L"WireframeGS.hlsl", macros, "main", "gs_5_1");
+	Shaders["WireframePS"] = d3dUtil::CompileShader(L"WireframePS.hlsl", macros, "main", "ps_5_1");
 	Shaders["TessellationUpdate"] = d3dUtil::CompileShader(L"TessellationUpdate.hlsl", macros, "main", "cs_5_1");
 	Shaders["TessellationCopyDraw"] = d3dUtil::CompileShader(L"TessellationCopyDraw.hlsl", macros, "main", "cs_5_1");
 
@@ -705,14 +726,7 @@ void Game::BuildPSOs()
 		reinterpret_cast<BYTE*>(Shaders["OpaquePS"]->GetBufferPointer()),
 		Shaders["OpaquePS"]->GetBufferSize()
 	};
-	geoOpaquePsoDesc.GS =
-	{
-		reinterpret_cast<BYTE*>(Shaders["OpaqueGS"]->GetBufferPointer()),
-		Shaders["OpaqueGS"]->GetBufferSize()
-	};
 	geoOpaquePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
-	if (imguiParams.WireframeMode)
-		geoOpaquePsoDesc.RasterizerState.FillMode = D3D12_FILL_MODE_WIREFRAME;
 	geoOpaquePsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE; // TODO: use D3D12_CULL_MODE_FRONT (tessellation algorithm will need to be modified)
 	geoOpaquePsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 	geoOpaquePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
@@ -725,6 +739,40 @@ void Game::BuildPSOs()
 	geoOpaquePsoDesc.DSVFormat = DepthStencilFormat;
 	ThrowIfFailed(Device->CreateGraphicsPipelineState(&geoOpaquePsoDesc, IID_PPV_ARGS(&PSOs["Opaque"])));
 	PSOs["Opaque"]->SetName(L"OpaquePSO");
+
+
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC geoWireframePsoDesc;
+	ZeroMemory(&geoWireframePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+	geoWireframePsoDesc.InputLayout = { geoInputLayout.data(), (UINT)geoInputLayout.size() };
+	geoWireframePsoDesc.pRootSignature = opaqueRootSignature.Get();
+	geoWireframePsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(Shaders["OpaqueVS"]->GetBufferPointer()),
+		Shaders["OpaqueVS"]->GetBufferSize()
+	};
+	geoWireframePsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(Shaders["WireframePS"]->GetBufferPointer()),
+		Shaders["WireframePS"]->GetBufferSize()
+	};
+	geoWireframePsoDesc.GS =
+	{
+		reinterpret_cast<BYTE*>(Shaders["WireframeGS"]->GetBufferPointer()),
+		Shaders["WireframeGS"]->GetBufferSize()
+	};
+	geoWireframePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	geoWireframePsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE; // TODO: use D3D12_CULL_MODE_FRONT (tessellation algorithm will need to be modified)
+	geoWireframePsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	geoWireframePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+	geoWireframePsoDesc.SampleMask = UINT_MAX;
+	geoWireframePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	geoWireframePsoDesc.NumRenderTargets = 1;
+	geoWireframePsoDesc.RTVFormats[0] = BackBufferFormat;
+	geoWireframePsoDesc.SampleDesc.Count = xMsaaState ? 4 : 1;
+	geoWireframePsoDesc.SampleDesc.Quality = xMsaaState ? (xMsaaQuality - 1) : 0;
+	geoWireframePsoDesc.DSVFormat = DepthStencilFormat;
+	ThrowIfFailed(Device->CreateGraphicsPipelineState(&geoWireframePsoDesc, IID_PPV_ARGS(&PSOs["Wireframe"])));
+	PSOs["Wireframe"]->SetName(L"WireframePSO");
 
 
 	D3D12_COMPUTE_PIPELINE_STATE_DESC tessellationUpdatePSO = {};

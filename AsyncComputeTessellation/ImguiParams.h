@@ -20,5 +20,18 @@ struct ImguiParams
 	float TargetLength = 25;
 	float LodFactor = 1;
 	int CPULodLevel = 0;
+	bool Uniform = false;
 	int GPULodLevel = 0;
+};
+
+struct ImguiOutput
+{
+	bool RebuildMesh = false;
+	bool ReuploadBuffers = false;
+	bool RecompileShaders = false;
+
+	bool HasChanges() const
+	{
+		return RebuildMesh || ReuploadBuffers || RecompileShaders;
+	}
 };

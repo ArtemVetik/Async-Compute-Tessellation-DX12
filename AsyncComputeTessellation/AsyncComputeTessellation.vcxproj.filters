@@ -207,7 +207,7 @@
     <None Include="TessellationUpdate.hlsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="DefaultPS.hlsl">
+    <None Include="WireframePS.hlsl">
       <Filter>Shaders</Filter>
     </None>
     <None Include="DefaultVS.hlsl">
@@ -222,7 +222,10 @@
     <None Include="ConstantBuffers.hlsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="DefaultGS.hlsl">
+    <None Include="WireframeGS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="DefaultPS.hlsl">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

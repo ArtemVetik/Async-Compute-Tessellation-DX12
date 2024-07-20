@@ -34,23 +34,19 @@ void main(uint id : SV_DispatchThreadID, uint groupId : SV_GroupIndex)
         return;
     
     int targetLod = 0, parentLod = 0;
-    if (subdivisionLevel > 0)
-    {
-        targetLod = subdivisionLevel;
-        parentLod = subdivisionLevel;
-    }
-    else
-    {
-        float parentTargetLevel, targetLevel;
+#if UNIFORM_TESSELLATION
+    targetLod = subdivisionLevel;
+    parentLod = subdivisionLevel;
+#else 
+    float parentTargetLevel, targetLevel;
 #if USE_DISPLACE
-        computeTessLvlWithParent(key, cam_height_local, targetLevel, parentTargetLevel);
+    computeTessLvlWithParent(key, cam_height_local, targetLevel, parentTargetLevel);
 #else
-        computeTessLvlWithParent(key, targetLevel, parentTargetLevel);
+    computeTessLvlWithParent(key, targetLevel, parentTargetLevel);
 #endif
-        targetLod = int(targetLevel);
-        parentLod = int(parentTargetLevel);
-    }
-        
+    targetLod = int(targetLevel);
+    parentLod = int(parentTargetLevel);
+#endif
     
     int keyLod = ts_findMSB_64(nodeID);
     

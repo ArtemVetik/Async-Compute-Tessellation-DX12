@@ -102,7 +102,7 @@ private:
 	virtual void Update(const Timer& timer)override;
 	virtual void Draw(const Timer& timer)override;
 
-	void ImGuiDraw(bool* changePso);
+	void ImGuiDraw(ImguiOutput& output);
 	void UpdateMainPassCB(const Timer& timer);
 
 	void BuildUAVs();

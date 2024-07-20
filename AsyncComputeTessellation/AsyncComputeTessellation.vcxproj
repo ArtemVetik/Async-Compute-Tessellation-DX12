@@ -189,7 +189,7 @@
     <None Include="Common.hlsl">
       <FileType>Document</FileType>
     </None>
-    <None Include="DefaultPS.hlsl">
+    <None Include="WireframePS.hlsl">
       <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
       <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.1</ShaderModel>
       <FileType>Document</FileType>
@@ -236,7 +236,12 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <None Include="DefaultGS.hlsl">
+    <None Include="WireframeGS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="DefaultPS.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>
