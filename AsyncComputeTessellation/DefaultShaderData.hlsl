@@ -16,6 +16,8 @@ struct VertexOut
     float3 PosW : POSITION;
     float3 NormalW : NORMAL;
     float2 TexC : TEXCOORD;
+    uint Lvl : TEXCOORD1;
+    float2 LeafPos : TEXCOORD2;
 };
 
 #endif

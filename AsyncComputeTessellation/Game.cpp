@@ -157,7 +157,7 @@ void Game::Draw(const Timer& timer)
 		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
 	// clear the back buffer and depth buffer
-	CommandList->ClearRenderTargetView(CurrentBackBufferView(), Colors::Black, 0, nullptr);
+	CommandList->ClearRenderTargetView(CurrentBackBufferView(), Colors::Aqua, 0, nullptr);
 	CommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
 	// specify the buffers we are going to render to
@@ -679,6 +679,7 @@ void Game::BuildShadersAndInputLayout()
 
 	Shaders["OpaqueVS"] = d3dUtil::CompileShader(L"DefaultVS.hlsl", macros, "main", "vs_5_1");
 	Shaders["OpaquePS"] = d3dUtil::CompileShader(L"DefaultPS.hlsl", macros, "main", "ps_5_1");
+	Shaders["OpaqueGS"] = d3dUtil::CompileShader(L"DefaultGS.hlsl", macros, "main", "gs_5_1");
 	Shaders["TessellationUpdate"] = d3dUtil::CompileShader(L"TessellationUpdate.hlsl", macros, "main", "cs_5_1");
 	Shaders["TessellationCopyDraw"] = d3dUtil::CompileShader(L"TessellationCopyDraw.hlsl", macros, "main", "cs_5_1");
 
@@ -703,6 +704,11 @@ void Game::BuildPSOs()
 	{
 		reinterpret_cast<BYTE*>(Shaders["OpaquePS"]->GetBufferPointer()),
 		Shaders["OpaquePS"]->GetBufferSize()
+	};
+	geoOpaquePsoDesc.GS =
+	{
+		reinterpret_cast<BYTE*>(Shaders["OpaqueGS"]->GetBufferPointer()),
+		Shaders["OpaqueGS"]->GetBufferSize()
 	};
 	geoOpaquePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
 	if (imguiParams.WireframeMode)

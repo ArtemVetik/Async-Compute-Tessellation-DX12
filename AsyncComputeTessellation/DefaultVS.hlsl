@@ -27,7 +27,8 @@ VertexOut main(VertexIn vIn, uint instanceID : SV_InstanceID)
     output.NormalW = 1;
     output.PosH = mul(mul(posW, view), projection);
     output.TexC = 1;
-	
+    output.Lvl = ts_findMSB_64(key.xy);
+    
     return output;
 }
 
