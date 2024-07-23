@@ -57,9 +57,6 @@
     <ClCompile Include="stdafx.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="SystemData.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="Timer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -134,9 +131,6 @@
     <ClInclude Include="stdafx.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="SystemData.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="targetver.h">
       <Filter>Header Files</Filter>
     </ClInclude>
@@ -189,9 +183,6 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <None Include="SimplexNoise.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="Noise.hlsl">
       <Filter>Shaders</Filter>
     </None>
@@ -226,6 +217,15 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="DefaultPS.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Structs.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="LightingUtil.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="gpu_noise_lib.hlsl">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

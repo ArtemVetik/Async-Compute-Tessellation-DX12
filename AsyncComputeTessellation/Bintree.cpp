@@ -28,10 +28,10 @@ void Bintree::UploadMeshData(ID3D12Resource* vertexResource, ID3D12Resource* ind
 		if (MeshDataVertexUploadBuffer)
 			MeshDataVertexUploadBuffer.reset();
 
-		MeshDataVertexUploadBuffer = std::make_unique<UploadBuffer<DirectX::XMFLOAT3>>(mDevice, mMeshData.Vertices.size(), false);
+		MeshDataVertexUploadBuffer = std::make_unique<UploadBuffer<Vertex>>(mDevice, mMeshData.Vertices.size(), false);
 
 		for (int i = 0; i < mMeshData.Vertices.size(); i++)
-			MeshDataVertexUploadBuffer->CopyData(i, mMeshData.Vertices[i].Position);
+			MeshDataVertexUploadBuffer->CopyData(i, mMeshData.Vertices[i]);
 
 		mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(vertexResource, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
 		mCommandList->CopyResource(vertexResource, MeshDataVertexUploadBuffer->Resource());

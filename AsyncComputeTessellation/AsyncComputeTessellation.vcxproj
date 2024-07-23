@@ -150,7 +150,6 @@
     <ClCompile Include="MathHelper.cpp" />
     <ClCompile Include="MeshUtils.cpp" />
     <ClCompile Include="stdafx.cpp" />
-    <ClCompile Include="SystemData.cpp" />
     <ClCompile Include="Timer.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -179,7 +178,6 @@
     <ClInclude Include="Renderable.h" />
     <ClInclude Include="Resource.h" />
     <ClInclude Include="stdafx.h" />
-    <ClInclude Include="SystemData.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="Timer.h" />
     <ClInclude Include="UploadBuffer.h" />
@@ -215,9 +213,6 @@
     <None Include="Noise.hlsl">
       <FileType>Document</FileType>
     </None>
-    <None Include="SimplexNoise.hlsl">
-      <FileType>Document</FileType>
-    </None>
   </ItemGroup>
   <ItemGroup>
     <Image Include="small.ico" />
@@ -242,6 +237,21 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="DefaultPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Structs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="LightingUtil.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="gpu_noise_lib.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

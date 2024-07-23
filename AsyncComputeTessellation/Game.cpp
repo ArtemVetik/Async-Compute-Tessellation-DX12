@@ -6,7 +6,6 @@ Game::Game(HINSTANCE hInstance) : DXCore(hInstance)
 {
 	mainCamera = new Camera(screenWidth, screenHeight);
 
-	systemData = new SystemData();
 	inputManager = new InputManager();
 	bintree = nullptr;
 	pingPongCounter = 0;
@@ -16,9 +15,6 @@ Game::~Game()
 {
 	if (Device != nullptr)
 		FlushCommandQueue();
-
-	delete systemData;
-	systemData = 0;
 
 	delete inputManager;
 	delete mainCamera;
@@ -229,13 +225,13 @@ void Game::Draw(const Timer& timer)
 		if (imguiOutput.RebuildMesh)
 			BuildUAVs();
 
-		if (imguiOutput.ReuploadBuffers)
+		if (imguiOutput.ReuploadBuffers || imguiOutput.RebuildMesh)
 		{
 			UploadBuffers();
 			pingPongCounter = 1;
 		}
 
-		if (imguiOutput.RecompileShaders)
+		if (imguiOutput.RecompileShaders || imguiOutput.RebuildMesh)
 		{
 			BuildShadersAndInputLayout();
 			BuildPSOs();
@@ -302,6 +298,12 @@ void Game::ImGuiDraw(ImguiOutput& output)
 		}
 	}
 
+	if (imguiParams.WireframeMode == false)
+	{
+		if (ImGui::Checkbox("Flat Normals", &imguiParams.FlatNormals))
+			output.RecompileShaders = true;
+	}
+
 	float expo = log2(imguiParams.TargetLength);
 	if (ImGui::SliderFloat("Edge Length (2^x)", &expo, 2, 10))
 	{
@@ -332,6 +334,12 @@ void Game::UpdateMainPassCB(const Timer& timer)
 	XMStoreFloat4x4(&objConstants.View, XMMatrixTranspose(view));
 	XMStoreFloat4x4(&objConstants.Projection, XMMatrixTranspose(projection));
 	objConstants.AspectRatio = (float)screenWidth / screenHeight;
+	objConstants.Lights[0].Direction = { 0.57735f, -0.57735f, 0.57735f };
+	objConstants.Lights[0].Strength = { 0.6f, 0.6f, 0.6f };
+	objConstants.Lights[1].Direction = { -0.57735f, -0.57735f, 0.57735f };
+	objConstants.Lights[1].Strength = { 0.3f, 0.3f, 0.3f };
+	objConstants.Lights[2].Direction = { 0.0f, -0.707f, -0.707f };
+	objConstants.Lights[2].Strength = { 0.15f, 0.15f, 0.15f };
 	currObjectCB->CopyData(0, objConstants);
 
 	auto currTessellationCB = currentFrameResource->TessellationCB.get();
@@ -363,7 +371,7 @@ void Game::BuildUAVs()
 	// Mesh Data Vertices
 	{
 		int vertexCount = bintree->GetMeshData().Vertices.size();
-		UINT64 meshDataVertexByteSize = sizeof(DirectX::XMFLOAT3) * vertexCount;
+		UINT64 meshDataVertexByteSize = sizeof(Vertex) * vertexCount;
 		ThrowIfFailed(Device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
 			D3D12_HEAP_FLAG_NONE,
@@ -378,7 +386,7 @@ void Game::BuildUAVs()
 		meshDataVertexUAVDescription.Format = DXGI_FORMAT_UNKNOWN;
 		meshDataVertexUAVDescription.Buffer.FirstElement = 0;
 		meshDataVertexUAVDescription.Buffer.NumElements = vertexCount;
-		meshDataVertexUAVDescription.Buffer.StructureByteStride = sizeof(DirectX::XMFLOAT3);
+		meshDataVertexUAVDescription.Buffer.StructureByteStride = sizeof(Vertex);
 		meshDataVertexUAVDescription.Buffer.CounterOffsetInBytes = 0;
 		meshDataVertexUAVDescription.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
 
@@ -392,7 +400,7 @@ void Game::BuildUAVs()
 		meshDataVertexSRVDescription.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 		meshDataVertexSRVDescription.Buffer.FirstElement = 0;
 		meshDataVertexSRVDescription.Buffer.NumElements = vertexCount;
-		meshDataVertexSRVDescription.Buffer.StructureByteStride = sizeof(DirectX::XMFLOAT3);
+		meshDataVertexSRVDescription.Buffer.StructureByteStride = sizeof(Vertex);
 
 		MeshDataVertexCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 2, CBVSRVUAVDescriptorSize);
 		MeshDataVertexGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 2, CBVSRVUAVDescriptorSize);
@@ -694,6 +702,7 @@ void Game::BuildShadersAndInputLayout()
 	{
 		{"USE_DISPLACE", imguiParams.UseDisplaceMapping && imguiParams.MeshMode == MeshMode::TERRAIN ? "1" : "0"},
 		{"UNIFORM_TESSELLATION", imguiParams.Uniform ? "1" : "0"},
+		{"FLAT_NORMALS", imguiParams.FlatNormals ? "1" : "0"},
 		{NULL, NULL}
 	};
 

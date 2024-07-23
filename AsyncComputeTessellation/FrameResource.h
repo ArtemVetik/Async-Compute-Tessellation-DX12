@@ -10,6 +10,8 @@ struct ObjectConstants
 	DirectX::XMFLOAT4X4 View = MathHelper::Identity4x4();
 	DirectX::XMFLOAT4X4 Projection = MathHelper::Identity4x4();
 	float AspectRatio = 0.0f;
+	DirectX::XMUINT3 Padding;
+	Light Lights[MaxLights];
 };
 
 struct TessellationConstants

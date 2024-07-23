@@ -15,18 +15,18 @@ VertexOut main(VertexIn vIn, uint instanceID : SV_InstanceID)
     ts_getMeshTriangle(key.z, t);
     
     float2 tree_pos = ts_Leaf_to_Tree_64(leaf_pos, nodeID);
-    float3 vertex = ts_mapTo3DTriangle(t, tree_pos);
+    Vertex vertex = ts_interpolateVertex(t, tree_pos);
     
-    float4 posW = mul(float4(vertex, 1.0f), world);
+    float4 posW = mul(float4(vertex.Position, 1.0f), world);
     
 #if USE_DISPLACE
     posW = float4(displaceVertex(posW.xyz, camPosition), 1);
 #endif
     
     output.PosW = posW;
-    output.NormalW = 1;
+    output.NormalW = mul(float4(vertex.Normal, 1.0f), world);
     output.PosH = mul(mul(posW, view), projection);
-    output.TexC = 1;
+    output.TexC = vertex.TexC;
     output.Lvl = ts_findMSB_64(key.xy);
     
     return output;

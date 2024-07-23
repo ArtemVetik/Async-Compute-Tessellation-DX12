@@ -1,7 +1,9 @@
 #ifndef DEFAULT_SHADER_DATA
 #define DEFAULT_SHADER_DATA
 
-StructuredBuffer<float3> MeshDataVertex : register(t0);
+#include "Structs.hlsl"
+
+StructuredBuffer<Vertex> MeshDataVertex : register(t0);
 StructuredBuffer<uint> MeshDataIndex : register(t1);
 StructuredBuffer<uint4> SubdBufferOut : register(t2);
 

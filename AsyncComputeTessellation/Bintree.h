@@ -30,7 +30,7 @@ private:
 	GeometryGenerator::MeshData mMeshData;
 	std::unique_ptr<MeshGeometry> mLeafGeometry;
 
-	std::unique_ptr<UploadBuffer<DirectX::XMFLOAT3>> MeshDataVertexUploadBuffer;
+	std::unique_ptr<UploadBuffer<Vertex>> MeshDataVertexUploadBuffer;
 	std::unique_ptr<UploadBuffer<UINT>> MeshDataIndexUploadBuffer;
 	std::unique_ptr<UploadBuffer<DirectX::XMUINT4>> SubdBufferInUploadBuffer;
 	std::unique_ptr<UploadBuffer<IndirectCommand>> IndirectCommandUploadBuffer;

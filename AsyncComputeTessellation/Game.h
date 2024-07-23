@@ -8,7 +8,6 @@
 #include "FrameResource.h"
 #include "Renderable.h"
 #include "GeometryGenerator.h"
-#include "SystemData.h"
 #include "DDSTextureLoader.h"
 #include "ImguiParams.h"
 #include "Bintree.h"
@@ -91,8 +90,6 @@ private:
 	Camera* mainCamera;
 
 	InputManager* inputManager;
-
-	SystemData *systemData;
 
 	ImguiParams imguiParams;
 

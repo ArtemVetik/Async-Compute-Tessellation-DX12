@@ -5,11 +5,6 @@
 #endif
 #include "ConstantBuffers.hlsl"
 
-struct Triangle
-{
-    float3 Vertex[3];
-};
-
 uint ts_findMSB_64(uint2 nodeID)
 {
     return nodeID.x == 0 ? firstbithigh(nodeID.y) : (firstbithigh(nodeID.x) + 32);
@@ -134,10 +129,29 @@ float2 ts_Leaf_to_Tree_64(float2 p, uint2 nodeID)
 
 float3 ts_mapTo3DTriangle(Triangle t, float2 uv)
 {
-    float3 result = (1.0 - uv.x - uv.y) * t.Vertex[0] +
-            uv.x * t.Vertex[2] +
-            uv.y * t.Vertex[1];
+    float3 result = (1.0 - uv.x - uv.y) * t.Vertex[0].Position +
+            uv.x * t.Vertex[2].Position +
+            uv.y * t.Vertex[1].Position;
     return result;
+}
+
+Vertex ts_interpolateVertex(Triangle t, float2 uv)
+{
+    Vertex v;
+    v.Position = (1.0 - uv.x - uv.y) * t.Vertex[0].Position
+            + uv.x * t.Vertex[2].Position
+            + uv.y * t.Vertex[1].Position;
+    v.Normal = (1.0 - uv.x - uv.y) * t.Vertex[0].Normal
+            + uv.x * t.Vertex[2].Normal
+            + uv.y * t.Vertex[1].Normal;
+    v.Normal = normalize(v.Normal);
+    v.TexC = (1.0 - uv.x - uv.y) * t.Vertex[0].TexC
+            + uv.x * t.Vertex[2].TexC
+            + uv.y * t.Vertex[1].TexC;
+    v.TangentU = (1.0 - uv.x - uv.y) * t.Vertex[0].TangentU
+            + uv.x * t.Vertex[2].TangentU
+            + uv.y * t.Vertex[1].TangentU;
+    return v;
 }
 
 float3 ts_Tree_to_MeshPosition(float2 p, uint meshPolygonID)

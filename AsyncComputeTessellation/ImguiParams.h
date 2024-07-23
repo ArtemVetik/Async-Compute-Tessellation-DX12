@@ -22,6 +22,7 @@ struct ImguiParams
 	int CPULodLevel = 0;
 	bool Uniform = false;
 	int GPULodLevel = 0;
+	bool FlatNormals = false;
 };
 
 struct ImguiOutput
