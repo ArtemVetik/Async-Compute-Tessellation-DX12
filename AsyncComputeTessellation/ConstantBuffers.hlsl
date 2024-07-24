@@ -8,6 +8,7 @@ cbuffer objectData : register(b0)
     matrix world;
     matrix view;
     matrix projection;
+    matrix shadowTransform;
     float aspectRatio;
     uint3 padding0;
     // Indices [0, NUM_DIR_LIGHTS) are directional lights;

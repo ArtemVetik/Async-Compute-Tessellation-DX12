@@ -11,6 +11,7 @@
 #include "DDSTextureLoader.h"
 #include "ImguiParams.h"
 #include "Bintree.h"
+#include "ShadowMap.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -84,11 +85,23 @@ private:
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> Shaders;
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> PSOs;
 
-	ObjectConstants MainObjectCB;
+	XMFLOAT3 mLightPosW;
+	XMFLOAT4X4 mLightView = MathHelper::Identity4x4();
+	XMFLOAT4X4 mLightProj = MathHelper::Identity4x4();
+	XMFLOAT4X4 mShadowTransform = MathHelper::Identity4x4();
+	float mLightRotationAngle = 0.0f;
+	XMFLOAT3 mBaseLightDirections[3] = {
+		XMFLOAT3(0.57735f, -0.57735f, 0.57735f),
+		XMFLOAT3(-0.57735f, -0.57735f, 0.57735f),
+		XMFLOAT3(0.0f, -0.707f, -0.707f)
+	};
+	XMFLOAT3 mRotatedLightDirections[3];
 
-	Bintree* bintree;
+	Bintree* bintree; // TODO: make unique ptr
 
 	Camera* mainCamera;
+
+	std::unique_ptr<ShadowMap> mShadowMap;
 
 	InputManager* inputManager;
 
@@ -102,6 +115,7 @@ private:
 
 	void ImGuiDraw(ImguiOutput& output);
 	void UpdateMainPassCB(const Timer& timer);
+	void UpdateShadowTransform(const Timer& timer);
 
 	void BuildUAVs();
 	void UploadBuffers();
@@ -110,7 +124,7 @@ private:
 	void BuildPSOs();
 	void BuildFrameResources();
 
-	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> GetStaticSamplers();
+	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers();
 
 	// We pack the UAV counter into the same buffer as the commands rather than create
 	// a separate 64K resource/heap for it. The counter must be aligned on 4K boundaries,

@@ -149,6 +149,7 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="MathHelper.cpp" />
     <ClCompile Include="MeshUtils.cpp" />
+    <ClCompile Include="ShadowMap.cpp" />
     <ClCompile Include="stdafx.cpp" />
     <ClCompile Include="Timer.cpp" />
   </ItemGroup>
@@ -177,6 +178,7 @@
     <ClInclude Include="MeshUtils.h" />
     <ClInclude Include="Renderable.h" />
     <ClInclude Include="Resource.h" />
+    <ClInclude Include="ShadowMap.h" />
     <ClInclude Include="stdafx.h" />
     <ClInclude Include="targetver.h" />
     <ClInclude Include="Timer.h" />

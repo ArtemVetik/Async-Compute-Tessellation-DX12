@@ -24,6 +24,7 @@ VertexOut main(VertexIn vIn, uint instanceID : SV_InstanceID)
 #endif
     
     output.PosW = posW;
+    output.ShadowPosH = mul(posW, shadowTransform);
     output.NormalW = mul(float4(vertex.Normal, 1.0f), world);
     output.PosH = mul(mul(posW, view), projection);
     output.TexC = vertex.TexC;

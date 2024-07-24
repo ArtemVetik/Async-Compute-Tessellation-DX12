@@ -253,7 +253,7 @@ void DXCore::CreateRTVDSVCBVDescriptorHeaps()
 		&RTVHeapDescription, IID_PPV_ARGS(RTVHeap.GetAddressOf())));
 
 	D3D12_DESCRIPTOR_HEAP_DESC DSVHeapDescription;
-	DSVHeapDescription.NumDescriptors = 1;
+	DSVHeapDescription.NumDescriptors = 2;
 	DSVHeapDescription.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
 	DSVHeapDescription.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	DSVHeapDescription.NodeMask = 0;
@@ -261,7 +261,7 @@ void DXCore::CreateRTVDSVCBVDescriptorHeaps()
 		&DSVHeapDescription, IID_PPV_ARGS(DSVHeap.GetAddressOf())));
 
 	D3D12_DESCRIPTOR_HEAP_DESC uavHeapDesc = {};
-	uavHeapDesc.NumDescriptors = 11;
+	uavHeapDesc.NumDescriptors = 12;
 	uavHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	uavHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(Device->CreateDescriptorHeap(&uavHeapDesc, IID_PPV_ARGS(&CBVSRVUAVHeap)));

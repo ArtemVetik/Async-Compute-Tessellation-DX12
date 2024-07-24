@@ -30,6 +30,8 @@ bool Game::Initialize()
 
 	bintree = new Bintree(Device.Get(), CommandList.Get());
 
+	mShadowMap = std::make_unique<ShadowMap>(Device.Get(), 4096, 4096);
+
 	// reset the command list to prep for initialization commands
 	ThrowIfFailed(CommandList->Reset(CommandListAllocator.Get(), nullptr));
 
@@ -99,6 +101,17 @@ void Game::Update(const Timer& timer)
 		CloseHandle(eventHandle);
 	}
 
+	mLightRotationAngle += 0.8f * timer.GetDeltaTime();
+
+	XMMATRIX R = XMMatrixRotationY(mLightRotationAngle);
+	for (int i = 0; i < 3; ++i)
+	{
+		XMVECTOR lightDir = XMLoadFloat3(&mBaseLightDirections[i]);
+		lightDir = XMVector3TransformNormal(lightDir, R);
+		XMStoreFloat3(&mRotatedLightDirections[i], lightDir);
+	}
+
+	UpdateShadowTransform(timer);
 	UpdateMainPassCB(timer);
 }
 
@@ -149,6 +162,54 @@ void Game::Draw(const Timer& timer)
 		CommandList->Dispatch(1, 1, 1);
 	}
 
+	{
+		CommandList->RSSetViewports(1, &mShadowMap->Viewport());
+		CommandList->RSSetScissorRects(1, &mShadowMap->ScissorRect());
+
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mShadowMap->Resource(),
+			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+
+		CommandList->ClearDepthStencilView(mShadowMap->Dsv(),
+			D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+
+		CommandList->OMSetRenderTargets(0, nullptr, false, &mShadowMap->Dsv());
+
+		UINT passCBByteSize = d3dUtil::CalcConstantBufferByteSize(sizeof(ObjectConstants));
+
+		CommandList->SetPipelineState(PSOs["ShadowOpaque"].Get());
+
+		CommandList->SetGraphicsRootSignature(opaqueRootSignature.Get());
+
+		CommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		CommandList->SetGraphicsRootConstantBufferView(0, objectCB->GetGPUVirtualAddress() + 1 * passCBByteSize);
+		CommandList->SetGraphicsRootConstantBufferView(1, tessellationCB->GetGPUVirtualAddress());
+		CommandList->SetGraphicsRootConstantBufferView(2, perFrameCB->GetGPUVirtualAddress());
+
+		CommandList->SetGraphicsRootDescriptorTable(3, MeshDataVertexGPUSRV);
+		CommandList->SetGraphicsRootDescriptorTable(4, MeshDataIndexGPUSRV);
+		CommandList->SetGraphicsRootDescriptorTable(5, SubdBufferOutCulledGPUSRV);
+		//CommandList->SetGraphicsRootDescriptorTable(6, mShadowMap->Srv());
+
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(),
+			D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
+
+		CommandList->ExecuteIndirect(
+			tessellationCommandSignature.Get(),
+			1,
+			RWDrawArgs.Get(),
+			0,
+			nullptr,
+			0);
+
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(),
+			D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+
+		// Change back to GENERIC_READ so we can read the texture in a shader.
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mShadowMap->Resource(),
+			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
+	}
+
 	if (imguiParams.WireframeMode)
 		CommandList->SetPipelineState(PSOs["Wireframe"].Get());
 	else
@@ -179,6 +240,7 @@ void Game::Draw(const Timer& timer)
 	CommandList->SetGraphicsRootDescriptorTable(3, MeshDataVertexGPUSRV);
 	CommandList->SetGraphicsRootDescriptorTable(4, MeshDataIndexGPUSRV);
 	CommandList->SetGraphicsRootDescriptorTable(5, SubdBufferOutCulledGPUSRV);
+	CommandList->SetGraphicsRootDescriptorTable(6, mShadowMap->Srv());
 
 	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(),
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
@@ -328,21 +390,22 @@ void Game::UpdateMainPassCB(const Timer& timer)
 {
 	// TODO: optimize loading of constant buffers (load only when needed, not every frame)
 
-	auto currObjectCB = currentFrameResource->ObjectCB.get();
 	XMMATRIX world = XMLoadFloat4x4(&MathHelper::Identity4x4());
 	XMMATRIX view = XMLoadFloat4x4(&mainCamera->GetViewMatrix());
 	XMMATRIX projection = XMLoadFloat4x4(&mainCamera->GetProjectionMatrix());
+	XMMATRIX shadowTransform = XMLoadFloat4x4(&mShadowTransform);
 
 	ObjectConstants objConstants = {};
 	XMStoreFloat4x4(&objConstants.World, DirectX::XMMatrixTranspose(world));
 	XMStoreFloat4x4(&objConstants.View, DirectX::XMMatrixTranspose(view));
 	XMStoreFloat4x4(&objConstants.Projection, DirectX::XMMatrixTranspose(projection));
+	XMStoreFloat4x4(&objConstants.ShadowTransform, XMMatrixTranspose(shadowTransform));
 	objConstants.AspectRatio = (float)screenWidth / screenHeight;
-	objConstants.Lights[0].Direction = { 0.57735f, -0.57735f, 0.57735f };
-	objConstants.Lights[0].Strength = { 0.6f, 0.6f, 0.6f };
-	objConstants.Lights[1].Direction = { -0.57735f, -0.57735f, 0.57735f };
+	objConstants.Lights[0].Direction = mRotatedLightDirections[0];
+	objConstants.Lights[0].Strength = { 0.7f, 0.7f, 0.7f };
+	objConstants.Lights[1].Direction = mRotatedLightDirections[1];
 	objConstants.Lights[1].Strength = { 0.3f, 0.3f, 0.3f };
-	objConstants.Lights[2].Direction = { 0.0f, -0.707f, -0.707f };
+	objConstants.Lights[2].Direction = mRotatedLightDirections[2];
 	objConstants.Lights[2].Strength = { 0.15f, 0.15f, 0.15f };
 
 	FrustrumPlanes frustrum = mainCamera->GetFrustrumPlanes(world);
@@ -350,9 +413,9 @@ void Game::UpdateMainPassCB(const Timer& timer)
 	for (int i = 0; i < 6; i++)
 		objConstants.FrustrumPlanes[i] = frustrum.Planes[i];
 
+	auto currObjectCB = currentFrameResource->ObjectCB.get();
 	currObjectCB->CopyData(0, objConstants);
 
-	auto currTessellationCB = currentFrameResource->TessellationCB.get();
 	TessellationConstants tessellationConstants = {};
 	tessellationConstants.ScreenRes = std::max(screenWidth, screenHeight);
 	XMStoreFloat4x4(&tessellationConstants.MeshWorld, XMMatrixTranspose(world));
@@ -363,14 +426,61 @@ void Game::UpdateMainPassCB(const Timer& timer)
 	tessellationConstants.DisplacePosScale = imguiParams.DisplacePosScale;
 	tessellationConstants.DisplaceH = imguiParams.DisplaceH;
 	tessellationConstants.LodFactor = imguiParams.LodFactor;
+	auto currTessellationCB = currentFrameResource->TessellationCB.get();
 	currTessellationCB->CopyData(0, tessellationConstants);
 
-	auto currFrameCB = currentFrameResource->PerFrameCB.get();
 	PerFrameConstants perFrameConstants = {};
 	perFrameConstants.CamPosition = mainCamera->GetPosition();
 	perFrameConstants.DeltaTime = timer.GetDeltaTime();
 	perFrameConstants.TotalTime = timer.GetTotalTime();
+	auto currFrameCB = currentFrameResource->PerFrameCB.get();
 	currFrameCB->CopyData(0, perFrameConstants);
+
+	ObjectConstants shadowConstants = {};
+	XMMATRIX lightView = XMLoadFloat4x4(&mLightView);
+	XMMATRIX lightProjection = XMLoadFloat4x4(&mLightProj);
+	XMStoreFloat4x4(&shadowConstants.World, XMMatrixTranspose(world));
+	XMStoreFloat4x4(&shadowConstants.View, XMMatrixTranspose(lightView));
+	XMStoreFloat4x4(&shadowConstants.Projection, XMMatrixTranspose(lightProjection));
+	auto currShadowCB = currentFrameResource->ObjectCB.get();
+	currShadowCB->CopyData(1, shadowConstants);
+}
+
+void Game::UpdateShadowTransform(const Timer& timer)
+{
+	float radius = 300;
+
+	XMVECTOR lightDir = XMLoadFloat3(&mRotatedLightDirections[0]);
+	XMVECTOR lightPos = -2.0f * radius * lightDir;
+	XMVECTOR targetPos = { 0, 0, 0 };
+	XMVECTOR lightUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+	XMMATRIX lightView = XMMatrixLookAtLH(lightPos, targetPos, lightUp);
+
+	XMStoreFloat3(&mLightPosW, lightPos);
+
+	XMFLOAT3 sphereCenterLS;
+	XMStoreFloat3(&sphereCenterLS, XMVector3TransformCoord(targetPos, lightView));
+
+	// Ortho frustum in light space encloses scene.
+	float l = sphereCenterLS.x - radius;
+	float b = sphereCenterLS.y - radius;
+	float n = sphereCenterLS.z - radius;
+	float r = sphereCenterLS.x + radius;
+	float t = sphereCenterLS.y + radius;
+	float f = sphereCenterLS.z + radius;
+
+	XMMATRIX lightProj = XMMatrixOrthographicOffCenterLH(l, r, b, t, n, f);
+
+	XMMATRIX T(
+		0.5f, 0.0f, 0.0f, 0.0f,
+		0.0f, -0.5f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.5f, 0.5f, 0.0f, 1.0f);
+
+	XMMATRIX S = lightView * lightProj * T;
+	XMStoreFloat4x4(&mLightView, lightView);
+	XMStoreFloat4x4(&mLightProj, lightProj);
+	XMStoreFloat4x4(&mShadowTransform, S);
 }
 
 void Game::BuildUAVs()
@@ -487,7 +597,7 @@ void Game::BuildUAVs()
 
 	// Subd Buffer In/Out
 	{
-		int subdSize = 10000000; // TODO: find out what size is needed here
+		int subdSize = 1000000; // TODO: find out what size is needed here
 		UINT64 subdBufferByteSize = sizeof(XMUINT4) * subdSize;
 
 		ThrowIfFailed(Device->CreateCommittedResource(
@@ -578,6 +688,18 @@ void Game::BuildUAVs()
 		SubdCounterGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 10, CBVSRVUAVDescriptorSize);
 		Device->CreateUnorderedAccessView(RWSubdCounter.Get(), 0, &subdCounterUAVDescription, SubdCounterCPUUAV);
 	}
+
+	// Shadow Maps
+	{
+		auto srvCpuStart = CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart();
+		auto srvGpuStart = CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart();
+		auto dsvCpuStart = DSVHeap->GetCPUDescriptorHandleForHeapStart();
+
+		mShadowMap->BuildDescriptors(
+			CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, 11, CBVSRVUAVDescriptorSize),
+			CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, 11, CBVSRVUAVDescriptorSize),
+			CD3DX12_CPU_DESCRIPTOR_HANDLE(dsvCpuStart, 1, DSVDescriptorSize));
+	}
 }
 
 void Game::UploadBuffers()
@@ -601,19 +723,23 @@ void Game::BuildRootSignature()
 		CD3DX12_DESCRIPTOR_RANGE srvTable2;
 		srvTable2.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2);
 
+		CD3DX12_DESCRIPTOR_RANGE srvTable3;
+		srvTable3.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3);
+
 		// Root parameter can be a table, root descriptor or root constants.
-		CD3DX12_ROOT_PARAMETER slotRootParameter[6];
+		CD3DX12_ROOT_PARAMETER slotRootParameter[7];
 		slotRootParameter[0].InitAsConstantBufferView(0);
 		slotRootParameter[1].InitAsConstantBufferView(1);
 		slotRootParameter[2].InitAsConstantBufferView(2);
 		slotRootParameter[3].InitAsDescriptorTable(1, &srvTable0);
 		slotRootParameter[4].InitAsDescriptorTable(1, &srvTable1);
 		slotRootParameter[5].InitAsDescriptorTable(1, &srvTable2);
+		slotRootParameter[6].InitAsDescriptorTable(1, &srvTable3);
 
 		auto staticSamplers = GetStaticSamplers();
 
 		// A root signature is an array of root parameters.
-		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(6, slotRootParameter,
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(7, slotRootParameter,
 			(UINT)staticSamplers.size(),
 			staticSamplers.data(),
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -701,22 +827,24 @@ void Game::BuildRootSignature()
 	}
 
 	// tessellation command signature
-	D3D12_INDIRECT_ARGUMENT_DESC Args[3];
+	{
+		D3D12_INDIRECT_ARGUMENT_DESC Args[3];
 
-	Args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_VERTEX_BUFFER_VIEW;
-	Args[0].VertexBuffer.Slot = 0;
-	Args[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_INDEX_BUFFER_VIEW;
-	Args[2].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
+		Args[0].Type = D3D12_INDIRECT_ARGUMENT_TYPE_VERTEX_BUFFER_VIEW;
+		Args[0].VertexBuffer.Slot = 0;
+		Args[1].Type = D3D12_INDIRECT_ARGUMENT_TYPE_INDEX_BUFFER_VIEW;
+		Args[2].Type = D3D12_INDIRECT_ARGUMENT_TYPE_DRAW_INDEXED;
 
-	D3D12_COMMAND_SIGNATURE_DESC particleCommandSingatureDescription = {};
-	particleCommandSingatureDescription.ByteStride = sizeof(IndirectCommand);
-	particleCommandSingatureDescription.NumArgumentDescs = _countof(Args);
-	particleCommandSingatureDescription.pArgumentDescs = Args;
+		D3D12_COMMAND_SIGNATURE_DESC particleCommandSingatureDescription = {};
+		particleCommandSingatureDescription.ByteStride = sizeof(IndirectCommand);
+		particleCommandSingatureDescription.NumArgumentDescs = _countof(Args);
+		particleCommandSingatureDescription.pArgumentDescs = Args;
 
-	ThrowIfFailed(Device->CreateCommandSignature(
-		&particleCommandSingatureDescription,
-		NULL,
-		IID_PPV_ARGS(tessellationCommandSignature.GetAddressOf())));
+		ThrowIfFailed(Device->CreateCommandSignature(
+			&particleCommandSingatureDescription,
+			NULL,
+			IID_PPV_ARGS(tessellationCommandSignature.GetAddressOf())));
+	}
 }
 
 void Game::BuildShadersAndInputLayout()
@@ -744,6 +872,9 @@ void Game::BuildShadersAndInputLayout()
 
 void Game::BuildPSOs()
 {
+	//
+	// PSO for opaque objects
+	//
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC geoOpaquePsoDesc;
 	ZeroMemory(&geoOpaquePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
 	geoOpaquePsoDesc.InputLayout = { geoInputLayout.data(), (UINT)geoInputLayout.size() };
@@ -772,7 +903,28 @@ void Game::BuildPSOs()
 	ThrowIfFailed(Device->CreateGraphicsPipelineState(&geoOpaquePsoDesc, IID_PPV_ARGS(&PSOs["Opaque"])));
 	PSOs["Opaque"]->SetName(L"OpaquePSO");
 
+	//
+	// PSO for shadow map pass
+	//
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC smapPsoDesc = geoOpaquePsoDesc;
+	smapPsoDesc.RasterizerState.DepthBias = 100000;
+	smapPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
+	smapPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
+	smapPsoDesc.pRootSignature = opaqueRootSignature.Get();
+	smapPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(Shaders["OpaqueVS"]->GetBufferPointer()),
+		Shaders["OpaqueVS"]->GetBufferSize()
+	};
+	smapPsoDesc.PS = {};
+	smapPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
+	smapPsoDesc.NumRenderTargets = 0;
+	ThrowIfFailed(Device->CreateGraphicsPipelineState(&smapPsoDesc, IID_PPV_ARGS(&PSOs["ShadowOpaque"])));
+	PSOs["ShadowOpaque"]->SetName(L"ShadowOpaquePSO");
 
+	//
+	// PSO for wireframe mode
+	//
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC geoWireframePsoDesc;
 	ZeroMemory(&geoWireframePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
 	geoWireframePsoDesc.InputLayout = { geoInputLayout.data(), (UINT)geoInputLayout.size() };
@@ -806,7 +958,9 @@ void Game::BuildPSOs()
 	ThrowIfFailed(Device->CreateGraphicsPipelineState(&geoWireframePsoDesc, IID_PPV_ARGS(&PSOs["Wireframe"])));
 	PSOs["Wireframe"]->SetName(L"WireframePSO");
 
-
+	//
+	// PSO for compute tessellation
+	//
 	D3D12_COMPUTE_PIPELINE_STATE_DESC tessellationUpdatePSO = {};
 	tessellationUpdatePSO.pRootSignature = tessellationComputeRootSignature.Get();
 	tessellationUpdatePSO.CS =
@@ -835,11 +989,11 @@ void Game::BuildFrameResources()
 {
 	for (int i = 0; i < gNumberFrameResources; ++i)
 	{
-		FrameResources.push_back(std::make_unique<FrameResource>(Device.Get(), 1, 1, 1));
+		FrameResources.push_back(std::make_unique<FrameResource>(Device.Get()));
 	}
 }
 
-std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> Game::GetStaticSamplers()
+std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> Game::GetStaticSamplers()
 {
 	// Applications usually only need a handful of samplers.  So just define them all up front
 	// and keep them available as part of the root signature.  
@@ -890,8 +1044,20 @@ std::array<const CD3DX12_STATIC_SAMPLER_DESC, 6> Game::GetStaticSamplers()
 		0.0f,                              // mipLODBias
 		8);                                // maxAnisotropy
 
+	const CD3DX12_STATIC_SAMPLER_DESC shadow(
+		6, // shaderRegister
+		D3D12_FILTER_COMPARISON_MIN_MAG_LINEAR_MIP_POINT, // filter
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressU
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressV
+		D3D12_TEXTURE_ADDRESS_MODE_BORDER,  // addressW
+		0.0f,                               // mipLODBias
+		16,                                 // maxAnisotropy
+		D3D12_COMPARISON_FUNC_LESS_EQUAL,
+		D3D12_STATIC_BORDER_COLOR_OPAQUE_BLACK);
+
 	return {
 		pointWrap, pointClamp,
 		linearWrap, linearClamp,
-		anisotropicWrap, anisotropicClamp };
+		anisotropicWrap, anisotropicClamp, shadow
+	};
 }
