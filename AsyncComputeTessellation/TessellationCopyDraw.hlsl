@@ -14,11 +14,12 @@ void main(uint3 id : SV_DispatchThreadID)
     //DrawArgs[6] = 0; // IB size
     //DrawArgs[7] = 0; // IB format
     //DrawArgs[8] = 0; // IndexCountPerInstance
-    DrawArgs[9] = SubdCounter[1]; // InstanceCount
+    DrawArgs[9] = SubdCounter[2]; // InstanceCount
     //DrawArgs[10] = 0; // StartIndexLocation
     //DrawArgs[11] = 0; // BaseVertexLocation
     //DrawArgs[12] = 0; // StartInstanceLocation
     
     SubdCounter[0] = SubdCounter[1];
     SubdCounter[1] = 0;
+    SubdCounter[2] = 0;
 }

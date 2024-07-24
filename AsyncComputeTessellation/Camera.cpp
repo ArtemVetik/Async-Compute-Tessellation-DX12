@@ -61,6 +61,42 @@ DirectX::XMFLOAT3 Camera::GetPosition() const
 	return mPosition;
 }
 
+FrustrumPlanes Camera::GetFrustrumPlanes(XMMATRIX worldMatrix) const
+{
+	XMMATRIX view = XMLoadFloat4x4(&viewMatrix);
+	XMMATRIX projection = XMLoadFloat4x4(&projectionMatrix);
+	XMMATRIX mvp = XMMatrixMultiply(XMMatrixMultiply(worldMatrix, view), projection);
+
+	FrustrumPlanes planes = {};
+
+	for (int i = 0; i < 3; ++i)
+	{
+		for (int j = 0; j < 2; ++j) {
+			planes.Planes[i * 2 + j].x =
+				mvp.r[0].m128_f32[3] + (j == 0 ? mvp.r[0].m128_f32[i] : -mvp.r[0].m128_f32[i]);
+			planes.Planes[i * 2 + j].y =
+				mvp.r[1].m128_f32[3] + (j == 0 ? mvp.r[1].m128_f32[i] : -mvp.r[1].m128_f32[i]);
+			planes.Planes[i * 2 + j].z =
+				mvp.r[2].m128_f32[3] + (j == 0 ? mvp.r[2].m128_f32[i] : -mvp.r[2].m128_f32[i]);
+			planes.Planes[i * 2 + j].w =
+				mvp.r[3].m128_f32[3] + (j == 0 ? mvp.r[3].m128_f32[i] : -mvp.r[3].m128_f32[i]);
+		}
+	}
+
+	for (int i = 0; i < 6; i++)
+	{
+		float length = sqrtf(planes.Planes[i].x * planes.Planes[i].x
+			+ planes.Planes[i].y * planes.Planes[i].y +
+			planes.Planes[i].z * planes.Planes[i].z);
+		planes.Planes[i].x /= length;
+		planes.Planes[i].y /= length;
+		planes.Planes[i].z /= length;
+		planes.Planes[i].w /= length;
+	}
+
+	return planes;
+}
+
 void Camera::Pitch(float angle)
 {
 	// Rotate up and look vector about the right vector.

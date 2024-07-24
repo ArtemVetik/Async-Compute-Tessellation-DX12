@@ -121,27 +121,33 @@ void Game::Draw(const Timer& timer)
 	auto objectCB = currentFrameResource->ObjectCB->Resource();
 	auto tessellationCB = currentFrameResource->TessellationCB->Resource();
 	auto perFrameCB = currentFrameResource->PerFrameCB->Resource();
-	CommandList->SetComputeRootConstantBufferView(0, objectCB->GetGPUVirtualAddress());
-	CommandList->SetComputeRootConstantBufferView(1, tessellationCB->GetGPUVirtualAddress());
-	CommandList->SetComputeRootConstantBufferView(2, perFrameCB->GetGPUVirtualAddress());
 
-	CommandList->SetComputeRootDescriptorTable(3, MeshDataVertexGPUUAV);
-	CommandList->SetComputeRootDescriptorTable(4, MeshDataIndexGPUUAV);
-	CommandList->SetComputeRootDescriptorTable(5, DrawArgsGPUUAV);
-	CommandList->SetComputeRootDescriptorTable(6 + pingPongCounter, SubdBufferInGPUUAV);
-	CommandList->SetComputeRootDescriptorTable(7 - pingPongCounter, SubdBufferOutGPUUAV);
-	CommandList->SetComputeRootDescriptorTable(8, SubdCounterGPUUAV);
+	if (imguiParams.Freeze == false)
+	{
+		CommandList->SetComputeRootConstantBufferView(0, objectCB->GetGPUVirtualAddress());
+		CommandList->SetComputeRootConstantBufferView(1, tessellationCB->GetGPUVirtualAddress());
+		CommandList->SetComputeRootConstantBufferView(2, perFrameCB->GetGPUVirtualAddress());
 
-	CommandList->SetPipelineState(PSOs["tessellationUpdate"].Get());
-	CommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
-	CommandList->Dispatch(10000, 1, 1); // TODO: figure out how many threads group to run
+		CommandList->SetComputeRootDescriptorTable(3, MeshDataVertexGPUUAV);
+		CommandList->SetComputeRootDescriptorTable(4, MeshDataIndexGPUUAV);
+		CommandList->SetComputeRootDescriptorTable(5, DrawArgsGPUUAV);
+		CommandList->SetComputeRootDescriptorTable(6 + pingPongCounter, SubdBufferInGPUUAV);
+		CommandList->SetComputeRootDescriptorTable(7 - pingPongCounter, SubdBufferOutGPUUAV);
+		CommandList->SetComputeRootDescriptorTable(8, SubdBufferOutCulledGPUUAV);
+		CommandList->SetComputeRootDescriptorTable(9, SubdCounterGPUUAV);
 
-	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferIn.Get()));
-	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferOut.Get()));
+		CommandList->SetPipelineState(PSOs["tessellationUpdate"].Get());
+		CommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
+		CommandList->Dispatch(10000, 1, 1); // TODO: figure out how many threads group to run
 
-	CommandList->SetPipelineState(PSOs["tessellationCopyDraw"].Get());
-	CommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
-	CommandList->Dispatch(1, 1, 1);
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferIn.Get())); // TODO: are these lines necessary?
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferOut.Get()));
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferOutCulled.Get()));
+
+		CommandList->SetPipelineState(PSOs["tessellationCopyDraw"].Get());
+		CommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
+		CommandList->Dispatch(1, 1, 1);
+	}
 
 	if (imguiParams.WireframeMode)
 		CommandList->SetPipelineState(PSOs["Wireframe"].Get());
@@ -165,7 +171,6 @@ void Game::Draw(const Timer& timer)
 	CommandList->SetGraphicsRootSignature(opaqueRootSignature.Get());
 
 	CommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	//CommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_POINTLIST);
 
 	CommandList->SetGraphicsRootConstantBufferView(0, objectCB->GetGPUVirtualAddress());
 	CommandList->SetGraphicsRootConstantBufferView(1, tessellationCB->GetGPUVirtualAddress());
@@ -173,10 +178,7 @@ void Game::Draw(const Timer& timer)
 
 	CommandList->SetGraphicsRootDescriptorTable(3, MeshDataVertexGPUSRV);
 	CommandList->SetGraphicsRootDescriptorTable(4, MeshDataIndexGPUSRV);
-	if (pingPongCounter == 0)
-		CommandList->SetGraphicsRootDescriptorTable(5, SubdBufferOutGPUSRV);
-	else
-		CommandList->SetGraphicsRootDescriptorTable(5, SubdBufferInGPUSRV);
+	CommandList->SetGraphicsRootDescriptorTable(5, SubdBufferOutCulledGPUSRV);
 
 	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(),
 		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
@@ -311,6 +313,8 @@ void Game::ImGuiDraw(ImguiOutput& output)
 		bintree->UpdateLodFactor(&imguiParams, std::max(screenWidth, screenHeight), mainCamera->GetFov());
 	}
 
+	ImGui::Checkbox("Freeze", &imguiParams.Freeze);
+
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
 	ImGui::End();
@@ -330,9 +334,9 @@ void Game::UpdateMainPassCB(const Timer& timer)
 	XMMATRIX projection = XMLoadFloat4x4(&mainCamera->GetProjectionMatrix());
 
 	ObjectConstants objConstants = {};
-	XMStoreFloat4x4(&objConstants.World, XMMatrixTranspose(world));
-	XMStoreFloat4x4(&objConstants.View, XMMatrixTranspose(view));
-	XMStoreFloat4x4(&objConstants.Projection, XMMatrixTranspose(projection));
+	XMStoreFloat4x4(&objConstants.World, DirectX::XMMatrixTranspose(world));
+	XMStoreFloat4x4(&objConstants.View, DirectX::XMMatrixTranspose(view));
+	XMStoreFloat4x4(&objConstants.Projection, DirectX::XMMatrixTranspose(projection));
 	objConstants.AspectRatio = (float)screenWidth / screenHeight;
 	objConstants.Lights[0].Direction = { 0.57735f, -0.57735f, 0.57735f };
 	objConstants.Lights[0].Strength = { 0.6f, 0.6f, 0.6f };
@@ -340,6 +344,12 @@ void Game::UpdateMainPassCB(const Timer& timer)
 	objConstants.Lights[1].Strength = { 0.3f, 0.3f, 0.3f };
 	objConstants.Lights[2].Direction = { 0.0f, -0.707f, -0.707f };
 	objConstants.Lights[2].Strength = { 0.15f, 0.15f, 0.15f };
+
+	FrustrumPlanes frustrum = mainCamera->GetFrustrumPlanes(world);
+
+	for (int i = 0; i < 6; i++)
+		objConstants.FrustrumPlanes[i] = frustrum.Planes[i];
+
 	currObjectCB->CopyData(0, objConstants);
 
 	auto currTessellationCB = currentFrameResource->TessellationCB.get();
@@ -498,6 +508,15 @@ void Game::BuildUAVs()
 			IID_PPV_ARGS(&RWSubdBufferOut)));
 		RWSubdBufferOut->SetName(L"SubdBufferOut");
 
+		ThrowIfFailed(Device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			D3D12_HEAP_FLAG_NONE,
+			&CD3DX12_RESOURCE_DESC::Buffer(subdBufferByteSize, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),
+			D3D12_RESOURCE_STATE_COMMON,
+			nullptr,
+			IID_PPV_ARGS(&RWSubdBufferOutCulled)));
+		RWSubdBufferOutCulled->SetName(L"SubdBufferOutCulled");
+
 		D3D12_UNORDERED_ACCESS_VIEW_DESC subdBufferUAVDescription = {};
 
 		subdBufferUAVDescription.Format = DXGI_FORMAT_UNKNOWN;
@@ -523,18 +542,18 @@ void Game::BuildUAVs()
 		SubdBufferOutGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 7, CBVSRVUAVDescriptorSize);
 		Device->CreateUnorderedAccessView(RWSubdBufferOut.Get(), nullptr, &subdBufferUAVDescription, SubdBufferOutCPUUAV);
 
-		SubdBufferInCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 8, CBVSRVUAVDescriptorSize);
-		SubdBufferInGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 8, CBVSRVUAVDescriptorSize);
-		Device->CreateShaderResourceView(RWSubdBufferIn.Get(), &subdBufferSRVDescription, SubdBufferInCPUSRV);
+		SubdBufferOutCulledCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 8, CBVSRVUAVDescriptorSize);
+		SubdBufferOutCulledGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 8, CBVSRVUAVDescriptorSize);
+		Device->CreateUnorderedAccessView(RWSubdBufferOutCulled.Get(), nullptr, &subdBufferUAVDescription, SubdBufferOutCulledCPUUAV);
 
-		SubdBufferOutCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 9, CBVSRVUAVDescriptorSize);
-		SubdBufferOutGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 9, CBVSRVUAVDescriptorSize);
-		Device->CreateShaderResourceView(RWSubdBufferOut.Get(), &subdBufferSRVDescription, SubdBufferOutCPUSRV);
+		SubdBufferOutCulledCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 9, CBVSRVUAVDescriptorSize);
+		SubdBufferOutCulledGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 9, CBVSRVUAVDescriptorSize);
+		Device->CreateShaderResourceView(RWSubdBufferOutCulled.Get(), &subdBufferSRVDescription, SubdBufferOutCulledCPUSRV);
 	}
 
 	// Subd Counter
 	{
-		UINT64 subdCounterByteSize = (sizeof(unsigned int) * 2);
+		UINT64 subdCounterByteSize = (sizeof(unsigned int) * 3);
 
 		ThrowIfFailed(Device->CreateCommittedResource(
 			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
@@ -549,7 +568,7 @@ void Game::BuildUAVs()
 
 		subdCounterUAVDescription.Format = DXGI_FORMAT_UNKNOWN;
 		subdCounterUAVDescription.Buffer.FirstElement = 0;
-		subdCounterUAVDescription.Buffer.NumElements = 2;
+		subdCounterUAVDescription.Buffer.NumElements = 3;
 		subdCounterUAVDescription.Buffer.StructureByteStride = sizeof(unsigned int);
 		subdCounterUAVDescription.Buffer.CounterOffsetInBytes = 0;
 		subdCounterUAVDescription.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
@@ -638,8 +657,11 @@ void Game::BuildRootSignature()
 		CD3DX12_DESCRIPTOR_RANGE uavTable5;
 		uavTable5.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 5);
 
+		CD3DX12_DESCRIPTOR_RANGE uavTable6;
+		uavTable6.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 6);
+
 		// Root parameter can be a table, root descriptor or root constants.
-		CD3DX12_ROOT_PARAMETER slotRootParameter[9];
+		CD3DX12_ROOT_PARAMETER slotRootParameter[10];
 		slotRootParameter[0].InitAsConstantBufferView(0);
 		slotRootParameter[1].InitAsConstantBufferView(1);
 		slotRootParameter[2].InitAsConstantBufferView(2);
@@ -649,11 +671,12 @@ void Game::BuildRootSignature()
 		slotRootParameter[6].InitAsDescriptorTable(1, &uavTable3);
 		slotRootParameter[7].InitAsDescriptorTable(1, &uavTable4);
 		slotRootParameter[8].InitAsDescriptorTable(1, &uavTable5);
+		slotRootParameter[9].InitAsDescriptorTable(1, &uavTable6);
 
 		auto staticSamplers = GetStaticSamplers();
 
 		// A root signature is an array of root parameters.
-		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(9, slotRootParameter,
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(10, slotRootParameter,
 			(UINT)staticSamplers.size(),
 			staticSamplers.data(),
 			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);

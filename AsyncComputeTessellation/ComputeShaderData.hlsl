@@ -10,6 +10,7 @@ RWStructuredBuffer<uint> MeshDataIndex : register(u1);
 RWStructuredBuffer<uint> DrawArgs : register(u2);
 RWStructuredBuffer<uint4> SubdBufferIn : register(u3);
 RWStructuredBuffer<uint4> SubdBufferOut : register(u4);
-RWStructuredBuffer<uint> SubdCounter : register(u5);
+RWStructuredBuffer<uint4> SubdBufferOutCulled : register(u5);
+RWStructuredBuffer<uint> SubdCounter : register(u6);
 
 #endif

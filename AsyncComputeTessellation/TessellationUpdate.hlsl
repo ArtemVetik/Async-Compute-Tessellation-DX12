@@ -3,15 +3,55 @@
 #include "LoD.hlsl"
 #include "Noise.hlsl"
 
+static const int O = 0;
+static const int R = 1;
+static const int U = 2;
+static const float2 unit_O = float2(0, 0);
+static const float2 unit_R = float2(1, 0);
+static const float2 unit_U = float2(0, 1);
+
+void cull_writeKey(uint4 key)
+{
+    uint idx;
+    InterlockedAdd(SubdCounter[2], 1, idx);
+    SubdBufferOutCulled[idx] = key;
+}
+
+void cullPass(uint4 key)
+{
+    float3x3 mesh_coord;
+    float3 b_min = 10e6;
+    float3 b_max = -10e6;
+
+    mesh_coord[O] = ts_Leaf_to_MeshPosition(unit_O, key);
+    mesh_coord[U] = ts_Leaf_to_MeshPosition(unit_U, key);
+    mesh_coord[R] = ts_Leaf_to_MeshPosition(unit_R, key);
+
+#if USE_DISPLACE
+    mesh_coord[O] = displaceVertex(mesh_coord[O], camPosition);
+    mesh_coord[U] = displaceVertex(mesh_coord[U], camPosition);
+    mesh_coord[R] = displaceVertex(mesh_coord[R], camPosition);
+#endif
+
+    b_min = min(b_min, mesh_coord[O]);
+    b_min = min(b_min, mesh_coord[U]);
+    b_min = min(b_min, mesh_coord[R]);
+
+    b_max = max(b_max, mesh_coord[O]);
+    b_max = max(b_max, mesh_coord[U]);
+    b_max = max(b_max, mesh_coord[R]);
+    
+    float4x4 mvp = mul(mul(world, view), projection);
+    if (culltest(mvp, b_min.xyz, b_max.xyz))
+        cull_writeKey(key);
+}
 void compute_writeKey(uint2 new_nodeID, uint4 current_key)
 {
     uint4 new_key = uint4(new_nodeID, current_key.zw);
     uint idx;
     InterlockedAdd(SubdCounter[1], 1, idx);
-
     SubdBufferOut[idx] = new_key;
 }
-
 [numthreads(512, 1, 1)]
 void main(uint id : SV_DispatchThreadID, uint groupId : SV_GroupIndex)
 {
@@ -73,4 +113,6 @@ void main(uint id : SV_DispatchThreadID, uint groupId : SV_GroupIndex)
             compute_writeKey(ts_parent_64(nodeID), key);
         }
     }
+    
+    cullPass(key);
 }

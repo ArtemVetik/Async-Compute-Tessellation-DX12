@@ -1,3 +1,4 @@
+#include "ConstantBuffers.hlsl"
 #include "ComputeShaderData.hlsl"
 #include "Common.hlsl"
 
@@ -34,4 +35,17 @@ void computeTessLvlWithParent(uint4 key, out float lvl, out float parent_lvl)
 
     lvl = distanceToLod(p_mesh.xyz);
     parent_lvl = distanceToLod(pp_mesh.xyz);
+}
+
+bool culltest(float4x4 mvp, float3 bmin, float3 bmax)
+{
+    bool inside = true;
+    [unroll]
+    for (int i = 0; i < 6; ++i)
+    {
+        bool3 b = (frustrumPlanes[i].xyz > float3(0, 0, 0));
+        float3 n = lerp(bmin, bmax, b);
+        inside = inside && (dot(float4(n, 1.0), frustrumPlanes[i]) >= 0);
+    }
+    return inside;
 }

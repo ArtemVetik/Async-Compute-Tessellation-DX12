@@ -23,6 +23,7 @@ struct ImguiParams
 	bool Uniform = false;
 	int GPULodLevel = 0;
 	bool FlatNormals = false;
+	bool Freeze = false;
 };
 
 struct ImguiOutput

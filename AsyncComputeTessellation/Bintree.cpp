@@ -74,7 +74,7 @@ void Bintree::UploadSubdivisionCounter(ID3D12Resource* subdivisionCounter)
 	if (SubdCounterUploadBuffer)
 		SubdCounterUploadBuffer.reset();
 
-	SubdCounterUploadBuffer = std::make_unique<UploadBuffer<UINT>>(mDevice, 2, false);
+	SubdCounterUploadBuffer = std::make_unique<UploadBuffer<UINT>>(mDevice, 3, false);
 
 	SubdCounterUploadBuffer->CopyData(0, mMeshData.Indices32.size() / 3);
 	SubdCounterUploadBuffer->CopyData(1, 0);

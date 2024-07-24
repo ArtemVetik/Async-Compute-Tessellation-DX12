@@ -6,6 +6,11 @@
 
 using namespace DirectX;
 
+struct FrustrumPlanes
+{
+	DirectX::XMFLOAT4 Planes[6];
+};
+
 class Camera : public MyMouseEventHandler
 {
 public:
@@ -18,6 +23,7 @@ public:
 	float GetFar() const;
 	float GetFov() const;
 	DirectX::XMFLOAT3 GetPosition() const;
+	FrustrumPlanes GetFrustrumPlanes(XMMATRIX worldMatrix) const;
 
 	void Pitch(float angle);
 	void RotateY(float angle);

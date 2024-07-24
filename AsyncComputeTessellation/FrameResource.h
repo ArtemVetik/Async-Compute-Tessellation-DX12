@@ -12,6 +12,7 @@ struct ObjectConstants
 	float AspectRatio = 0.0f;
 	DirectX::XMUINT3 Padding;
 	Light Lights[MaxLights];
+	DirectX::XMFLOAT4 FrustrumPlanes[6];
 };
 
 struct TessellationConstants
