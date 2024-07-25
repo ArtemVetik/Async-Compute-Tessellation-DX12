@@ -64,7 +64,7 @@ void DXCore::Set4xMsaaStata(bool value)
 int DXCore::Run()
 {
 	MSG msg = { 0 };
-	
+
 	//timer.Reset();
 
 	while (msg.message != WM_QUIT)
@@ -100,7 +100,7 @@ bool DXCore::Initialize()
 {
 	if (!InitMainWindow())
 		return false;
-	
+
 	if (!InitDirect3D())
 		return false;
 
@@ -120,7 +120,7 @@ LRESULT DXCore::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 	switch (msg)
 	{
-	// WM_SIZE is sent when the user resizes the window.  
+		// WM_SIZE is sent when the user resizes the window.  
 	case WM_SIZE:
 		// Save the new client area dimensions.
 		screenWidth = LOWORD(lParam);
@@ -176,7 +176,7 @@ LRESULT DXCore::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 		}
 		return 0;
 
-	// WM_DESTROY is sent when the window is being destroyed.
+		// WM_DESTROY is sent when the window is being destroyed.
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		return 0;
@@ -245,7 +245,7 @@ LRESULT DXCore::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 void DXCore::CreateRTVDSVCBVDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC RTVHeapDescription;
-	RTVHeapDescription.NumDescriptors = SwapChainBufferCount;
+	RTVHeapDescription.NumDescriptors = SwapChainBufferCount + GBufferCount + 1;
 	RTVHeapDescription.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	RTVHeapDescription.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	RTVHeapDescription.NodeMask = 0;
@@ -261,7 +261,7 @@ void DXCore::CreateRTVDSVCBVDescriptorHeaps()
 		&DSVHeapDescription, IID_PPV_ARGS(DSVHeap.GetAddressOf())));
 
 	D3D12_DESCRIPTOR_HEAP_DESC uavHeapDesc = {};
-	uavHeapDesc.NumDescriptors = 12;
+	uavHeapDesc.NumDescriptors = 16;
 	uavHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	uavHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(Device->CreateDescriptorHeap(&uavHeapDesc, IID_PPV_ARGS(&CBVSRVUAVHeap)));
@@ -277,6 +277,88 @@ void DXCore::Resize()
 	FlushCommandQueue();
 
 	ThrowIfFailed(CommandList->Reset(CommandListAllocator.Get(), nullptr));
+
+	// G Buffer
+	{
+		for (int i = 0; i < GBufferCount; ++i) {
+			GBuffer[i].Reset();
+		}
+
+		AccumulationBuffer.Reset();
+
+		D3D12_RESOURCE_DESC resourceDesc;
+		ZeroMemory(&resourceDesc, sizeof(resourceDesc));
+		resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
+		resourceDesc.Alignment = 0;
+		resourceDesc.SampleDesc.Count = 1;
+		resourceDesc.SampleDesc.Quality = 0;
+		resourceDesc.MipLevels = 1;
+		resourceDesc.DepthOrArraySize = 1;
+		resourceDesc.Width = (UINT)screenWidth;
+		resourceDesc.Height = (UINT)screenHeight;
+		resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
+		resourceDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
+
+		D3D12_CLEAR_VALUE clearVal;
+		clearVal.Color[0] = 0;
+		clearVal.Color[1] = 0;
+		clearVal.Color[2] = 0;
+		clearVal.Color[3] = 1;
+
+		for (int i = 0; i < GBufferCount; i++) {
+			resourceDesc.Format = GBufferFormats[i];
+			clearVal.Format = GBufferFormats[i];
+
+			ThrowIfFailed(Device->CreateCommittedResource(
+				&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+				D3D12_HEAP_FLAG_NONE,
+				&resourceDesc,
+				D3D12_RESOURCE_STATE_RENDER_TARGET,
+				&clearVal,
+				IID_PPV_ARGS(GBuffer[i].GetAddressOf())));
+
+			wchar_t formattedString[32];
+			swprintf(formattedString, 32, L"GBuffer-%d", i);
+			GBuffer[i]->SetName(formattedString);
+		}
+
+		resourceDesc.Format = AccumulationBufferFormat;
+		ThrowIfFailed(Device->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_RENDER_TARGET,
+			&clearVal,
+			IID_PPV_ARGS(AccumulationBuffer.GetAddressOf())));
+		AccumulationBuffer->SetName(L"AccumulationBuffer");
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHeapHandle(RTVHeap->GetCPUDescriptorHandleForHeapStart(), SwapChainBufferCount, RTVDescriptorSize);
+
+		for (UINT i = 0; i < GBufferCount; i++)
+		{
+			Device->CreateRenderTargetView(GBuffer[i].Get(), nullptr, rtvHeapHandle);
+			rtvHeapHandle.Offset(1, RTVDescriptorSize);
+		}
+
+		Device->CreateRenderTargetView(AccumulationBuffer.Get(), nullptr, rtvHeapHandle);
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 12, CBVSRVUAVDescriptorSize);
+		D3D12_SHADER_RESOURCE_VIEW_DESC descSRV;
+
+		ZeroMemory(&descSRV, sizeof(descSRV));
+		descSRV.Texture2D.MipLevels = 1;
+		descSRV.Texture2D.MostDetailedMip = 0;
+		descSRV.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+		descSRV.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+
+		for (int i = 0; i < GBufferCount; i++) {
+			descSRV.Format = GBufferFormats[i];
+			Device->CreateShaderResourceView(GBuffer[i].Get(), &descSRV, hDescriptor);
+			hDescriptor.Offset(1, CBVSRVUAVDescriptorSize);
+		}
+
+		Device->CreateShaderResourceView(AccumulationBuffer.Get(), &descSRV, hDescriptor);
+	}
 
 	// release the previous resources we will be recreating
 	for (int i = 0; i < SwapChainBufferCount; ++i)
@@ -328,6 +410,7 @@ void DXCore::Resize()
 		D3D12_RESOURCE_STATE_COMMON,
 		&optClear,
 		IID_PPV_ARGS(DepthStencilBuffer.GetAddressOf())));
+	DepthStencilBuffer->SetName(L"DepthStencilBuffer");
 
 	// create descriptor to mip level 0 of entire resource using the format of the resource
 	D3D12_DEPTH_STENCIL_VIEW_DESC DSVDescription;
@@ -336,6 +419,17 @@ void DXCore::Resize()
 	DSVDescription.Format = DepthStencilFormat;
 	DSVDescription.Texture2D.MipSlice = 0;
 	Device->CreateDepthStencilView(DepthStencilBuffer.Get(), &DSVDescription, DepthStencilView());
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Format = DXGI_FORMAT_R24_UNORM_X8_TYPELESS;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MostDetailedMip = 0;
+	srvDesc.Texture2D.MipLevels = 1;
+	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+	srvDesc.Texture2D.PlaneSlice = 0;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 15, CBVSRVUAVDescriptorSize);
+	Device->CreateShaderResourceView(DepthStencilBuffer.Get(), &srvDesc, hDescriptor);
 
 	// transition the resource from its initial state to be used as a depth buffer
 	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(DepthStencilBuffer.Get(),
@@ -405,12 +499,9 @@ bool DXCore::InitMainWindow()
 bool DXCore::InitDirect3D()
 {
 #if defined(DEBUG) || defined(_DEBUG) 
-	// enable D3D12 debug layer
-	{
-		ComPtr<ID3D12Debug> debugController;
-		ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)));
-		debugController->EnableDebugLayer();
-	}
+	ComPtr<ID3D12Debug> debugController;
+	ThrowIfFailed(D3D12GetDebugInterface(IID_PPV_ARGS(&debugController)));
+	debugController->EnableDebugLayer();
 #endif
 
 	ThrowIfFailed(CreateDXGIFactory1(IID_PPV_ARGS(&DXGIFactory)));
@@ -470,7 +561,7 @@ bool DXCore::InitImGui()
 		DXGI_FORMAT_R8G8B8A8_UNORM, CBVSRVUAVHeap.Get(),
 		CBVSRVUAVHeap.Get()->GetCPUDescriptorHandleForHeapStart(),
 		CBVSRVUAVHeap.Get()->GetGPUDescriptorHandleForHeapStart());
-	
+
 	return true;
 }
 

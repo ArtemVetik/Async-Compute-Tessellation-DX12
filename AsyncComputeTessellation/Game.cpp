@@ -37,6 +37,7 @@ bool Game::Initialize()
 
 	BuildUAVs();
 	UploadBuffers();
+	BuildSSQuad();
 	BuildRootSignature();
 	BuildShadersAndInputLayout();
 	BuildFrameResources();
@@ -134,7 +135,9 @@ void Game::Draw(const Timer& timer)
 	auto objectCB = currentFrameResource->ObjectCB->Resource();
 	auto tessellationCB = currentFrameResource->TessellationCB->Resource();
 	auto perFrameCB = currentFrameResource->PerFrameCB->Resource();
+	auto lightPassCB = currentFrameResource->LightPassCB->Resource();
 
+	// compute pass
 	if (imguiParams.Freeze == false)
 	{
 		CommandList->SetComputeRootConstantBufferView(0, objectCB->GetGPUVirtualAddress());
@@ -162,6 +165,7 @@ void Game::Draw(const Timer& timer)
 		CommandList->Dispatch(1, 1, 1);
 	}
 
+	// shadow pass
 	{
 		CommandList->RSSetViewports(1, &mShadowMap->Viewport());
 		CommandList->RSSetScissorRects(1, &mShadowMap->ScissorRect());
@@ -210,66 +214,129 @@ void Game::Draw(const Timer& timer)
 			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
 	}
 
-	if (imguiParams.WireframeMode)
-		CommandList->SetPipelineState(PSOs["Wireframe"].Get());
-	else
-		CommandList->SetPipelineState(PSOs["Opaque"].Get());
+	// main draw pass
+	{
+		if (imguiParams.WireframeMode)
+			CommandList->SetPipelineState(PSOs["Wireframe"].Get());
+		else
+			CommandList->SetPipelineState(PSOs["Opaque"].Get());
 
-	CommandList->RSSetViewports(1, &ScreenViewPort);
-	CommandList->RSSetScissorRects(1, &ScissorRect);
+		CommandList->RSSetViewports(1, &ScreenViewPort);
+		CommandList->RSSetScissorRects(1, &ScissorRect);
 
-	// indicate a state transition on the resource usage
-	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
-		D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-	// clear the back buffer and depth buffer
-	CommandList->ClearRenderTargetView(CurrentBackBufferView(), Colors::Aqua, 0, nullptr);
-	CommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+		CommandList->ClearRenderTargetView(CurrentBackBufferView(), Colors::Aqua, 0, nullptr);
+		CommandList->ClearDepthStencilView(DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
-	// specify the buffers we are going to render to
-	CommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
+		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDesc(RTVHeap->GetCPUDescriptorHandleForHeapStart(), SwapChainBufferCount, RTVDescriptorSize);
 
-	CommandList->SetGraphicsRootSignature(opaqueRootSignature.Get());
+		for (int i = 0; i < GBufferCount; i++) {
+			CommandList->ClearRenderTargetView(rtvDesc, DirectX::Colors::Black, 0, nullptr); // TODO: change color
+			rtvDesc.Offset(1, RTVDescriptorSize);
+		}
 
-	CommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		rtvDesc = CD3DX12_CPU_DESCRIPTOR_HANDLE(RTVHeap->GetCPUDescriptorHandleForHeapStart(), SwapChainBufferCount, RTVDescriptorSize);
+		CommandList->OMSetRenderTargets(GBufferCount, &rtvDesc, true, &DepthStencilView());
 
-	CommandList->SetGraphicsRootConstantBufferView(0, objectCB->GetGPUVirtualAddress());
-	CommandList->SetGraphicsRootConstantBufferView(1, tessellationCB->GetGPUVirtualAddress());
-	CommandList->SetGraphicsRootConstantBufferView(2, perFrameCB->GetGPUVirtualAddress());
+		CommandList->SetGraphicsRootSignature(opaqueRootSignature.Get());
 
-	CommandList->SetGraphicsRootDescriptorTable(3, MeshDataVertexGPUSRV);
-	CommandList->SetGraphicsRootDescriptorTable(4, MeshDataIndexGPUSRV);
-	CommandList->SetGraphicsRootDescriptorTable(5, SubdBufferOutCulledGPUSRV);
-	CommandList->SetGraphicsRootDescriptorTable(6, mShadowMap->Srv());
+		CommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(),
-		D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
+		CommandList->SetGraphicsRootConstantBufferView(0, objectCB->GetGPUVirtualAddress());
+		CommandList->SetGraphicsRootConstantBufferView(1, tessellationCB->GetGPUVirtualAddress());
+		CommandList->SetGraphicsRootConstantBufferView(2, perFrameCB->GetGPUVirtualAddress());
 
-	CommandList->ExecuteIndirect(
-		tessellationCommandSignature.Get(),
-		1,
-		RWDrawArgs.Get(),
-		0,
-		nullptr,
-		0);
+		CommandList->SetGraphicsRootDescriptorTable(3, MeshDataVertexGPUSRV);
+		CommandList->SetGraphicsRootDescriptorTable(4, MeshDataIndexGPUSRV);
+		CommandList->SetGraphicsRootDescriptorTable(5, SubdBufferOutCulledGPUSRV);
+		CommandList->SetGraphicsRootDescriptorTable(6, mShadowMap->Srv());
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(),
+			D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
 
-	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(),
-		D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+		CommandList->ExecuteIndirect(
+			tessellationCommandSignature.Get(),
+			1,
+			RWDrawArgs.Get(),
+			0,
+			nullptr,
+			0);
+
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(RWDrawArgs.Get(),
+			D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+	}
+
+	// light pass
+	{
+		auto rtvDesc = CD3DX12_CPU_DESCRIPTOR_HANDLE(RTVHeap->GetCPUDescriptorHandleForHeapStart(), SwapChainBufferCount + GBufferCount, RTVDescriptorSize);
+		CommandList->OMSetRenderTargets(1, &rtvDesc, true, nullptr);
+
+		for (int i = 0; i < GBufferCount; i++)
+		{
+			CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GBuffer[i].Get(),
+				D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+		}
+
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(DepthStencilBuffer.Get(),
+			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+		CommandList->SetPipelineState(PSOs["DeferredLightPass"].Get());
+		CommandList->SetGraphicsRootSignature(gBufferRootSignature.Get());
+
+		CommandList->IASetVertexBuffers(0, 1, &ssQuadMesh->VertexBufferView());
+		CommandList->IASetIndexBuffer(&ssQuadMesh->IndexBufferView());
+		CommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		CommandList->SetGraphicsRootConstantBufferView(0, lightPassCB->GetGPUVirtualAddress());
+		CommandList->SetGraphicsRootDescriptorTable(1, GBufferGPUSRV);
+
+		CommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
+	}
+
+	// render quad pass
+	{
+		CommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
+
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(AccumulationBuffer.Get(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+		CommandList->SetPipelineState(PSOs["RenderQuadPass"].Get());
+		CommandList->SetGraphicsRootSignature(gBufferRootSignature.Get());
+
+		CommandList->IASetVertexBuffers(0, 1, &ssQuadMesh->VertexBufferView());
+		CommandList->IASetIndexBuffer(&ssQuadMesh->IndexBufferView());
+		CommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		CommandList->SetGraphicsRootConstantBufferView(0, lightPassCB->GetGPUVirtualAddress());
+		CommandList->SetGraphicsRootDescriptorTable(1, GBufferGPUSRV);
+
+		CommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
+	}
 
 	ImguiOutput imguiOutput;
 	ImGuiDraw(imguiOutput);
+
+	for (int i = 0; i < GBufferCount; i++)
+	{
+		CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GBuffer[i].Get(),
+			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
+	}
+
+	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(AccumulationBuffer.Get(),
+		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(DepthStencilBuffer.Get(),
+		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
 	// indicate a state transition on the resource usage
 	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
-	// done recording commands
 	ThrowIfFailed(CommandList->Close());
-	// add the command list to the queue for execution
 	ID3D12CommandList* cmdsLists[] = { CommandList.Get() };
 	CommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
-	// wwap the back and front buffers
 	ThrowIfFailed(SwapChain->Present(0, 0));
 	currentBackBuffer = (currentBackBuffer + 1) % SwapChainBufferCount;
 
@@ -401,12 +468,6 @@ void Game::UpdateMainPassCB(const Timer& timer)
 	XMStoreFloat4x4(&objConstants.Projection, DirectX::XMMatrixTranspose(projection));
 	XMStoreFloat4x4(&objConstants.ShadowTransform, XMMatrixTranspose(shadowTransform));
 	objConstants.AspectRatio = (float)screenWidth / screenHeight;
-	objConstants.Lights[0].Direction = mRotatedLightDirections[0];
-	objConstants.Lights[0].Strength = { 0.7f, 0.7f, 0.7f };
-	objConstants.Lights[1].Direction = mRotatedLightDirections[1];
-	objConstants.Lights[1].Strength = { 0.3f, 0.3f, 0.3f };
-	objConstants.Lights[2].Direction = mRotatedLightDirections[2];
-	objConstants.Lights[2].Strength = { 0.15f, 0.15f, 0.15f };
 
 	FrustrumPlanes frustrum = mainCamera->GetFrustrumPlanes(world);
 
@@ -444,6 +505,23 @@ void Game::UpdateMainPassCB(const Timer& timer)
 	XMStoreFloat4x4(&shadowConstants.Projection, XMMatrixTranspose(lightProjection));
 	auto currShadowCB = currentFrameResource->ObjectCB.get();
 	currShadowCB->CopyData(1, shadowConstants);
+
+	LightPassConstants lightPassConstants = {};
+	DirectX::XMStoreFloat4x4(&lightPassConstants.ViewInv, XMMatrixInverse(nullptr, XMLoadFloat4x4(&mainCamera->GetViewMatrix())));
+	DirectX::XMStoreFloat4x4(&lightPassConstants.ProjInv, XMMatrixInverse(nullptr, XMLoadFloat4x4(&mainCamera->GetProjectionMatrix())));
+	lightPassConstants.DiffuseAlbedo = { 0.8f, 0.8f, 0.8f, 1.0f };
+	lightPassConstants.AmbientLight = { 0.55f, 0.55f, 0.55f, 1.0f };
+	lightPassConstants.EyePosW = mainCamera->GetPosition();
+	lightPassConstants.Roughness = 0.125f;
+	lightPassConstants.FresnelR0 = { 0.02f, 0.02f, 0.02f };
+	lightPassConstants.Lights[0].Direction = mRotatedLightDirections[0];
+	lightPassConstants.Lights[0].Strength = { 1.0f, 0.0f, 0.0f };
+	lightPassConstants.Lights[1].Direction = mRotatedLightDirections[1];
+	lightPassConstants.Lights[1].Strength = { 0.0f, 1.0f, 0.0f };
+	lightPassConstants.Lights[2].Direction = mRotatedLightDirections[2];
+	lightPassConstants.Lights[2].Strength = { 0.0f, 0.0f, 1.0f };
+	auto lightPassCB = currentFrameResource->LightPassCB.get();
+	lightPassCB->CopyData(0, lightPassConstants);
 }
 
 void Game::UpdateShadowTransform(const Timer& timer)
@@ -700,6 +778,12 @@ void Game::BuildUAVs()
 			CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, 11, CBVSRVUAVDescriptorSize),
 			CD3DX12_CPU_DESCRIPTOR_HANDLE(dsvCpuStart, 1, DSVDescriptorSize));
 	}
+
+	// G Buffer Textures
+	{
+		// TODO: simplify heap indexing
+		GBufferGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), 12, CBVSRVUAVDescriptorSize);
+	}
 }
 
 void Game::UploadBuffers()
@@ -708,6 +792,44 @@ void Game::UploadBuffers()
 	bintree->UploadSubdivisionBuffer(RWSubdBufferIn.Get());
 	bintree->UploadSubdivisionCounter(RWSubdCounter.Get());
 	bintree->UploadDrawArgs(RWDrawArgs.Get(), imguiParams.CPULodLevel);
+}
+
+void Game::BuildSSQuad()
+{
+	GeometryGenerator geoGen;
+	GeometryGenerator::MeshData quad = geoGen.CreateQuad(-1.0f, 1.0f, 2.0f, 2.0f, 0.0f);
+
+	std::vector<VertexPT> vertices;
+	std::vector<std::uint16_t> indices;
+
+	for (size_t i = 0; i < quad.Vertices.size(); i++)
+		vertices.push_back({ quad.Vertices[i].Position, quad.Vertices[i].TexC });
+
+	for (size_t i = 0; i < quad.Indices32.size(); i++)
+		indices.push_back(quad.Indices32[i]);
+
+	const UINT vbByteSize = (UINT)vertices.size() * sizeof(VertexPT);
+	const UINT ibByteSize = (UINT)indices.size() * sizeof(std::uint16_t);
+
+	ssQuadMesh = std::make_unique<MeshGeometry>();
+	ssQuadMesh->Name = "quad";
+
+	ThrowIfFailed(D3DCreateBlob(vbByteSize, &ssQuadMesh->VertexBufferCPU));
+	CopyMemory(ssQuadMesh->VertexBufferCPU->GetBufferPointer(), vertices.data(), vbByteSize);
+
+	ThrowIfFailed(D3DCreateBlob(ibByteSize, &ssQuadMesh->IndexBufferCPU));
+	CopyMemory(ssQuadMesh->IndexBufferCPU->GetBufferPointer(), indices.data(), ibByteSize);
+
+	ssQuadMesh->VertexBufferGPU = d3dUtil::CreateDefaultBuffer(Device.Get(),
+		CommandList.Get(), vertices.data(), vbByteSize, ssQuadMesh->VertexBufferUploader);
+
+	ssQuadMesh->IndexBufferGPU = d3dUtil::CreateDefaultBuffer(Device.Get(),
+		CommandList.Get(), indices.data(), ibByteSize, ssQuadMesh->IndexBufferUploader);
+
+	ssQuadMesh->VertexByteStride = sizeof(VertexPT);
+	ssQuadMesh->VertexBufferByteSize = vbByteSize;
+	ssQuadMesh->IndexFormat = DXGI_FORMAT_R16_UINT;
+	ssQuadMesh->IndexBufferByteSize = ibByteSize;
 }
 
 void Game::BuildRootSignature()
@@ -761,6 +883,43 @@ void Game::BuildRootSignature()
 			serializedRootSig->GetBufferPointer(),
 			serializedRootSig->GetBufferSize(),
 			IID_PPV_ARGS(opaqueRootSignature.GetAddressOf())));
+	}
+
+	// g buffer signature
+	{
+		CD3DX12_DESCRIPTOR_RANGE srvTable0;
+		srvTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 4, 0);
+
+		// Root parameter can be a table, root descriptor or root constants.
+		CD3DX12_ROOT_PARAMETER slotRootParameter[2];
+		slotRootParameter[0].InitAsConstantBufferView(0);
+		slotRootParameter[1].InitAsDescriptorTable(1, &srvTable0);
+
+		auto staticSamplers = GetStaticSamplers();
+
+		// A root signature is an array of root parameters.
+		CD3DX12_ROOT_SIGNATURE_DESC rootSigDesc(2, slotRootParameter,
+			(UINT)staticSamplers.size(),
+			staticSamplers.data(),
+			D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		// create a root signature with a single slot which points to a descriptor range consisting of a single constant buffer
+		ComPtr<ID3DBlob> serializedRootSig = nullptr;
+		ComPtr<ID3DBlob> errorBlob = nullptr;
+		HRESULT hr = D3D12SerializeRootSignature(&rootSigDesc, D3D_ROOT_SIGNATURE_VERSION_1,
+			serializedRootSig.GetAddressOf(), errorBlob.GetAddressOf());
+
+		if (errorBlob != nullptr)
+		{
+			::OutputDebugStringA((char*)errorBlob->GetBufferPointer());
+		}
+		ThrowIfFailed(hr);
+
+		ThrowIfFailed(Device->CreateRootSignature(
+			0,
+			serializedRootSig->GetBufferPointer(),
+			serializedRootSig->GetBufferSize(),
+			IID_PPV_ARGS(gBufferRootSignature.GetAddressOf())));
 	}
 
 	// tessellation root signature
@@ -861,12 +1020,22 @@ void Game::BuildShadersAndInputLayout()
 	Shaders["OpaquePS"] = d3dUtil::CompileShader(L"DefaultPS.hlsl", macros, "main", "ps_5_1");
 	Shaders["WireframeGS"] = d3dUtil::CompileShader(L"WireframeGS.hlsl", macros, "main", "gs_5_1");
 	Shaders["WireframePS"] = d3dUtil::CompileShader(L"WireframePS.hlsl", macros, "main", "ps_5_1");
+	Shaders["LightPassVS"] = d3dUtil::CompileShader(L"LightPass.hlsl", macros, "VS", "vs_5_1");
+	Shaders["LightPassPS"] = d3dUtil::CompileShader(L"LightPass.hlsl", macros, "PS", "ps_5_1");
+	Shaders["RenderQuadVS"] = d3dUtil::CompileShader(L"RenderQuad.hlsl", macros, "VS", "vs_5_1");
+	Shaders["RenderQuadPS"] = d3dUtil::CompileShader(L"RenderQuad.hlsl", macros, "PS", "ps_5_1");
 	Shaders["TessellationUpdate"] = d3dUtil::CompileShader(L"TessellationUpdate.hlsl", macros, "main", "cs_5_1");
 	Shaders["TessellationCopyDraw"] = d3dUtil::CompileShader(L"TessellationCopyDraw.hlsl", macros, "main", "cs_5_1");
 
-	geoInputLayout =
+	posInputLayout =
 	{
 		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+	};
+
+	posTexInputLayout =
+	{
+		{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+		{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 	};
 }
 
@@ -877,7 +1046,7 @@ void Game::BuildPSOs()
 	//
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC geoOpaquePsoDesc;
 	ZeroMemory(&geoOpaquePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
-	geoOpaquePsoDesc.InputLayout = { geoInputLayout.data(), (UINT)geoInputLayout.size() };
+	geoOpaquePsoDesc.InputLayout = { posInputLayout.data(), (UINT)posInputLayout.size() };
 	geoOpaquePsoDesc.pRootSignature = opaqueRootSignature.Get();
 	geoOpaquePsoDesc.VS =
 	{
@@ -895,8 +1064,9 @@ void Game::BuildPSOs()
 	geoOpaquePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 	geoOpaquePsoDesc.SampleMask = UINT_MAX;
 	geoOpaquePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	geoOpaquePsoDesc.NumRenderTargets = 1;
-	geoOpaquePsoDesc.RTVFormats[0] = BackBufferFormat;
+	geoOpaquePsoDesc.NumRenderTargets = GBufferCount;
+	for (int i = 0; i < GBufferCount; i++)
+		geoOpaquePsoDesc.RTVFormats[i] = GBufferFormats[i];
 	geoOpaquePsoDesc.SampleDesc.Count = xMsaaState ? 4 : 1;
 	geoOpaquePsoDesc.SampleDesc.Quality = xMsaaState ? (xMsaaQuality - 1) : 0;
 	geoOpaquePsoDesc.DSVFormat = DepthStencilFormat;
@@ -906,7 +1076,16 @@ void Game::BuildPSOs()
 	//
 	// PSO for shadow map pass
 	//
-	D3D12_GRAPHICS_PIPELINE_STATE_DESC smapPsoDesc = geoOpaquePsoDesc;
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC smapPsoDesc = {};
+	ZeroMemory(&smapPsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+	smapPsoDesc.InputLayout = { posInputLayout.data(), (UINT)posInputLayout.size() };
+	smapPsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	smapPsoDesc.RasterizerState.CullMode = D3D12_CULL_MODE_NONE; // TODO: use D3D12_CULL_MODE_FRONT (tessellation algorithm will need to be modified)
+	smapPsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	smapPsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+	smapPsoDesc.SampleMask = UINT_MAX;
+	smapPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	smapPsoDesc.pRootSignature = opaqueRootSignature.Get();
 	smapPsoDesc.RasterizerState.DepthBias = 100000;
 	smapPsoDesc.RasterizerState.DepthBiasClamp = 0.0f;
 	smapPsoDesc.RasterizerState.SlopeScaledDepthBias = 1.0f;
@@ -917,8 +1096,11 @@ void Game::BuildPSOs()
 		Shaders["OpaqueVS"]->GetBufferSize()
 	};
 	smapPsoDesc.PS = {};
-	smapPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
 	smapPsoDesc.NumRenderTargets = 0;
+	smapPsoDesc.RTVFormats[0] = DXGI_FORMAT_UNKNOWN;
+	smapPsoDesc.SampleDesc.Count = xMsaaState ? 4 : 1;
+	smapPsoDesc.SampleDesc.Quality = xMsaaState ? (xMsaaQuality - 1) : 0;
+	smapPsoDesc.DSVFormat = DepthStencilFormat;
 	ThrowIfFailed(Device->CreateGraphicsPipelineState(&smapPsoDesc, IID_PPV_ARGS(&PSOs["ShadowOpaque"])));
 	PSOs["ShadowOpaque"]->SetName(L"ShadowOpaquePSO");
 
@@ -927,7 +1109,7 @@ void Game::BuildPSOs()
 	//
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC geoWireframePsoDesc;
 	ZeroMemory(&geoWireframePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
-	geoWireframePsoDesc.InputLayout = { geoInputLayout.data(), (UINT)geoInputLayout.size() };
+	geoWireframePsoDesc.InputLayout = { posInputLayout.data(), (UINT)posInputLayout.size() };
 	geoWireframePsoDesc.pRootSignature = opaqueRootSignature.Get();
 	geoWireframePsoDesc.VS =
 	{
@@ -950,13 +1132,74 @@ void Game::BuildPSOs()
 	geoWireframePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
 	geoWireframePsoDesc.SampleMask = UINT_MAX;
 	geoWireframePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	geoWireframePsoDesc.NumRenderTargets = 1;
-	geoWireframePsoDesc.RTVFormats[0] = BackBufferFormat;
+	geoWireframePsoDesc.NumRenderTargets = GBufferCount;
+	for (int i = 0; i < GBufferCount; i++)
+		geoWireframePsoDesc.RTVFormats[i] = GBufferFormats[i];
 	geoWireframePsoDesc.SampleDesc.Count = xMsaaState ? 4 : 1;
 	geoWireframePsoDesc.SampleDesc.Quality = xMsaaState ? (xMsaaQuality - 1) : 0;
 	geoWireframePsoDesc.DSVFormat = DepthStencilFormat;
 	ThrowIfFailed(Device->CreateGraphicsPipelineState(&geoWireframePsoDesc, IID_PPV_ARGS(&PSOs["Wireframe"])));
 	PSOs["Wireframe"]->SetName(L"WireframePSO");
+
+	//
+	// PSO for deferred light pass
+	//
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC deferredLightPsoDesc;
+	ZeroMemory(&deferredLightPsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+	deferredLightPsoDesc.InputLayout = { posTexInputLayout.data(), (UINT)posTexInputLayout.size() };
+	deferredLightPsoDesc.pRootSignature = gBufferRootSignature.Get();
+	deferredLightPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(Shaders["LightPassVS"]->GetBufferPointer()),
+		Shaders["LightPassVS"]->GetBufferSize()
+	};
+	deferredLightPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(Shaders["LightPassPS"]->GetBufferPointer()),
+		Shaders["LightPassPS"]->GetBufferSize()
+	};
+	deferredLightPsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	deferredLightPsoDesc.RasterizerState.DepthClipEnable = false;
+	deferredLightPsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	deferredLightPsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+	deferredLightPsoDesc.DepthStencilState.DepthEnable = false;
+	deferredLightPsoDesc.SampleMask = UINT_MAX;
+	deferredLightPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	deferredLightPsoDesc.NumRenderTargets = 1;
+	deferredLightPsoDesc.RTVFormats[0] = AccumulationBufferFormat;
+	deferredLightPsoDesc.SampleDesc.Count = 1;
+	ThrowIfFailed(Device->CreateGraphicsPipelineState(&deferredLightPsoDesc, IID_PPV_ARGS(&PSOs["DeferredLightPass"])));
+	PSOs["DeferredLightPass"]->SetName(L"DeferredLightPassPSO");
+
+	//
+	// PSO for final render quad
+	//
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC renderQuadPsoDesc = {};
+	ZeroMemory(&renderQuadPsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+	renderQuadPsoDesc.InputLayout = { posTexInputLayout.data(), (UINT)posTexInputLayout.size() };
+	renderQuadPsoDesc.pRootSignature = gBufferRootSignature.Get();
+	renderQuadPsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(Shaders["RenderQuadVS"]->GetBufferPointer()),
+		Shaders["RenderQuadVS"]->GetBufferSize()
+	};
+	renderQuadPsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(Shaders["RenderQuadPS"]->GetBufferPointer()),
+		Shaders["RenderQuadPS"]->GetBufferSize()
+	};
+	renderQuadPsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	renderQuadPsoDesc.RasterizerState.DepthClipEnable = false;
+	renderQuadPsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	renderQuadPsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+	renderQuadPsoDesc.DepthStencilState.DepthEnable = false;
+	renderQuadPsoDesc.SampleMask = UINT_MAX;
+	renderQuadPsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	renderQuadPsoDesc.NumRenderTargets = 1;
+	renderQuadPsoDesc.RTVFormats[0] = BackBufferFormat;
+	renderQuadPsoDesc.SampleDesc.Count = 1;
+	ThrowIfFailed(Device->CreateGraphicsPipelineState(&renderQuadPsoDesc, IID_PPV_ARGS(&PSOs["RenderQuadPass"])));
+	PSOs["RenderQuadPass"]->SetName(L"RenderQuadPassPSO");
 
 	//
 	// PSO for compute tessellation

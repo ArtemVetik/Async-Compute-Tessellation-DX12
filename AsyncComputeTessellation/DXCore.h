@@ -63,10 +63,13 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> CommandListAllocator;
 	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> CommandList;
 
+	static const int GBufferCount = 2;
 	static const int SwapChainBufferCount = 2;
 	int currentBackBuffer = 0;
 	Microsoft::WRL::ComPtr<ID3D12Resource> SwapChainBuffer[SwapChainBufferCount];
 	Microsoft::WRL::ComPtr<ID3D12Resource> DepthStencilBuffer;
+	Microsoft::WRL::ComPtr<ID3D12Resource> GBuffer[GBufferCount];
+	Microsoft::WRL::ComPtr<ID3D12Resource> AccumulationBuffer;
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> RTVHeap;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> DSVHeap;
@@ -84,6 +87,12 @@ protected:
 	D3D_DRIVER_TYPE D3DDriverType = D3D_DRIVER_TYPE_HARDWARE;
 	DXGI_FORMAT BackBufferFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
 	DXGI_FORMAT DepthStencilFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	DXGI_FORMAT AccumulationBufferFormat = DXGI_FORMAT_R16G16B16A16_FLOAT;
+	DXGI_FORMAT GBufferFormats[GBufferCount] =
+	{
+		DXGI_FORMAT_R16G16B16A16_FLOAT,
+		DXGI_FORMAT_R16G16B16A16_FLOAT, // TODO: compact normal map https://aras-p.info/texts/CompactNormalStorage.html
+	};
 	int screenWidth = 1280;
 	int screenHeight = 720;
 

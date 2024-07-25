@@ -33,8 +33,10 @@ private:
 	FrameResource* currentFrameResource = nullptr;
 	int currentFrameResourceIndex = 0;
 
-	std::vector<D3D12_INPUT_ELEMENT_DESC> geoInputLayout;
+	std::vector<D3D12_INPUT_ELEMENT_DESC> posInputLayout;
+	std::vector<D3D12_INPUT_ELEMENT_DESC> posTexInputLayout;
 	ComPtr<ID3D12RootSignature> opaqueRootSignature = nullptr;
+	ComPtr<ID3D12RootSignature> gBufferRootSignature = nullptr;
 	ComPtr<ID3D12RootSignature> tessellationComputeRootSignature = nullptr;
 	ComPtr<ID3D12CommandSignature> tessellationCommandSignature = nullptr;
 
@@ -82,6 +84,8 @@ private:
 	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdCounterCPUUAV;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdCounterGPUUAV;
 
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GBufferGPUSRV;
+
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> Shaders;
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> PSOs;
 
@@ -103,6 +107,8 @@ private:
 
 	std::unique_ptr<ShadowMap> mShadowMap;
 
+	std::unique_ptr<MeshGeometry> ssQuadMesh;
+
 	InputManager* inputManager;
 
 	ImguiParams imguiParams;
@@ -119,6 +125,7 @@ private:
 
 	void BuildUAVs();
 	void UploadBuffers();
+	void BuildSSQuad();
 	void BuildRootSignature();
 	void BuildShadersAndInputLayout();
 	void BuildPSOs();

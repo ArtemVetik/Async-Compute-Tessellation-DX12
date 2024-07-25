@@ -40,21 +40,11 @@ float CalcShadowFactor(float4 shadowPosH)
     return percentLit / 9.0f;
 }
 
-float4 main(VertexOut pin) : SV_Target
+ps_output main(VertexOut pin) : SV_Target
 {
-    // Interpolating normal can unnormalize it, so renormalize it.
-    pin.NormalW = normalize(pin.NormalW);
-
-    // Vector from point being lit to eye. 
-    float3 toEyeW = normalize(camPosition - pin.PosW);
-
-	// Indirect lighting.
-    float4 gAmbientLight = float4(0.55f, 0.55f, 0.55f, 1.0f);
-    float4 gDiffuseAlbedo = float4(0.8f, 0.8f, 0.8f, 1.0f);
-    float gRoughness = 0.125f;
-    float3 gFresnelR0 = float3(0.02f, 0.02f, 0.02f);
+    ps_output output;
     
-    float4 ambient = gAmbientLight * gDiffuseAlbedo;
+    pin.NormalW = normalize(pin.NormalW);
     
     float3 dx = ddx(pin.PosW);
     float3 dy = ddy(pin.PosW);
@@ -70,17 +60,8 @@ float4 main(VertexOut pin) : SV_Target
     float3 shadowFactor = float3(1.0f, 1.0f, 1.0f);
     shadowFactor[0] = CalcShadowFactor(pin.ShadowPosH);
     
-    const float shininess = 1.0f - gRoughness;
-    Material mat = { gDiffuseAlbedo, gFresnelR0, shininess };
+    output.albedo = 1;
+    output.normal = float4(pin.NormalW, shadowFactor[0]);
     
-    float4 directLight = ComputeLighting(lights, mat, pin.PosW,
-        pin.NormalW, toEyeW, shadowFactor);
-
-    float4 litColor = ambient + directLight;
-
-    // Common convention to take alpha from diffuse material.
-    litColor.a = gDiffuseAlbedo.a;
-    
-    
-    return litColor;
+    return output;
 }

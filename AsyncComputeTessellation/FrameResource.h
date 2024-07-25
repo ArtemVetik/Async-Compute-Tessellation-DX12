@@ -12,7 +12,6 @@ struct ObjectConstants
 	DirectX::XMFLOAT4X4 ShadowTransform;
 	float AspectRatio = 0.0f;
 	DirectX::XMUINT3 Padding;
-	Light Lights[MaxLights];
 	DirectX::XMFLOAT4 FrustrumPlanes[6];
 };
 
@@ -27,6 +26,19 @@ struct TessellationConstants
 	float DisplacePosScale = 0.02;
 	float DisplaceH = 0.96;
 	float LodFactor;
+};
+
+struct LightPassConstants
+{
+	DirectX::XMFLOAT4X4 ViewInv;
+	DirectX::XMFLOAT4X4 ProjInv;
+	DirectX::XMFLOAT4 DiffuseAlbedo;
+	DirectX::XMFLOAT4 AmbientLight;
+	DirectX::XMFLOAT3 EyePosW;
+	float Roughness;
+	DirectX::XMFLOAT3 FresnelR0;
+	UINT Space;
+	Light Lights[MaxLights];
 };
 
 struct PerFrameConstants
@@ -62,6 +74,7 @@ public:
 	std::unique_ptr<UploadBuffer<ObjectConstants>> ObjectCB = nullptr;
 	std::unique_ptr<UploadBuffer<TessellationConstants>> TessellationCB = nullptr;
 	std::unique_ptr<UploadBuffer<PerFrameConstants>> PerFrameCB = nullptr;
+	std::unique_ptr<UploadBuffer<LightPassConstants>> LightPassCB = nullptr;
 
 	// fence value to mark commands up to this fence point 
 	// this lets us check if these frame resources are still in use by the GPU.

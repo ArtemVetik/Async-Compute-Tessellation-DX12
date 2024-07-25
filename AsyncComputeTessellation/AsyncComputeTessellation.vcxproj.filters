@@ -234,5 +234,11 @@
     <None Include="gpu_noise_lib.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="LightPass.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="RenderQuad.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

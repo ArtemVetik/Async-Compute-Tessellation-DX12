@@ -33,4 +33,10 @@ struct VertexOut
     float2 LeafPos : TEXCOORD2;
 };
 
+struct ps_output
+{
+    float4 albedo : SV_TARGET0;
+    float4 normal : SV_TARGET1;
+};
+
 #endif

@@ -29,13 +29,18 @@ float gridFactor(float2 vBC, float width)
     return min(min(a3.x, a3.y), a3.z);
 }
 
-float4 main(VertexOut pin) : SV_Target
+ps_output main(VertexOut pin) : SV_Target
 {
+    ps_output output;
+    
     float3 p = pin.PosW;
     
     float4 c = levelColor(pin.Lvl);
 
     float wireframe_factor = gridFactor(pin.LeafPos, 0.5);
 
-    return float4(c.xyz * wireframe_factor, 1);
+    output.albedo = float4(c.xyz * wireframe_factor, 1);
+    output.normal = float4(normalize(pin.NormalW), 1);
+    
+    return output;
 }
