@@ -17,6 +17,7 @@ public:
 	Camera(unsigned int width, unsigned int height);
 	~Camera();
 
+	XMFLOAT4X4 GetPrevViewMatrix();
 	XMFLOAT4X4 GetViewMatrix();
 	XMFLOAT4X4 GetProjectionMatrix();
 	float GetNear() const;
@@ -46,6 +47,7 @@ private:
 	DirectX::XMFLOAT3 mLook = { 0.0f, 0.0f, 1.0f };
 	float fov = 55.0f;
 
+	XMFLOAT4X4 prevViewMatrix;
 	XMFLOAT4X4 viewMatrix;
 	XMFLOAT4X4 projectionMatrix;
 	float nearValue;

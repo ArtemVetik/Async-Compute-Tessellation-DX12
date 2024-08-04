@@ -10,6 +10,7 @@ FrameResource::FrameResource(ID3D12Device* device)
 	TessellationCB = std::make_unique<UploadBuffer<TessellationConstants>>(device, 1, true);
 	PerFrameCB = std::make_unique<UploadBuffer<PerFrameConstants>>(device, 1, true);
 	LightPassCB = std::make_unique<UploadBuffer<LightPassConstants>>(device, 1, true);
+	MotionBlureCB = std::make_unique<UploadBuffer<MotionBlureConstants>>(device, 1, true);
 }
 
 FrameResource::~FrameResource()

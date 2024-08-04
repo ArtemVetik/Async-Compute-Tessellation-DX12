@@ -17,6 +17,7 @@ Camera::Camera(unsigned int width, unsigned int height)
 		pos,
 		dir,
 		up);
+	XMStoreFloat4x4(&prevViewMatrix, (V));
 	XMStoreFloat4x4(&viewMatrix, (V));
 
 	SetProjectionMatrix(width, height);
@@ -29,6 +30,11 @@ Camera::Camera(unsigned int width, unsigned int height)
 
 Camera::~Camera()
 {
+}
+
+XMFLOAT4X4 Camera::GetPrevViewMatrix()
+{
+	return prevViewMatrix;
 }
 
 XMFLOAT4X4 Camera::GetViewMatrix()
@@ -135,7 +141,7 @@ void Camera::Update()
 	XMVECTOR upVector = XMLoadFloat3(&mUp);
 	XMVECTOR pos = XMLoadFloat3(&mPosition);
 
-	float moveRate = 0.1f;
+	float moveRate = 0.05f;
 
 	if (InputManager::getInstance()->isKeyPressed('W') || InputManager::getInstance()->isControllerButtonPressed(XINPUT_GAMEPAD_Y))
 	{
@@ -175,7 +181,7 @@ void Camera::Update()
 
 	XMStoreFloat3(&mPosition, pos);
 
-
+	prevViewMatrix = viewMatrix;
 	if (mViewDirty)
 	{
 		XMVECTOR R = XMLoadFloat3(&mRight);

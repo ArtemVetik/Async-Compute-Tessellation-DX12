@@ -24,6 +24,8 @@ struct ImguiParams
 	int GPULodLevel = 0;
 	bool FlatNormals = false;
 	bool Freeze = false;
+	float MotionBlurAmount = 50.0f;
+	int MotionBlurSamplerCount = 20;
 };
 
 struct ImguiOutput

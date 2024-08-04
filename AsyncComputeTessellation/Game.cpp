@@ -136,6 +136,7 @@ void Game::Draw(const Timer& timer)
 	auto tessellationCB = currentFrameResource->TessellationCB->Resource();
 	auto perFrameCB = currentFrameResource->PerFrameCB->Resource();
 	auto lightPassCB = currentFrameResource->LightPassCB->Resource();
+	auto motionBlurePassCB = currentFrameResource->MotionBlureCB->Resource();
 
 	// compute pass
 	if (imguiParams.Freeze == false)
@@ -269,8 +270,8 @@ void Game::Draw(const Timer& timer)
 
 	// light pass
 	{
-		auto rtvDesc = CD3DX12_CPU_DESCRIPTOR_HANDLE(RTVHeap->GetCPUDescriptorHandleForHeapStart(), SwapChainBufferCount + GBufferCount, RTVDescriptorSize);
-		CommandList->OMSetRenderTargets(1, &rtvDesc, true, nullptr);
+		auto accumBufferDesc = CD3DX12_CPU_DESCRIPTOR_HANDLE(RTVHeap->GetCPUDescriptorHandleForHeapStart(), SwapChainBufferCount + GBufferCount, RTVDescriptorSize);
+		CommandList->OMSetRenderTargets(1, &accumBufferDesc, true, nullptr);
 
 		for (int i = 0; i < GBufferCount; i++)
 		{
@@ -289,6 +290,24 @@ void Game::Draw(const Timer& timer)
 		CommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 		CommandList->SetGraphicsRootConstantBufferView(0, lightPassCB->GetGPUVirtualAddress());
+		CommandList->SetGraphicsRootDescriptorTable(1, GBufferGPUSRV);
+
+		CommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
+	}
+
+	// motion blure pass
+	{
+		auto accumBufferDesc = CD3DX12_CPU_DESCRIPTOR_HANDLE(RTVHeap->GetCPUDescriptorHandleForHeapStart(), SwapChainBufferCount + GBufferCount, RTVDescriptorSize);
+		CommandList->OMSetRenderTargets(1, &accumBufferDesc, true, nullptr);
+
+		CommandList->SetPipelineState(PSOs["MotionBlurePass"].Get());
+		CommandList->SetGraphicsRootSignature(gBufferRootSignature.Get());
+
+		CommandList->IASetVertexBuffers(0, 1, &ssQuadMesh->VertexBufferView());
+		CommandList->IASetIndexBuffer(&ssQuadMesh->IndexBufferView());
+		CommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		CommandList->SetGraphicsRootConstantBufferView(0, motionBlurePassCB->GetGPUVirtualAddress());
 		CommandList->SetGraphicsRootDescriptorTable(1, GBufferGPUSRV);
 
 		CommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
@@ -444,6 +463,9 @@ void Game::ImGuiDraw(ImguiOutput& output)
 
 	ImGui::Checkbox("Freeze", &imguiParams.Freeze);
 
+	ImGui::SliderFloat("Motion Blure Amount", &imguiParams.MotionBlurAmount, 1, 100);
+	ImGui::SliderInt("Motion Blure Sampler", &imguiParams.MotionBlurSamplerCount, 1, 50);
+
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
 	ImGui::End();
@@ -458,6 +480,7 @@ void Game::UpdateMainPassCB(const Timer& timer)
 	// TODO: optimize loading of constant buffers (load only when needed, not every frame)
 
 	XMMATRIX world = XMLoadFloat4x4(&MathHelper::Identity4x4());
+	XMMATRIX prevView = XMLoadFloat4x4(&mainCamera->GetPrevViewMatrix());
 	XMMATRIX view = XMLoadFloat4x4(&mainCamera->GetViewMatrix());
 	XMMATRIX projection = XMLoadFloat4x4(&mainCamera->GetProjectionMatrix());
 	XMMATRIX shadowTransform = XMLoadFloat4x4(&mShadowTransform);
@@ -522,6 +545,16 @@ void Game::UpdateMainPassCB(const Timer& timer)
 	lightPassConstants.Lights[2].Strength = { 0.0f, 0.0f, 1.0f };
 	auto lightPassCB = currentFrameResource->LightPassCB.get();
 	lightPassCB->CopyData(0, lightPassConstants);
+
+	MotionBlureConstants motionBlureConstants = {};
+	XMStoreFloat4x4(&motionBlureConstants.ViewProj, DirectX::XMMatrixTranspose(DirectX::XMMatrixMultiply(view, projection)));
+	XMStoreFloat4x4(&motionBlureConstants.PrevViewProj, DirectX::XMMatrixTranspose(DirectX::XMMatrixMultiply(prevView, projection)));
+	DirectX::XMStoreFloat4x4(&motionBlureConstants.ViewInv, XMMatrixInverse(nullptr, XMLoadFloat4x4(&mainCamera->GetViewMatrix())));
+	DirectX::XMStoreFloat4x4(&motionBlureConstants.ProjInv, XMMatrixInverse(nullptr, XMLoadFloat4x4(&mainCamera->GetProjectionMatrix())));
+	motionBlureConstants.BlureAmount = imguiParams.MotionBlurAmount;
+	motionBlureConstants.SamplerCount = imguiParams.MotionBlurSamplerCount;
+	auto motionBlureCB = currentFrameResource->MotionBlureCB.get();
+	motionBlureCB->CopyData(0, motionBlureConstants);
 }
 
 void Game::UpdateShadowTransform(const Timer& timer)
@@ -1022,6 +1055,8 @@ void Game::BuildShadersAndInputLayout()
 	Shaders["WireframePS"] = d3dUtil::CompileShader(L"WireframePS.hlsl", macros, "main", "ps_5_1");
 	Shaders["LightPassVS"] = d3dUtil::CompileShader(L"LightPass.hlsl", macros, "VS", "vs_5_1");
 	Shaders["LightPassPS"] = d3dUtil::CompileShader(L"LightPass.hlsl", macros, "PS", "ps_5_1");
+	Shaders["MotionBlureVS"] = d3dUtil::CompileShader(L"MotionBlure.hlsl", macros, "VS", "vs_5_1");
+	Shaders["MotionBlurePS"] = d3dUtil::CompileShader(L"MotionBlure.hlsl", macros, "PS", "ps_5_1");
 	Shaders["RenderQuadVS"] = d3dUtil::CompileShader(L"RenderQuad.hlsl", macros, "VS", "vs_5_1");
 	Shaders["RenderQuadPS"] = d3dUtil::CompileShader(L"RenderQuad.hlsl", macros, "PS", "ps_5_1");
 	Shaders["TessellationUpdate"] = d3dUtil::CompileShader(L"TessellationUpdate.hlsl", macros, "main", "cs_5_1");
@@ -1172,6 +1207,36 @@ void Game::BuildPSOs()
 	PSOs["DeferredLightPass"]->SetName(L"DeferredLightPassPSO");
 
 	//
+	// PSO for motion blure
+	//
+	D3D12_GRAPHICS_PIPELINE_STATE_DESC motionBlurePsoDesc = {};
+	ZeroMemory(&motionBlurePsoDesc, sizeof(D3D12_GRAPHICS_PIPELINE_STATE_DESC));
+	motionBlurePsoDesc.InputLayout = { posTexInputLayout.data(), (UINT)posTexInputLayout.size() };
+	motionBlurePsoDesc.pRootSignature = gBufferRootSignature.Get();
+	motionBlurePsoDesc.VS =
+	{
+		reinterpret_cast<BYTE*>(Shaders["MotionBlureVS"]->GetBufferPointer()),
+		Shaders["MotionBlureVS"]->GetBufferSize()
+	};
+	motionBlurePsoDesc.PS =
+	{
+		reinterpret_cast<BYTE*>(Shaders["MotionBlurePS"]->GetBufferPointer()),
+		Shaders["MotionBlurePS"]->GetBufferSize()
+	};
+	motionBlurePsoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+	motionBlurePsoDesc.RasterizerState.DepthClipEnable = false;
+	motionBlurePsoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+	motionBlurePsoDesc.DepthStencilState = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+	motionBlurePsoDesc.DepthStencilState.DepthEnable = false;
+	motionBlurePsoDesc.SampleMask = UINT_MAX;
+	motionBlurePsoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+	motionBlurePsoDesc.NumRenderTargets = 1;
+	motionBlurePsoDesc.RTVFormats[0] = AccumulationBufferFormat;
+	motionBlurePsoDesc.SampleDesc.Count = 1;
+	ThrowIfFailed(Device->CreateGraphicsPipelineState(&motionBlurePsoDesc, IID_PPV_ARGS(&PSOs["MotionBlurePass"])));
+	PSOs["MotionBlurePass"]->SetName(L"MotionBlurePassPSO");
+
+	//
 	// PSO for final render quad
 	//
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC renderQuadPsoDesc = {};
@@ -1199,7 +1264,7 @@ void Game::BuildPSOs()
 	renderQuadPsoDesc.RTVFormats[0] = BackBufferFormat;
 	renderQuadPsoDesc.SampleDesc.Count = 1;
 	ThrowIfFailed(Device->CreateGraphicsPipelineState(&renderQuadPsoDesc, IID_PPV_ARGS(&PSOs["RenderQuadPass"])));
-	PSOs["RenderQuadPass"]->SetName(L"RenderQuadPassPSO");
+	PSOs["RenderQuadPass"]->SetName(L"RenderQuadPassPSO"); // TODO: change name to HDR Tone Mapping
 
 	//
 	// PSO for compute tessellation

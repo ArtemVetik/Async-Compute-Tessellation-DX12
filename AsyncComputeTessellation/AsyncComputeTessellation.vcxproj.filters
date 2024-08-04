@@ -240,5 +240,8 @@
     <None Include="RenderQuad.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="MotionBlure.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
