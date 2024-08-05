@@ -41,7 +41,7 @@ struct LightPassConstants
 	Light Lights[MaxLights];
 };
 
-struct MotionBlureConstants
+struct MotionBlurConstants
 {
 	DirectX::XMFLOAT4X4 ViewProj;
 	DirectX::XMFLOAT4X4 PrevViewProj;
@@ -50,6 +50,12 @@ struct MotionBlureConstants
 	float BlureAmount;
 	UINT SamplerCount;
 	DirectX::XMUINT2 Padding;
+};
+
+struct BloomConstants
+{
+	float Threshold;
+	DirectX::XMUINT3 Padding;
 };
 
 struct PerFrameConstants
@@ -86,7 +92,8 @@ public:
 	std::unique_ptr<UploadBuffer<TessellationConstants>> TessellationCB = nullptr;
 	std::unique_ptr<UploadBuffer<PerFrameConstants>> PerFrameCB = nullptr;
 	std::unique_ptr<UploadBuffer<LightPassConstants>> LightPassCB = nullptr;
-	std::unique_ptr<UploadBuffer<MotionBlureConstants>> MotionBlureCB = nullptr;
+	std::unique_ptr<UploadBuffer<MotionBlurConstants>> MotionBlurCB = nullptr;
+	std::unique_ptr<UploadBuffer<BloomConstants>> BloomCB = nullptr;
 
 	// fence value to mark commands up to this fence point 
 	// this lets us check if these frame resources are still in use by the GPU.

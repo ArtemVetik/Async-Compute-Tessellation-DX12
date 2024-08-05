@@ -1,0 +1,36 @@
+#pragma once
+
+enum class CBVSRVUAVIndex
+{
+	IMGUI_TEXTURE = 0,
+	MESH_DATA_VERTEX_UAV = 1,
+	MESH_DATA_VERTEX_SRV = 2,
+	MESH_DATA_INDEX_UAV = 3,
+	MESH_DATA_INDEX_SRV = 4,
+	DRAW_ARGS_UAV = 5,
+	SUBD_IN_UAV = 6,
+	SUBD_OUT_UAV = 7,
+	SUBD_OUT_CULL_UAV = 8,
+	SUBD_OUT_CULL_SRV = 9,
+	SUBD_COUNTER_UAV = 10,
+	SHADOW_MAP_SRV = 11,
+	G_BUFFER = 12, // 12 - 13 (2)
+	ACCUMULATION_BUFFER = 14, // 14 - 15 (2)
+	BLOOM_BUFFER = 16, // 16 - 17 (2)
+	BLOOM_WEIGHTS = 18,
+	DEPTH_BUFFER = 19,
+};
+
+enum class RTVIndex
+{
+	SWAP_CHAIN = 0, // 0 - 1 (2)
+	G_BUFFER = 2, // 2 - 3 (2)
+	ACCUMULATION_BUFFER = 4, // 4 - 5 (2)
+	BLOOM_BUFFER = 6, // 6 - 7 (2)
+};
+
+enum class DSVIndex
+{
+	DEPTH_STENCIL_MAIN = 0,
+	SHADOW_MAP_DEPTH = 1,
+};

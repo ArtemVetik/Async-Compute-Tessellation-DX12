@@ -2,8 +2,7 @@
 
 Texture2D gAlbedoTexture : register(t0);
 Texture2D gNormalTexture : register(t1);
-Texture2D gAccumTexture : register(t2);
-Texture2D gDepthTexture : register(t3);
+Texture2D gDepthTexture : register(t2);
 
 SamplerState gsamPointWrap : register(s0);
 SamplerState gsamPointClamp : register(s1);

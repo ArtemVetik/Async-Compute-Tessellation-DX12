@@ -90,6 +90,9 @@
     <ClCompile Include="ShadowMap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Bloom.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h">
@@ -182,6 +185,12 @@
     <ClInclude Include="ShadowMap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="HeapIndexes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Bloom.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Image Include="small.ico">
@@ -240,7 +249,10 @@
     <None Include="RenderQuad.hlsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="MotionBlure.hlsl">
+    <None Include="MotionBlur.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="BloomShader.hlsl">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

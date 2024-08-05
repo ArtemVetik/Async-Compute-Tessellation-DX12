@@ -1,7 +1,5 @@
-Texture2D gAlbedoTexture : register(t0);
-Texture2D gNormalTexture : register(t1);
-Texture2D gAccumTexture : register(t2);
-Texture2D gDepthTexture : register(t3);
+Texture2D gAccumTexture : register(t0);
+Texture2D gDepthTexture : register(t1);
 
 SamplerState gsamPointWrap : register(s0);
 SamplerState gsamPointClamp : register(s1);
@@ -11,7 +9,7 @@ SamplerState gsamAnisotropicWrap : register(s4);
 SamplerState gsamAnisotropicClamp : register(s5);
 SamplerComparisonState gsamShadow : register(s6);
 
-cbuffer cbMotionBlureBuffer : register(b0)
+cbuffer cbMotionBlurBuffer : register(b0)
 {
     float4x4 gViewProj;
     float4x4 gPreviousViewProj;

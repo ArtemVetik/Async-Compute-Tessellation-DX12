@@ -130,6 +130,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Bintree.cpp" />
+    <ClCompile Include="Bloom.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="d3dUtil.cpp" />
     <ClCompile Include="DDSTextureLoader.cpp" />
@@ -155,6 +156,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Bintree.h" />
+    <ClInclude Include="Bloom.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="d3dUtil.h" />
     <ClInclude Include="d3dx12.h" />
@@ -163,6 +165,7 @@
     <ClInclude Include="FrameResource.h" />
     <ClInclude Include="Game.h" />
     <ClInclude Include="GeometryGenerator.h" />
+    <ClInclude Include="HeapIndexes.h" />
     <ClInclude Include="ImguiParams.h" />
     <ClInclude Include="imgui\imconfig.h" />
     <ClInclude Include="imgui\imgui.h" />
@@ -268,7 +271,12 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <None Include="MotionBlure.hlsl">
+    <None Include="MotionBlur.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="BloomShader.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

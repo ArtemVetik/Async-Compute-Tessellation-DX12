@@ -12,6 +12,7 @@
 #include "ImguiParams.h"
 #include "Bintree.h"
 #include "ShadowMap.h"
+#include "Bloom.h"
 
 using Microsoft::WRL::ComPtr;
 using namespace DirectX;
@@ -37,6 +38,9 @@ private:
 	std::vector<D3D12_INPUT_ELEMENT_DESC> posTexInputLayout;
 	ComPtr<ID3D12RootSignature> opaqueRootSignature = nullptr;
 	ComPtr<ID3D12RootSignature> gBufferRootSignature = nullptr;
+	ComPtr<ID3D12RootSignature> motionBlurRootSignature = nullptr;
+	ComPtr<ID3D12RootSignature> bloomRootSignature = nullptr;
+	ComPtr<ID3D12RootSignature> finalPassRootSignature = nullptr;
 	ComPtr<ID3D12RootSignature> tessellationComputeRootSignature = nullptr;
 	ComPtr<ID3D12CommandSignature> tessellationCommandSignature = nullptr;
 
@@ -47,12 +51,7 @@ private:
 	ComPtr<ID3D12Resource> RWSubdBufferOut = nullptr;
 	ComPtr<ID3D12Resource> RWSubdBufferOutCulled = nullptr;
 	ComPtr<ID3D12Resource> RWSubdCounter = nullptr;
-
-	std::unique_ptr<UploadBuffer<DirectX::XMFLOAT3>> MeshDataVertexUploadBuffer;
-	std::unique_ptr<UploadBuffer<UINT>> MeshDataIndexUploadBuffer;
-	std::unique_ptr<UploadBuffer<DirectX::XMUINT4>> SubdBufferInUploadBuffer;
-	std::unique_ptr<UploadBuffer<IndirectCommand>> IndirectCommandUploadBuffer;
-	std::unique_ptr<UploadBuffer<UINT>> SubdCounterUploadBuffer;
+	ComPtr<ID3D12Resource> RWBloomWeights = nullptr;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE MeshDataVertexCPUSRV;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE MeshDataVertexGPUSRV;
@@ -86,6 +85,8 @@ private:
 
 	CD3DX12_GPU_DESCRIPTOR_HANDLE GBufferGPUSRV;
 
+	CD3DX12_GPU_DESCRIPTOR_HANDLE BloomWeightsGPUSRV;
+
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> Shaders;
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> PSOs;
 
@@ -102,6 +103,7 @@ private:
 	XMFLOAT3 mRotatedLightDirections[3];
 
 	Bintree* bintree; // TODO: make unique ptr
+	Bloom* bloom; // TODO: make unique ptr
 
 	Camera* mainCamera;
 

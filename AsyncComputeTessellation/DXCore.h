@@ -8,6 +8,7 @@
 #include "d3dUtil.h"
 #include "InputManager.h"
 #include "Timer.h"
+#include "HeapIndexes.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_win32.h"
 #include "imgui/imgui_impl_dx12.h"
@@ -69,7 +70,8 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D12Resource> SwapChainBuffer[SwapChainBufferCount];
 	Microsoft::WRL::ComPtr<ID3D12Resource> DepthStencilBuffer;
 	Microsoft::WRL::ComPtr<ID3D12Resource> GBuffer[GBufferCount];
-	Microsoft::WRL::ComPtr<ID3D12Resource> AccumulationBuffer;
+	Microsoft::WRL::ComPtr<ID3D12Resource> AccumulationBuffer[2];
+	Microsoft::WRL::ComPtr<ID3D12Resource> BloomBuffer[2];
 
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> RTVHeap;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> DSVHeap;

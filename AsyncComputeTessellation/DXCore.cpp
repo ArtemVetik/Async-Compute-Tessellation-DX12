@@ -245,7 +245,7 @@ LRESULT DXCore::MsgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 void DXCore::CreateRTVDSVCBVDescriptorHeaps()
 {
 	D3D12_DESCRIPTOR_HEAP_DESC RTVHeapDescription;
-	RTVHeapDescription.NumDescriptors = SwapChainBufferCount + GBufferCount + 1;
+	RTVHeapDescription.NumDescriptors = 8;
 	RTVHeapDescription.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 	RTVHeapDescription.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 	RTVHeapDescription.NodeMask = 0;
@@ -261,7 +261,7 @@ void DXCore::CreateRTVDSVCBVDescriptorHeaps()
 		&DSVHeapDescription, IID_PPV_ARGS(DSVHeap.GetAddressOf())));
 
 	D3D12_DESCRIPTOR_HEAP_DESC uavHeapDesc = {};
-	uavHeapDesc.NumDescriptors = 16;
+	uavHeapDesc.NumDescriptors = 20;
 	uavHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 	uavHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 	ThrowIfFailed(Device->CreateDescriptorHeap(&uavHeapDesc, IID_PPV_ARGS(&CBVSRVUAVHeap)));
@@ -280,11 +280,14 @@ void DXCore::Resize()
 
 	// G Buffer
 	{
-		for (int i = 0; i < GBufferCount; ++i) {
+		for (int i = 0; i < GBufferCount; ++i)
 			GBuffer[i].Reset();
-		}
 
-		AccumulationBuffer.Reset();
+		for (int i = 0; i < 2; i++)
+			AccumulationBuffer[i].Reset();
+
+		for (int i = 0; i < 2; i++)
+			BloomBuffer[i].Reset();
 
 		D3D12_RESOURCE_DESC resourceDesc;
 		ZeroMemory(&resourceDesc, sizeof(resourceDesc));
@@ -323,16 +326,32 @@ void DXCore::Resize()
 		}
 
 		resourceDesc.Format = AccumulationBufferFormat;
-		ThrowIfFailed(Device->CreateCommittedResource(
-			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
-			D3D12_HEAP_FLAG_NONE,
-			&resourceDesc,
-			D3D12_RESOURCE_STATE_RENDER_TARGET,
-			&clearVal,
-			IID_PPV_ARGS(AccumulationBuffer.GetAddressOf())));
-		AccumulationBuffer->SetName(L"AccumulationBuffer");
+		for (int i = 0; i < 2; i++)
+		{
+			ThrowIfFailed(Device->CreateCommittedResource(
+				&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+				D3D12_HEAP_FLAG_NONE,
+				&resourceDesc,
+				D3D12_RESOURCE_STATE_RENDER_TARGET,
+				&clearVal,
+				IID_PPV_ARGS(AccumulationBuffer[i].GetAddressOf())));
+			wchar_t formattedString[32];
+			swprintf(formattedString, 32, L"AccumulationBuffer-%d", i);
+			AccumulationBuffer[i]->SetName(formattedString);
 
-		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHeapHandle(RTVHeap->GetCPUDescriptorHandleForHeapStart(), SwapChainBufferCount, RTVDescriptorSize);
+			ThrowIfFailed(Device->CreateCommittedResource(
+				&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT),
+				D3D12_HEAP_FLAG_NONE,
+				&resourceDesc,
+				D3D12_RESOURCE_STATE_RENDER_TARGET,
+				&clearVal,
+				IID_PPV_ARGS(BloomBuffer[i].GetAddressOf())));
+			formattedString[32];
+			swprintf(formattedString, 32, L"BloomBuffer-%d", i);
+			BloomBuffer[i]->SetName(formattedString);
+		}
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHeapHandle(RTVHeap->GetCPUDescriptorHandleForHeapStart(), (int)RTVIndex::G_BUFFER, RTVDescriptorSize);
 
 		for (UINT i = 0; i < GBufferCount; i++)
 		{
@@ -340,9 +359,21 @@ void DXCore::Resize()
 			rtvHeapHandle.Offset(1, RTVDescriptorSize);
 		}
 
-		Device->CreateRenderTargetView(AccumulationBuffer.Get(), nullptr, rtvHeapHandle);
+		rtvHeapHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(RTVHeap->GetCPUDescriptorHandleForHeapStart(), (int)RTVIndex::ACCUMULATION_BUFFER, RTVDescriptorSize);
+		for (int i = 0; i < 2; i++)
+		{
+			Device->CreateRenderTargetView(AccumulationBuffer[i].Get(), nullptr, rtvHeapHandle);
+			rtvHeapHandle.Offset(1, RTVDescriptorSize);
+		}
+		
+		rtvHeapHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(RTVHeap->GetCPUDescriptorHandleForHeapStart(), (int)RTVIndex::BLOOM_BUFFER, RTVDescriptorSize);
+		for (int i = 0; i < 2; i++)
+		{
+			Device->CreateRenderTargetView(BloomBuffer[i].Get(), nullptr, rtvHeapHandle);
+			rtvHeapHandle.Offset(1, RTVDescriptorSize);
+		}
 
-		CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 12, CBVSRVUAVDescriptorSize);
+		CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::G_BUFFER, CBVSRVUAVDescriptorSize);
 		D3D12_SHADER_RESOURCE_VIEW_DESC descSRV;
 
 		ZeroMemory(&descSRV, sizeof(descSRV));
@@ -357,7 +388,20 @@ void DXCore::Resize()
 			hDescriptor.Offset(1, CBVSRVUAVDescriptorSize);
 		}
 
-		Device->CreateShaderResourceView(AccumulationBuffer.Get(), &descSRV, hDescriptor);
+		descSRV.Format = AccumulationBufferFormat;
+		hDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::ACCUMULATION_BUFFER, CBVSRVUAVDescriptorSize);
+		for (int i = 0; i < 2; i++)
+		{
+			Device->CreateShaderResourceView(AccumulationBuffer[i].Get(), &descSRV, hDescriptor);
+			hDescriptor.Offset(1, CBVSRVUAVDescriptorSize);
+		}
+
+		hDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::BLOOM_BUFFER, CBVSRVUAVDescriptorSize);
+		for (int i = 0; i < 2; i++)
+		{
+			Device->CreateShaderResourceView(BloomBuffer[i].Get(), &descSRV, hDescriptor);
+			hDescriptor.Offset(1, CBVSRVUAVDescriptorSize);
+		}
 	}
 
 	// release the previous resources we will be recreating
@@ -374,7 +418,7 @@ void DXCore::Resize()
 
 	currentBackBuffer = 0;
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE RTVHeapHandle(RTVHeap->GetCPUDescriptorHandleForHeapStart());
+	CD3DX12_CPU_DESCRIPTOR_HANDLE RTVHeapHandle(RTVHeap->GetCPUDescriptorHandleForHeapStart(), (int)RTVIndex::SWAP_CHAIN, RTVDescriptorSize);
 	for (UINT i = 0; i < SwapChainBufferCount; i++)
 	{
 		ThrowIfFailed(SwapChain->GetBuffer(i, IID_PPV_ARGS(&SwapChainBuffer[i])));
@@ -428,7 +472,7 @@ void DXCore::Resize()
 	srvDesc.Texture2D.MipLevels = 1;
 	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
 	srvDesc.Texture2D.PlaneSlice = 0;
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), 15, CBVSRVUAVDescriptorSize);
+	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::DEPTH_BUFFER, CBVSRVUAVDescriptorSize);
 	Device->CreateShaderResourceView(DepthStencilBuffer.Get(), &srvDesc, hDescriptor);
 
 	// transition the resource from its initial state to be used as a depth buffer
@@ -559,8 +603,8 @@ bool DXCore::InitImGui()
 	ImGui_ImplWin32_Init(mainWindowHandle);
 	ImGui_ImplDX12_Init(Device.Get(), SwapChainBufferCount,
 		DXGI_FORMAT_R8G8B8A8_UNORM, CBVSRVUAVHeap.Get(),
-		CBVSRVUAVHeap.Get()->GetCPUDescriptorHandleForHeapStart(),
-		CBVSRVUAVHeap.Get()->GetGPUDescriptorHandleForHeapStart());
+		CD3DX12_CPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetCPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::IMGUI_TEXTURE, CBVSRVUAVDescriptorSize),
+		CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::IMGUI_TEXTURE, CBVSRVUAVDescriptorSize));
 
 	return true;
 }
@@ -672,5 +716,8 @@ D3D12_CPU_DESCRIPTOR_HANDLE DXCore::CurrentBackBufferView()const
 
 D3D12_CPU_DESCRIPTOR_HANDLE DXCore::DepthStencilView() const
 {
-	return DSVHeap->GetCPUDescriptorHandleForHeapStart();
+	return CD3DX12_CPU_DESCRIPTOR_HANDLE(
+		DSVHeap->GetCPUDescriptorHandleForHeapStart(),
+		(int)DSVIndex::DEPTH_STENCIL_MAIN,
+		DSVDescriptorSize);
 }

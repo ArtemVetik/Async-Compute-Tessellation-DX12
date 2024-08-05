@@ -1,9 +1,6 @@
 #include "LightingUtil.hlsl"
-
-Texture2D gAlbedoTexture : register(t0);
-Texture2D gNormalTexture : register(t1);
-Texture2D gAccumTexture : register(t2);
-Texture2D gDepthTexture : register(t3);
+Texture2D gAccumTexture : register(t0);
+Texture2D gBloomTexture : register(t1);
 
 SamplerState gsamPointWrap : register(s0);
 SamplerState gsamPointClamp : register(s1);
@@ -54,6 +51,9 @@ VertexOut VS(VertexIn vIn)
 float4 PS(VertexOut pIn) : SV_TARGET
 {
     float4 hdrColor = gAccumTexture.Sample(gsamPointWrap, pIn.TexC);
+    float4 bloomColor = gBloomTexture.Sample(gsamPointWrap, pIn.TexC);
+    
+    hdrColor += 1.0f * bloomColor;
     
     float gamma = 2.2;
   
