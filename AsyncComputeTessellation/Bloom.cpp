@@ -6,19 +6,18 @@ Bloom::Bloom(ID3D12Device* device, ID3D12GraphicsCommandList* commandList)
 	mCommandList = commandList;
 }
 
-void Bloom::UploadWeightsBuffer(ID3D12Resource* weightsBuffer)
+void Bloom::UploadWeightsBuffer(ID3D12Resource* weightsBuffer, int kernelSize)
 {
 	if (WeightsBufferUpload)
 		WeightsBufferUpload.reset();
 
 	WeightsBufferUpload = std::make_unique<UploadBuffer<float>>(mDevice, 7, false);
 
-	const int radius = 7;
 	std::vector<float> weights;
 
-	float sigma = 2.0f;
+	float sigma = 3.0f;
 	float sum = 0.0f;
-	for (int i = 0; i <= radius; ++i) {
+	for (int i = 0; i <= kernelSize; ++i) {
 		float weight = expf(-0.5f * (i * i) / (sigma * sigma));
 		weights.push_back(weight);
 		sum += weight;

@@ -346,7 +346,7 @@ void DXCore::Resize()
 				D3D12_RESOURCE_STATE_RENDER_TARGET,
 				&clearVal,
 				IID_PPV_ARGS(BloomBuffer[i].GetAddressOf())));
-			formattedString[32];
+			
 			swprintf(formattedString, 32, L"BloomBuffer-%d", i);
 			BloomBuffer[i]->SetName(formattedString);
 		}

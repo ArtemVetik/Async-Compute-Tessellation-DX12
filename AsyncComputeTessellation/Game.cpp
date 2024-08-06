@@ -107,7 +107,7 @@ void Game::Update(const Timer& timer)
 		CloseHandle(eventHandle);
 	}
 
-	mLightRotationAngle += 0.8f * timer.GetDeltaTime();
+	mLightRotationAngle += imguiParams.LightRotateSpeed * timer.GetDeltaTime();
 
 	XMMATRIX R = XMMatrixRotationY(mLightRotationAngle);
 	for (int i = 0; i < 3; ++i)
@@ -335,6 +335,7 @@ void Game::Draw(const Timer& timer)
 		CommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
 	}
 
+	// TODO: make downsampling and upsampling
 	// bloom H pass
 	{
 		CommandList->OMSetRenderTargets(1, &bloomBuffer1RtvDescCpu, true, nullptr);
@@ -505,63 +506,119 @@ void Game::ImGuiDraw(ImguiOutput& output)
 		ImGui::ShowDemoWindow(&imguiParams.ShowDebugWindow);
 
 	static int counter = 0;
-	ImGui::Begin("Tessellation parameters | TEST");
+	ImGui::Begin("App parameters | TEST");
 	ImGui::Text("Test application parameters.");
 	ImGui::Checkbox("Demo Window", &imguiParams.ShowDebugWindow);
 
 	output = {};
 
-	if (ImGui::Combo("Mode", (int*)&imguiParams.MeshMode, "Terrain\0Mesh\0\0"))
+	if (ImGui::CollapsingHeader("Tessellation parameters"))
 	{
-		output.RebuildMesh = true;
-	}
+		ImGui::SeparatorText("View Mode");
 
-	ImGui::Checkbox("Wireframe Mode", &imguiParams.WireframeMode);
+		if (ImGui::Combo("Mode", (int*)&imguiParams.MeshMode, "Terrain\0Mesh\0\0"))
+		{
+			output.RebuildMesh = true;
+		}
 
-	if (ImGui::SliderInt("CPU Lod Level", &imguiParams.CPULodLevel, 0, 4))
-		output.ReuploadBuffers = true;
 
-	if (ImGui::Checkbox("Uniform", &imguiParams.Uniform))
-		output.RecompileShaders = true;
+		ImGui::Checkbox("Wireframe Mode", &imguiParams.WireframeMode);
 
-	if (imguiParams.Uniform)
-	{
-		if (ImGui::SliderInt("GPU Lod Level", &imguiParams.GPULodLevel, 0, 16))
+		if (imguiParams.WireframeMode == false)
+		{
+			if (ImGui::Checkbox("Flat Normals", &imguiParams.FlatNormals))
+				output.RecompileShaders = true;
+		}
+
+		ImGui::SeparatorText("LoD");
+
+		if (ImGui::SliderInt("CPU Lod Level", &imguiParams.CPULodLevel, 0, 4))
 			output.ReuploadBuffers = true;
-	}
 
-	if (imguiParams.MeshMode == MeshMode::TERRAIN)
-	{
-		if (ImGui::Checkbox("Displace Mapping", &imguiParams.UseDisplaceMapping))
+		if (ImGui::Checkbox("Uniform", &imguiParams.Uniform))
 			output.RecompileShaders = true;
 
-		if (imguiParams.UseDisplaceMapping)
+		if (imguiParams.Uniform)
 		{
-			ImGui::SliderFloat("Displace Factor", &imguiParams.DisplaceFactor, 1, 20);
-			ImGui::Checkbox("Waves Animation", &imguiParams.WavesAnimation);
-			ImGui::SliderFloat("Displace Lacunarity", &imguiParams.DisplaceLacunarity, 0.7, 3);
-			ImGui::SliderFloat("Displace PosScale", &imguiParams.DisplacePosScale, 0.01, 0.05);
-			ImGui::SliderFloat("Displace H", &imguiParams.DisplaceH, 0.1, 2);
+			ImGui::SameLine();
+			if (ImGui::SliderInt(" ", &imguiParams.GPULodLevel, 0, 16))
+				output.ReuploadBuffers = true;
+		}
+
+		float expo = log2(imguiParams.TargetLength);
+		if (ImGui::SliderFloat("Edge Length (2^x)", &expo, 2, 10))
+		{
+			imguiParams.TargetLength = std::pow(2, expo);
+			bintree->UpdateLodFactor(&imguiParams, std::max(screenWidth, screenHeight), mainCamera->GetFov());
+		}
+
+		if (imguiParams.MeshMode == MeshMode::TERRAIN)
+		{
+			ImGui::SeparatorText("Displace");
+
+			if (ImGui::Checkbox("Displace Mapping", &imguiParams.UseDisplaceMapping))
+				output.RecompileShaders = true;
+
+			if (imguiParams.UseDisplaceMapping)
+			{
+				ImGui::SliderFloat("Displace Factor", &imguiParams.DisplaceFactor, 1, 20);
+				ImGui::Checkbox("Animated", &imguiParams.WavesAnimation);
+				ImGui::SliderFloat("Displace Lacunarity", &imguiParams.DisplaceLacunarity, 0.7, 3);
+				ImGui::SliderFloat("Displace PosScale", &imguiParams.DisplacePosScale, 0.01, 0.05);
+				ImGui::SliderFloat("Displace H", &imguiParams.DisplaceH, 0.1, 2);
+			}
+		}
+
+		ImGui::SeparatorText("Compute Settings");
+
+		ImGui::Checkbox("Freeze", &imguiParams.Freeze);
+	}
+
+	if (ImGui::CollapsingHeader("Lighting"))
+	{
+		ImGui::SeparatorText("Directional Light");
+
+		if (ImGui::SliderInt("Count", &imguiParams.DirectionalLightCount, 1, 3))
+			output.RecompileShaders = true;
+
+		for (int i = 0; i < imguiParams.DirectionalLightCount; i++)
+		{
+			char str[50];
+			sprintf_s(str, "Color %d", i);
+
+			ImGui::ColorEdit3(str, imguiParams.DLColor[i]);
+
+			sprintf_s(str, "Intensivity %d", i);
+			ImGui::InputFloat(str, &imguiParams.DLIntensivity[i]);
+		}
+
+		ImGui::Spacing();
+		ImGui::SliderFloat("Rotate Speed", &imguiParams.LightRotateSpeed, 0, 5);
+
+		ImGui::SeparatorText("Shading Parameters");
+
+		ImGui::SliderFloat4("Diffuse Albedo", imguiParams.DiffuseAlbedo, 0, 1);
+		ImGui::SliderFloat4("Ambient Light", imguiParams.AmbientLight, 0, 1);
+		ImGui::SliderFloat("Roughness", &imguiParams.Roughness, 0, 1);
+		ImGui::SliderFloat3("FresnelR0", imguiParams.FresnelR0, 0, 1);
+	}
+
+	if (ImGui::CollapsingHeader("Motion Blur"))
+	{
+		ImGui::SliderFloat("Motion Blur Amount", &imguiParams.MotionBlurAmount, 1, 100);
+		ImGui::SliderInt("Motion Blur Sampler", &imguiParams.MotionBlurSamplerCount, 1, 50);
+	}
+
+	if (ImGui::CollapsingHeader("Bloom"))
+	{
+		ImGui::SliderFloat("Threshold", &imguiParams.Threshold, 0, 2);
+
+		if (ImGui::SliderInt("Kernel Size", &imguiParams.BloomKernelSize, 3, 32))
+		{
+			output.RecompileShaders = true;
+			output.ReuploadBuffers = true;
 		}
 	}
-
-	if (imguiParams.WireframeMode == false)
-	{
-		if (ImGui::Checkbox("Flat Normals", &imguiParams.FlatNormals))
-			output.RecompileShaders = true;
-	}
-
-	float expo = log2(imguiParams.TargetLength);
-	if (ImGui::SliderFloat("Edge Length (2^x)", &expo, 2, 10))
-	{
-		imguiParams.TargetLength = std::pow(2, expo);
-		bintree->UpdateLodFactor(&imguiParams, std::max(screenWidth, screenHeight), mainCamera->GetFov());
-	}
-
-	ImGui::Checkbox("Freeze", &imguiParams.Freeze);
-
-	ImGui::SliderFloat("Motion Blure Amount", &imguiParams.MotionBlurAmount, 1, 100);
-	ImGui::SliderInt("Motion Blure Sampler", &imguiParams.MotionBlurSamplerCount, 1, 50);
 
 	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
@@ -629,17 +686,17 @@ void Game::UpdateMainPassCB(const Timer& timer)
 	LightPassConstants lightPassConstants = {};
 	DirectX::XMStoreFloat4x4(&lightPassConstants.ViewInv, XMMatrixInverse(nullptr, XMLoadFloat4x4(&mainCamera->GetViewMatrix())));
 	DirectX::XMStoreFloat4x4(&lightPassConstants.ProjInv, XMMatrixInverse(nullptr, XMLoadFloat4x4(&mainCamera->GetProjectionMatrix())));
-	lightPassConstants.DiffuseAlbedo = { 0.8f, 0.8f, 0.8f, 1.0f };
-	lightPassConstants.AmbientLight = { 0.55f, 0.55f, 0.55f, 1.0f };
+	lightPassConstants.DiffuseAlbedo = DirectX::XMFLOAT4(imguiParams.DiffuseAlbedo);
+	lightPassConstants.AmbientLight = DirectX::XMFLOAT4(imguiParams.AmbientLight);
 	lightPassConstants.EyePosW = mainCamera->GetPosition();
-	lightPassConstants.Roughness = 0.125f;
-	lightPassConstants.FresnelR0 = { 0.02f, 0.02f, 0.02f };
+	lightPassConstants.Roughness = imguiParams.Roughness;
+	lightPassConstants.FresnelR0 = DirectX::XMFLOAT3(imguiParams.FresnelR0);
 	lightPassConstants.Lights[0].Direction = mRotatedLightDirections[0];
-	lightPassConstants.Lights[0].Strength = { 1.0f, 0.0f, 0.0f };
-	lightPassConstants.Lights[1].Direction = mRotatedLightDirections[1];
-	lightPassConstants.Lights[1].Strength = { 0.0f, 1.0f, 0.0f };
-	lightPassConstants.Lights[2].Direction = mRotatedLightDirections[2];
-	lightPassConstants.Lights[2].Strength = { 0.0f, 0.0f, 1.0f };
+	lightPassConstants.Lights[0].Strength = MathHelper::MultiplyFloat3(DirectX::XMFLOAT3(imguiParams.DLColor[0]), imguiParams.DLIntensivity[0]);
+	lightPassConstants.Lights[1].Direction = mRotatedLightDirections[1];										  
+	lightPassConstants.Lights[1].Strength = MathHelper::MultiplyFloat3(DirectX::XMFLOAT3(imguiParams.DLColor[1]), imguiParams.DLIntensivity[1]);
+	lightPassConstants.Lights[2].Direction = mRotatedLightDirections[2];										  
+	lightPassConstants.Lights[2].Strength = MathHelper::MultiplyFloat3(DirectX::XMFLOAT3(imguiParams.DLColor[2]), imguiParams.DLIntensivity[2]);
 	auto lightPassCB = currentFrameResource->LightPassCB.get();
 	lightPassCB->CopyData(0, lightPassConstants);
 
@@ -654,7 +711,7 @@ void Game::UpdateMainPassCB(const Timer& timer)
 	motionBlurCB->CopyData(0, motionBlurConstants);
 
 	BloomConstants bloomConstants = {};
-	bloomConstants.Threshold = 0.8f;
+	bloomConstants.Threshold = imguiParams.Threshold;
 	auto bloomCB = currentFrameResource->BloomCB.get();
 	bloomCB->CopyData(0, bloomConstants);
 }
@@ -726,7 +783,7 @@ void Game::BuildUAVs()
 		meshDataVertexUAVDescription.Buffer.StructureByteStride = sizeof(Vertex);
 		meshDataVertexUAVDescription.Buffer.CounterOffsetInBytes = 0;
 		meshDataVertexUAVDescription.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-		
+
 		MeshDataVertexCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::MESH_DATA_VERTEX_UAV, CBVSRVUAVDescriptorSize);
 		MeshDataVertexGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, (int)CBVSRVUAVIndex::MESH_DATA_VERTEX_UAV, CBVSRVUAVDescriptorSize);
 		Device->CreateUnorderedAccessView(RWMeshDataVertex.Get(), nullptr, &meshDataVertexUAVDescription, MeshDataVertexCPUUAV);
@@ -953,7 +1010,7 @@ void Game::UploadBuffers()
 	bintree->UploadSubdivisionBuffer(RWSubdBufferIn.Get());
 	bintree->UploadSubdivisionCounter(RWSubdCounter.Get());
 	bintree->UploadDrawArgs(RWDrawArgs.Get(), imguiParams.CPULodLevel);
-	bloom->UploadWeightsBuffer(RWBloomWeights.Get());
+	bloom->UploadWeightsBuffer(RWBloomWeights.Get(), imguiParams.BloomKernelSize);
 }
 
 void Game::BuildSSQuad()
@@ -1051,7 +1108,7 @@ void Game::BuildRootSignature()
 	{
 		CD3DX12_DESCRIPTOR_RANGE srvTable0;
 		srvTable0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, GBufferCount, 0);
-		
+
 		CD3DX12_DESCRIPTOR_RANGE srvTable1;
 		srvTable1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, GBufferCount);
 
@@ -1306,12 +1363,22 @@ void Game::BuildShadersAndInputLayout()
 		{"USE_DISPLACE", imguiParams.UseDisplaceMapping && imguiParams.MeshMode == MeshMode::TERRAIN ? "1" : "0"},
 		{"UNIFORM_TESSELLATION", imguiParams.Uniform ? "1" : "0"},
 		{"FLAT_NORMALS", imguiParams.FlatNormals ? "1" : "0"},
+		{"NUM_DIR_LIGHTS", imguiParams.DirectionalLightCount == 1 ? "1" : imguiParams.DirectionalLightCount == 2 ? "2" : "3"},
 		{NULL, NULL}
 	};
 
-	D3D_SHADER_MACRO bloomMacros[] =
+	char str[32];
+	sprintf_s(str, "%d", imguiParams.BloomKernelSize);
+	D3D_SHADER_MACRO bloomMacrosH[] =
 	{
 		{"HORIZONTAL_BLUR", "1"},
+		{"BLOOM_KERNEL_SIZE", str},
+		{NULL, NULL}
+	};
+
+	D3D_SHADER_MACRO bloomMacrosV[] =
+	{
+		{"BLOOM_KERNEL_SIZE", str},
 		{NULL, NULL}
 	};
 
@@ -1325,8 +1392,8 @@ void Game::BuildShadersAndInputLayout()
 	Shaders["MotionBlurPS"] = d3dUtil::CompileShader(L"MotionBlur.hlsl", macros, "PS", "ps_5_1");
 	Shaders["BloomVS"] = d3dUtil::CompileShader(L"BloomShader.hlsl", macros, "VS", "vs_5_1");
 	Shaders["BloomPSThreshold"] = d3dUtil::CompileShader(L"BloomShader.hlsl", macros, "PS", "ps_5_1");
-	Shaders["BloomPSMainH"] = d3dUtil::CompileShader(L"BloomShader.hlsl", bloomMacros, "PSMain", "ps_5_1");
-	Shaders["BloomPSMainV"] = d3dUtil::CompileShader(L"BloomShader.hlsl", nullptr, "PSMain", "ps_5_1");
+	Shaders["BloomPSMainH"] = d3dUtil::CompileShader(L"BloomShader.hlsl", bloomMacrosH, "PSMain", "ps_5_1");
+	Shaders["BloomPSMainV"] = d3dUtil::CompileShader(L"BloomShader.hlsl", bloomMacrosV, "PSMain", "ps_5_1");
 	Shaders["RenderQuadVS"] = d3dUtil::CompileShader(L"RenderQuad.hlsl", macros, "VS", "vs_5_1");
 	Shaders["RenderQuadPS"] = d3dUtil::CompileShader(L"RenderQuad.hlsl", macros, "PS", "ps_5_1");
 	Shaders["TessellationUpdate"] = d3dUtil::CompileShader(L"TessellationUpdate.hlsl", macros, "main", "cs_5_1");

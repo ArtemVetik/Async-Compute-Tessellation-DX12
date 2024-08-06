@@ -8,7 +8,7 @@ class Bloom
 public:
 	Bloom(ID3D12Device* device, ID3D12GraphicsCommandList* commandList);
 
-	void UploadWeightsBuffer(ID3D12Resource* weightsBuffer);
+	void UploadWeightsBuffer(ID3D12Resource* weightsBuffer, int kernelSize);
 
 private:
 	ID3D12Device* mDevice;

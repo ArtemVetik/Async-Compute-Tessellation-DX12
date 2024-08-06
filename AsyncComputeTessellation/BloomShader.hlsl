@@ -48,21 +48,23 @@ float4 PS(VertexOut pIn) : SV_Target
 
 float4 PSMain(VertexOut pIn) : SV_Target
 {
-    float4 color = gBloomTexture.SampleLevel(gsamLinearClamp, pIn.TexC, 0) * gWeights[0];
+    float4 color = gBloomTexture.SampleLevel(gsamPointClamp, pIn.TexC, 0) * gWeights[0];
     float width, height;
     gBloomTexture.GetDimensions(width, height);
-
+    
 #if HORIZONTAL_BLUR
     float2 texelSize = float2(1.0f/width, 0.0f);
 #else
     float2 texelSize = float2(0.0f, 1.0f / height);
 #endif
     
+#ifdef BLOOM_KERNEL_SIZE
     [unroll]
-    for (int i = 1; i <= 7; i++)
+    for (int i = 1; i <= BLOOM_KERNEL_SIZE; i++)
     {
         color += gBloomTexture.SampleLevel(gsamLinearClamp, pIn.TexC + texelSize * i, 0) * gWeights[i];
         color += gBloomTexture.SampleLevel(gsamLinearClamp, pIn.TexC - texelSize * i, 0) * gWeights[i];
     }
+#endif
     return color;
 }
