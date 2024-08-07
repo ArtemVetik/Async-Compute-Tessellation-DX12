@@ -26,6 +26,15 @@ Camera::Camera(unsigned int width, unsigned int height)
 	XMStoreFloat3(&mLook, dir);
 	XMStoreFloat3(&mUp, up);
 	XMStoreFloat3(&mRight, XMVector3Cross(up, dir));
+
+	for (int i = 0; i < PredictionBufferSize; i++)
+	{
+		mPositions[i] = mPosition;
+		mVelocity[i] = { 0.0f, 0.0f, 0.0f };
+	}
+
+	mPredictedPos = mPosition;
+	mCurrentPredictionIndex = 0;
 }
 
 Camera::~Camera()
@@ -65,6 +74,11 @@ float Camera::GetFov() const
 DirectX::XMFLOAT3 Camera::GetPosition() const
 {
 	return mPosition;
+}
+
+DirectX::XMFLOAT3 Camera::GetPredictedPosition() const
+{
+	return mPredictedPos;
 }
 
 FrustrumPlanes Camera::GetFrustrumPlanes(XMMATRIX worldMatrix) const
@@ -134,7 +148,7 @@ void Camera::SetProjectionMatrix(unsigned int newWidth, unsigned int newHeight)
 	XMStoreFloat4x4(&projectionMatrix, (P));
 }
 
-void Camera::Update()
+void Camera::Update(const Timer& timer)
 {
 	XMVECTOR direction = XMLoadFloat3(&mLook);
 	XMVECTOR lrVector = XMLoadFloat3(&mRight);
@@ -228,6 +242,19 @@ void Camera::Update()
 		mViewDirty = false;
 	}
 
+	mCurrentPredictionIndex = (mCurrentPredictionIndex + 1) % PredictionBufferSize;
+	mPositions[mCurrentPredictionIndex] = mPosition;
+	mVelocity[mCurrentPredictionIndex] = CalcCurrentVelocity(timer.GetDeltaTime());
+	
+	auto acceleration = CalcCurrentAcceleration(timer.GetDeltaTime());
+
+	mPredictedPos.x = mPositions[mCurrentPredictionIndex].x + mVelocity[mCurrentPredictionIndex].x * timer.GetDeltaTime() +
+		0.5f * acceleration.x * timer.GetDeltaTime() * timer.GetDeltaTime();
+	mPredictedPos.y = mPositions[mCurrentPredictionIndex].y + mVelocity[mCurrentPredictionIndex].y * timer.GetDeltaTime() +
+		0.5f * acceleration.y * timer.GetDeltaTime() * timer.GetDeltaTime();
+	mPredictedPos.z = mPositions[mCurrentPredictionIndex].z + mVelocity[mCurrentPredictionIndex].z * timer.GetDeltaTime() +
+		0.5f * acceleration.z * timer.GetDeltaTime() * timer.GetDeltaTime();
+
 }
 
 void Camera::ResetCamera()
@@ -239,6 +266,32 @@ void Camera::ResetCamera()
 void Camera::CreateMatrices()
 {
 
+}
+
+DirectX::XMFLOAT3 Camera::CalcCurrentVelocity(float deltaTime)
+{
+	auto currentPos = mPositions[mCurrentPredictionIndex];
+	auto prevPosIdx = mCurrentPredictionIndex == 0 ? PredictionBufferSize - 1 : mCurrentPredictionIndex - 1;
+	auto prevPos = mPositions[prevPosIdx];
+
+	return DirectX::XMFLOAT3(
+		(currentPos.x - prevPos.x) / deltaTime,
+		(currentPos.y - prevPos.y) / deltaTime,
+		(currentPos.z - prevPos.z) / deltaTime
+	);
+}
+
+DirectX::XMFLOAT3 Camera::CalcCurrentAcceleration(float deltaTime)
+{
+	auto currentVelocity = mVelocity[mCurrentPredictionIndex];
+	auto prevVelocityIdx = mCurrentPredictionIndex == 0 ? PredictionBufferSize - 1 : mCurrentPredictionIndex - 1;
+	auto prevVelocity = mVelocity[prevVelocityIdx];
+
+	return DirectX::XMFLOAT3(
+		(currentVelocity.x - prevVelocity.x) / deltaTime,
+		(currentVelocity.y - prevVelocity.y) / deltaTime,
+		(currentVelocity.z - prevVelocity.z) / deltaTime
+	);
 }
 
 void Camera::OnMouseMove(WPARAM btnState, int x, int y)

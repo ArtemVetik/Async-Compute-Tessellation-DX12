@@ -90,7 +90,7 @@ void Game::Resize()
 
 void Game::Update(const Timer& timer)
 {
-	mainCamera->Update();
+	mainCamera->Update(timer);
 	inputManager->UpdateController();
 
 	// Cycle through the circular frame resource array.

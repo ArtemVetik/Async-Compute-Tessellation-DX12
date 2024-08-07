@@ -3,6 +3,7 @@
 #include <d3d12.h>
 #include <DirectXMath.h>
 #include "InputManager.h"
+#include "Timer.h"
 
 using namespace DirectX;
 
@@ -24,13 +25,14 @@ public:
 	float GetFar() const;
 	float GetFov() const;
 	DirectX::XMFLOAT3 GetPosition() const;
+	DirectX::XMFLOAT3 GetPredictedPosition() const;
 	FrustrumPlanes GetFrustrumPlanes(XMMATRIX worldMatrix) const;
 
 	void Pitch(float angle);
 	void RotateY(float angle);
 	void SetProjectionMatrix(unsigned int newWidth, unsigned int newHeight);
 
-	void Update();
+	void Update(const Timer& timer);
 	void ResetCamera();
 
 	void OnMouseMove(WPARAM btnState, int x, int y) override;
@@ -56,6 +58,14 @@ private:
 	POINT mLastMousePos;
 	bool mViewDirty = true;
 
+	static const int PredictionBufferSize = 4;
+	DirectX::XMFLOAT3 mPositions[PredictionBufferSize];
+	DirectX::XMFLOAT3 mVelocity[PredictionBufferSize];
+	DirectX::XMFLOAT3 mPredictedPos;
+	int mCurrentPredictionIndex = 0;
+
 	void CreateMatrices();
+	DirectX::XMFLOAT3 CalcCurrentVelocity(float deltaTime);
+	DirectX::XMFLOAT3 CalcCurrentAcceleration(float deltaTime);
 };
 
