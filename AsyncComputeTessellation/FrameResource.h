@@ -84,7 +84,8 @@ public:
 	~FrameResource();
 
 	// we cannot reset the allocator until the GPU is done processing the commands so each frame needs their own allocator
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandListAllocator;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> graphicsCommandListAllocator;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> computeCommandListAllocator;
 
 	// we cannot update a cbuffer until the GPU is done processing the commands that reference it
 	//so each frame needs their own cbuffers
@@ -97,5 +98,6 @@ public:
 
 	// fence value to mark commands up to this fence point 
 	// this lets us check if these frame resources are still in use by the GPU.
-	UINT64 Fence = 0;
+	UINT64 GraphicsFence = 0;
+	UINT64 ComputeFence = 0;
 };

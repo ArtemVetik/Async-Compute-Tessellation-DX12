@@ -271,12 +271,12 @@ void DXCore::Resize()
 {
 	assert(Device);
 	assert(SwapChain);
-	assert(CommandListAllocator);
+	assert(GraphicsCommandListAllocator);
 
 	// flush before changing any resources
 	FlushCommandQueue();
 
-	ThrowIfFailed(CommandList->Reset(CommandListAllocator.Get(), nullptr));
+	ThrowIfFailed(GraphicsCommandList->Reset(GraphicsCommandListAllocator.Get(), nullptr));
 
 	// G Buffer
 	{
@@ -476,13 +476,13 @@ void DXCore::Resize()
 	Device->CreateShaderResourceView(DepthStencilBuffer.Get(), &srvDesc, hDescriptor);
 
 	// transition the resource from its initial state to be used as a depth buffer
-	CommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(DepthStencilBuffer.Get(),
+	GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(DepthStencilBuffer.Get(),
 		D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 
 	// execute the resize commands
-	ThrowIfFailed(CommandList->Close());
-	ID3D12CommandList* cmdsLists[] = { CommandList.Get() };
-	CommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
+	ThrowIfFailed(GraphicsCommandList->Close());
+	ID3D12CommandList* cmdsLists[] = { GraphicsCommandList.Get() };
+	GraphicsCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
 	// wait until resize is complete
 	FlushCommandQueue();
@@ -563,7 +563,10 @@ bool DXCore::InitDirect3D()
 #endif
 
 	ThrowIfFailed(Device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
-		IID_PPV_ARGS(&Fence)));
+		IID_PPV_ARGS(&GraphicsFence)));
+
+	ThrowIfFailed(Device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
+		IID_PPV_ARGS(&ComputeFence)));
 
 	RTVDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	DSVDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
@@ -614,23 +617,44 @@ void DXCore::CreateCommandObjects()
 	D3D12_COMMAND_QUEUE_DESC queueDesc = {};
 	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 	queueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	ThrowIfFailed(Device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&CommandQueue)));
+	ThrowIfFailed(Device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&GraphicsCommandQueue)));
+	GraphicsCommandQueue->SetName(L"GraphicsCommandQueue");
+
+	queueDesc.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
+	ThrowIfFailed(Device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&ComputeCommandQueue)));
+	ComputeCommandQueue->SetName(L"ComputeCommandQueue");
 
 	ThrowIfFailed(Device->CreateCommandAllocator(
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		IID_PPV_ARGS(CommandListAllocator.GetAddressOf())));
+		IID_PPV_ARGS(GraphicsCommandListAllocator.GetAddressOf())));
+	GraphicsCommandListAllocator->SetName(L"GraphicsCommandListAllocator");
+
+	ThrowIfFailed(Device->CreateCommandAllocator(
+		D3D12_COMMAND_LIST_TYPE_COMPUTE,
+		IID_PPV_ARGS(ComputeCommandListAllocator.GetAddressOf())));
+	ComputeCommandListAllocator->SetName(L"ComputeCommandListAllocator");
 
 	ThrowIfFailed(Device->CreateCommandList(
 		0,
 		D3D12_COMMAND_LIST_TYPE_DIRECT,
-		CommandListAllocator.Get(), // Associated command allocator
+		GraphicsCommandListAllocator.Get(), // Associated command allocator
 		nullptr,                   // Initial PipelineStateObject
-		IID_PPV_ARGS(CommandList.GetAddressOf())));
+		IID_PPV_ARGS(GraphicsCommandList.GetAddressOf())));
+	GraphicsCommandList->SetName(L"GraphicsCommandList");
 
+	ThrowIfFailed(Device->CreateCommandList(
+		0,
+		D3D12_COMMAND_LIST_TYPE_COMPUTE,
+		ComputeCommandListAllocator.Get(), // Associated command allocator
+		nullptr,                   // Initial PipelineStateObject
+		IID_PPV_ARGS(ComputeCommandList.GetAddressOf())));
+	ComputeCommandList->SetName(L"ComputeCommandList");
+	
 	// Start off in a closed state.  This is because the first time we refer 
 	// to the command list we will Reset it, and it needs to be closed before
 	// calling Reset.
-	CommandList->Close();
+	GraphicsCommandList->Close();
+	ComputeCommandList->Close();
 }
 
 void DXCore::CreateSwapChain()
@@ -657,7 +681,7 @@ void DXCore::CreateSwapChain()
 
 	// Note: Swap chain uses queue to perform flush.
 	ThrowIfFailed(DXGIFactory->CreateSwapChain(
-		CommandQueue.Get(),
+		GraphicsCommandQueue.Get(),
 		&sd,
 		SwapChain.GetAddressOf()));
 }
@@ -665,20 +689,34 @@ void DXCore::CreateSwapChain()
 void DXCore::FlushCommandQueue()
 {
 	// advance the fence value to mark commands up to this fence point
-	currentFence++;
+	currentGraphicsFence++;
+	currentComputeFence++;
 
 	// Add an instruction to the command queue to set a new fence point.  Because we 
 	// are on the GPU timeline, the new fence point won't be set until the GPU finishes
 	// processing all the commands prior to this Signal().
-	ThrowIfFailed(CommandQueue->Signal(Fence.Get(), currentFence));
+	ThrowIfFailed(GraphicsCommandQueue->Signal(GraphicsFence.Get(), currentGraphicsFence));
+	ThrowIfFailed(ComputeCommandQueue->Signal(ComputeFence.Get(), currentComputeFence));
 
 	// Wait until the GPU has completed commands up to this fence point.
-	if (Fence->GetCompletedValue() < currentFence)
+	if (GraphicsFence->GetCompletedValue() < currentGraphicsFence)
 	{
 		HANDLE eventHandle = CreateEventEx(nullptr, FALSE, false, EVENT_ALL_ACCESS);
 
 		// fire event when GPU hits current fence  
-		ThrowIfFailed(Fence->SetEventOnCompletion(currentFence, eventHandle));
+		ThrowIfFailed(GraphicsFence->SetEventOnCompletion(currentGraphicsFence, eventHandle));
+
+		// wait until the GPU hits current fence event is fired
+		WaitForSingleObject(eventHandle, INFINITE);
+		CloseHandle(eventHandle);
+	}
+
+	if (ComputeFence->GetCompletedValue() < currentComputeFence)
+	{
+		HANDLE eventHandle = CreateEventEx(nullptr, FALSE, false, EVENT_ALL_ACCESS);
+
+		// fire event when GPU hits current fence  
+		ThrowIfFailed(ComputeFence->SetEventOnCompletion(currentComputeFence, eventHandle));
 
 		// wait until the GPU hits current fence event is fired
 		WaitForSingleObject(eventHandle, INFINITE);
@@ -688,6 +726,7 @@ void DXCore::FlushCommandQueue()
 
 void DXCore::PrintInfoMessages()
 {
+#if defined(DEGUG) || defined(_DEBUG)
 	UINT64 messageCount = InfoQueue->GetNumStoredMessagesAllowedByRetrievalFilter();
 	for (UINT64 i = 0; i < messageCount; ++i) {
 		SIZE_T messageLength = 0;
@@ -699,6 +738,8 @@ void DXCore::PrintInfoMessages()
 
 		printf("D3D12 Message: %s\n", message->pDescription);
 	}
+	InfoQueue->ClearStoredMessages();
+#endif
 }
 
 ID3D12Resource* DXCore::CurrentBackBuffer() const

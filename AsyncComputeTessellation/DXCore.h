@@ -52,17 +52,24 @@ protected:
 
 	Timer timer;
 
+#if defined(DEGUG) || defined(_DEBUG)
 	Microsoft::WRL::ComPtr<ID3D12InfoQueue> InfoQueue;
+#endif
 	Microsoft::WRL::ComPtr<IDXGIFactory> DXGIFactory;
 	Microsoft::WRL::ComPtr<IDXGISwapChain> SwapChain;
 	Microsoft::WRL::ComPtr<ID3D12Device> Device;
 
-	Microsoft::WRL::ComPtr<ID3D12Fence> Fence;
-	UINT64 currentFence = 0;
+	Microsoft::WRL::ComPtr<ID3D12Fence> GraphicsFence;
+	Microsoft::WRL::ComPtr<ID3D12Fence> ComputeFence;
+	UINT64 currentGraphicsFence = 0;
+	UINT64 currentComputeFence = 0;
 
-	Microsoft::WRL::ComPtr<ID3D12CommandQueue> CommandQueue;
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> CommandListAllocator;
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> CommandList;
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> GraphicsCommandQueue;
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue> ComputeCommandQueue;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> GraphicsCommandListAllocator;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> ComputeCommandListAllocator;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> GraphicsCommandList;
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> ComputeCommandList;
 
 	static const int GBufferCount = 2;
 	static const int SwapChainBufferCount = 2;
