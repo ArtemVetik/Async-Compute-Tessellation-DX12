@@ -26,11 +26,11 @@ void cullPass(uint4 key)
     mesh_coord[O] = ts_Leaf_to_MeshPosition(unit_O, key);
     mesh_coord[U] = ts_Leaf_to_MeshPosition(unit_U, key);
     mesh_coord[R] = ts_Leaf_to_MeshPosition(unit_R, key);
-
+    
 #if USE_DISPLACE
-    mesh_coord[O] = displaceVertex(mesh_coord[O], camPosition);
-    mesh_coord[U] = displaceVertex(mesh_coord[U], camPosition);
-    mesh_coord[R] = displaceVertex(mesh_coord[R], camPosition);
+    mesh_coord[O] = displaceVertex(mesh_coord[O], predictedCamPosition);
+    mesh_coord[U] = displaceVertex(mesh_coord[U], predictedCamPosition);
+    mesh_coord[R] = displaceVertex(mesh_coord[R], predictedCamPosition);
 #endif
 
     b_min = min(b_min, mesh_coord[O]);
@@ -65,7 +65,7 @@ void main(uint id : SV_DispatchThreadID, uint groupId : SV_GroupIndex)
     // store it in a shared variable
     if (groupId == 0)
     {
-        cam_height_local = getHeight(camPosition.xz, screenRes);
+        cam_height_local = getHeight(predictedCamPosition.xz, screenRes);
     }
     GroupMemoryBarrierWithGroupSync();
 #endif

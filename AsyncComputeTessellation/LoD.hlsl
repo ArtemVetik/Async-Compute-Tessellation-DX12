@@ -6,7 +6,7 @@ static const float2 triangle_centroid = float2(0.5, 0.5);
 
 float distanceToLod(float3 pos)
 {
-    float d = distance(pos, camPosition);
+    float d = distance(pos, predictedCamPosition);
     float lod = (d * lodFactor);
     lod = clamp(lod, 0.0, 1.0);
     return -2.0 * log2(lod);

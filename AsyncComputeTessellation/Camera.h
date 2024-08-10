@@ -27,6 +27,7 @@ public:
 	DirectX::XMFLOAT3 GetPosition() const;
 	DirectX::XMFLOAT3 GetPredictedPosition() const;
 	FrustrumPlanes GetFrustrumPlanes(XMMATRIX worldMatrix) const;
+	FrustrumPlanes GetPredictedFrustrumPlanes(XMMATRIX worldMatrix) const;
 
 	void Pitch(float angle);
 	void RotateY(float angle);

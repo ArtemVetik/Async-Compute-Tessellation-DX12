@@ -30,9 +30,12 @@ cbuffer tessellationData : register(b1)
 cbuffer perFrameData : register(b2)
 {
     float3 camPosition;
+    uint padding1;
+    float3 predictedCamPosition;
+    uint padding2;
     float deltaTime;
     float totalTime;
-    uint3 padding2;
+    uint3 padding3;
 }
 
 #endif

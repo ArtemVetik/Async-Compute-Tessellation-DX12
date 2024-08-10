@@ -84,7 +84,7 @@ void Bintree::UploadSubdivisionCounter(ID3D12Resource* subdivisionCounter)
 	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(subdivisionCounter, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 }
 
-void Bintree::UploadDrawArgs(ID3D12Resource* drawArgs, int cpuLodLevel)
+void Bintree::UploadDrawArgs(ID3D12Resource* drawArgs0, ID3D12Resource* drawArgs1, int cpuLodLevel)
 {
 	MeshGeometry* mesh = BuildLeafMesh(cpuLodLevel);
 
@@ -97,16 +97,25 @@ void Bintree::UploadDrawArgs(ID3D12Resource* drawArgs, int cpuLodLevel)
 	command.DrawArguments.BaseVertexLocation = 0;
 	command.DrawArguments.StartInstanceLocation = 0;
 
-	if (IndirectCommandUploadBuffer)
-		IndirectCommandUploadBuffer.reset();
+	if (IndirectCommandUploadBuffer0)
+		IndirectCommandUploadBuffer0.reset();
 
-	IndirectCommandUploadBuffer = std::make_unique<UploadBuffer<IndirectCommand>>(mDevice, 1, false);
+	if (IndirectCommandUploadBuffer1)
+		IndirectCommandUploadBuffer1.reset();
 
-	IndirectCommandUploadBuffer->CopyData(0, command);
+	IndirectCommandUploadBuffer0 = std::make_unique<UploadBuffer<IndirectCommand>>(mDevice, 1, false);
+	IndirectCommandUploadBuffer1 = std::make_unique<UploadBuffer<IndirectCommand>>(mDevice, 1, false);
 
-	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(drawArgs, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
-	mCommandList->CopyResource(drawArgs, IndirectCommandUploadBuffer->Resource());
-	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(drawArgs, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+	IndirectCommandUploadBuffer0->CopyData(0, command);
+	IndirectCommandUploadBuffer1->CopyData(0, command);
+
+	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(drawArgs0, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+	mCommandList->CopyResource(drawArgs0, IndirectCommandUploadBuffer0->Resource());
+	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(drawArgs0, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
+
+	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(drawArgs1, D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_COPY_DEST));
+	mCommandList->CopyResource(drawArgs1, IndirectCommandUploadBuffer0->Resource());
+	mCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(drawArgs1, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 }
 
 void Bintree::UpdateLodFactor(ImguiParams* settings, int res, float fov)

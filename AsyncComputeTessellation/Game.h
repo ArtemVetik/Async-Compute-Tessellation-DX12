@@ -46,10 +46,12 @@ private:
 
 	ComPtr<ID3D12Resource> RWMeshDataVertex = nullptr;
 	ComPtr<ID3D12Resource> RWMeshDataIndex = nullptr;
-	ComPtr<ID3D12Resource> RWDrawArgs = nullptr;
+	ComPtr<ID3D12Resource> RWDrawArgs0 = nullptr;
+	ComPtr<ID3D12Resource> RWDrawArgs1 = nullptr;
 	ComPtr<ID3D12Resource> RWSubdBufferIn = nullptr;
 	ComPtr<ID3D12Resource> RWSubdBufferOut = nullptr;
-	ComPtr<ID3D12Resource> RWSubdBufferOutCulled = nullptr;
+	ComPtr<ID3D12Resource> RWSubdBufferOutCulled0 = nullptr;
+	ComPtr<ID3D12Resource> RWSubdBufferOutCulled1 = nullptr;
 	ComPtr<ID3D12Resource> RWSubdCounter = nullptr;
 	ComPtr<ID3D12Resource> RWBloomWeights = nullptr;
 
@@ -65,8 +67,11 @@ private:
 	CD3DX12_CPU_DESCRIPTOR_HANDLE MeshDataIndexCPUUAV;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE MeshDataIndexGPUUAV;
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE DrawArgsCPUUAV;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE DrawArgsGPUUAV;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE DrawArgsCPUUAV0;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE DrawArgsGPUUAV0;
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE DrawArgsCPUUAV1;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE DrawArgsGPUUAV1;
 								  
 	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdBufferInCPUUAV;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdBufferInGPUUAV;
@@ -74,11 +79,17 @@ private:
 	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdBufferOutCPUUAV;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdBufferOutGPUUAV;
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdBufferOutCulledCPUSRV;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdBufferOutCulledGPUSRV;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdBufferOutCulledCPUSRV0;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdBufferOutCulledGPUSRV0;
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdBufferOutCulledCPUUAV;
-	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdBufferOutCulledGPUUAV;
+	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdBufferOutCulledCPUUAV0;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdBufferOutCulledGPUUAV0;
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdBufferOutCulledCPUSRV1;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdBufferOutCulledGPUSRV1;
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdBufferOutCulledCPUUAV1;
+	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdBufferOutCulledGPUUAV1;
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE SubdCounterCPUUAV;
 	CD3DX12_GPU_DESCRIPTOR_HANDLE SubdCounterGPUUAV;
@@ -116,11 +127,13 @@ private:
 	ImguiParams imguiParams;
 
 	BYTE pingPongCounter;
+	BYTE subdCulledBuffIdx;
 
 	virtual void Resize()override;
 	virtual void Update(const Timer& timer)override;
 	virtual void Draw(const Timer& timer)override;
 
+	void RecordComputeCommands(const Timer& timer);
 	void ImGuiDraw(ImguiOutput& output);
 	void UpdateMainPassCB(const Timer& timer);
 	void UpdateShadowTransform(const Timer& timer);

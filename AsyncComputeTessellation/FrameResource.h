@@ -61,9 +61,12 @@ struct BloomConstants
 struct PerFrameConstants
 {
 	DirectX::XMFLOAT3 CamPosition = {};
+	UINT Padding0;
+	DirectX::XMFLOAT3 PredictedCamPosition = {};
+	UINT Padding1;
 	float DeltaTime = 0.0f;
 	float TotalTime = 0.0f;
-	DirectX::XMUINT3 Padding;
+	DirectX::XMUINT3 Padding2;
 };
 
 struct IndirectCommand
