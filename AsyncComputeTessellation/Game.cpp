@@ -147,6 +147,15 @@ void Game::Draw(const Timer& timer)
 
 	if (mRenderType != RenderType::Direct)
 	{
+		if (mRenderType == RenderType::AsyncShadowMap)
+		{
+			ID3D12CommandList* computeCmdsLists[] = { ComputeCommandList.Get() };
+			ComputeCommandQueue->ExecuteCommandLists(_countof(computeCmdsLists), computeCmdsLists);
+
+			currentFrameResource->ComputeFence = ++currentComputeFence;
+			ComputeCommandQueue->Signal(ComputeFence.Get(), currentComputeFence);
+		}
+
 		ThrowIfFailed(currentGraphicsCommandListAllocator->Reset());
 		ThrowIfFailed(GraphicsCommandList->Reset(currentGraphicsCommandListAllocator.Get(), nullptr));
 		GraphicsCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
@@ -207,19 +216,20 @@ void Game::Draw(const Timer& timer)
 			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
 	}
 
-	/*ThrowIfFailed(GraphicsCommandList->Close());
-	ID3D12CommandList* cmdsLists1[] = { GraphicsCommandList.Get() };
-	GraphicsCommandQueue->ExecuteCommandLists(_countof(cmdsLists1), cmdsLists1);
+	if (mRenderType == RenderType::AsyncShadowMap)
+	{
+		ThrowIfFailed(GraphicsCommandList->Close());
+		ID3D12CommandList* cmdsLists1[] = { GraphicsCommandList.Get() };
+		GraphicsCommandQueue->ExecuteCommandLists(_countof(cmdsLists1), cmdsLists1);
 
-	currentFrameResource->GraphicsFence = ++currentGraphicsFence;
-	GraphicsCommandQueue->Signal(GraphicsFence.Get(), currentGraphicsFence);
-	GraphicsCommandQueue->Wait(ComputeFence.Get(), currentComputeFence);
+		GraphicsCommandQueue->Wait(ComputeFence.Get(), currentComputeFence);
 
-	ThrowIfFailed(GraphicsCommandList->Reset(currentGraphicsCommandListAllocator.Get(), nullptr));
-	GraphicsCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+		ThrowIfFailed(GraphicsCommandList->Reset(currentGraphicsCommandListAllocator.Get(), nullptr));
+		GraphicsCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
-	GraphicsCommandList->RSSetViewports(1, &ScreenViewPort);
-	GraphicsCommandList->RSSetScissorRects(1, &ScissorRect);*/
+		GraphicsCommandList->RSSetViewports(1, &ScreenViewPort);
+		GraphicsCommandList->RSSetScissorRects(1, &ScissorRect);
+	}
 
 	// main draw pass
 	{
@@ -317,6 +327,30 @@ void Game::Draw(const Timer& timer)
 
 		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(AccumulationBuffer[0].Get(),
 			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+	}
+
+	if (mRenderType == RenderType::AsyncPostProcess)
+	{
+		ThrowIfFailed(GraphicsCommandList->Close());
+		ID3D12CommandList* cmdsLists1[] = { GraphicsCommandList.Get() };
+		GraphicsCommandQueue->ExecuteCommandLists(_countof(cmdsLists1), cmdsLists1);
+
+		currentFrameResource->GraphicsFence = ++currentGraphicsFence;
+		GraphicsCommandQueue->Signal(GraphicsFence.Get(), currentGraphicsFence);
+
+		ThrowIfFailed(GraphicsCommandList->Reset(currentGraphicsCommandListAllocator.Get(), nullptr));
+		GraphicsCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+		GraphicsCommandList->RSSetViewports(1, &ScreenViewPort);
+		GraphicsCommandList->RSSetScissorRects(1, &ScissorRect);
+
+		ComputeCommandQueue->Wait(GraphicsFence.Get(), currentGraphicsFence);
+
+		ID3D12CommandList* computeCmdsLists[] = { ComputeCommandList.Get() };
+		ComputeCommandQueue->ExecuteCommandLists(_countof(computeCmdsLists), computeCmdsLists);
+
+		currentFrameResource->ComputeFence = ++currentComputeFence;
+		ComputeCommandQueue->Signal(ComputeFence.Get(), currentComputeFence);
 	}
 
 	// bloom threshold pass
@@ -452,14 +486,14 @@ void Game::Draw(const Timer& timer)
 	GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
-	if (mRenderType != RenderType::Direct)
+	if (mRenderType == RenderType::AsyncAll)
 		GraphicsCommandQueue->Wait(ComputeFence.Get(), currentComputeFence);
 
 	ThrowIfFailed(GraphicsCommandList->Close());
 	ID3D12CommandList* cmdsLists[] = { GraphicsCommandList.Get() };
 	GraphicsCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
-	if (mRenderType != RenderType::Direct)
+	if (mRenderType == RenderType::AsyncAll)
 	{
 		ID3D12CommandList* computeCmdsLists[] = { ComputeCommandList.Get() };
 		ComputeCommandQueue->ExecuteCommandLists(_countof(computeCmdsLists), computeCmdsLists);
