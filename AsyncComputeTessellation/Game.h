@@ -129,13 +129,17 @@ private:
 
 	BYTE pingPongCounter;
 	BYTE subdCulledBuffIdx;
+	BYTE mAccumBuffRTVIdx;
+	BYTE mBloomBuffRTVIdx;
 
 	virtual void Resize()override;
 	virtual void Update(const Timer& timer)override;
 	virtual void Draw(const Timer& timer)override;
 
-	void RecordComputeCommands(const Timer& timer);
-	void ImGuiDraw(ImguiOutput& output);
+	void ExecuteGraphicsCommands(bool withSignal);
+	void ResetGraphicsCommands();
+	void ExecuteComputeCommands(bool withSignal);
+	void RecordImGuiCommands(ImguiOutput& output);
 	void UpdateMainPassCB(const Timer& timer);
 	void UpdateShadowTransform(const Timer& timer);
 
@@ -146,6 +150,11 @@ private:
 	void BuildShadersAndInputLayout();
 	void BuildPSOs();
 	void BuildFrameResources();
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetAccumBufferRtvDesc();
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetAccumBufferSrvDesc();
+	CD3DX12_CPU_DESCRIPTOR_HANDLE GetBloomBufferRtvDesc();
+	CD3DX12_GPU_DESCRIPTOR_HANDLE GetBloomBufferSrvDesc();
 
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers();
 

@@ -11,6 +11,8 @@ Game::Game(HINSTANCE hInstance) : DXCore(hInstance)
 	bloom = nullptr;
 	pingPongCounter = 0;
 	subdCulledBuffIdx = 0;
+	mAccumBuffRTVIdx = 0;
+	mBloomBuffRTVIdx = 0;
 
 	mRenderType = RenderType::Direct;
 }
@@ -132,40 +134,77 @@ void Game::Update(const Timer& timer)
 
 void Game::Draw(const Timer& timer)
 {
-	auto currentGraphicsCommandListAllocator = currentFrameResource->graphicsCommandListAllocator;
-
 	ID3D12DescriptorHeap* descriptorHeaps[] = { CBVSRVUAVHeap.Get() };
 
 	auto objectCB = currentFrameResource->ObjectCB->Resource();
 	auto tessellationCB = currentFrameResource->TessellationCB->Resource();
 	auto perFrameCB = currentFrameResource->PerFrameCB->Resource();
 	auto lightPassCB = currentFrameResource->LightPassCB->Resource();
-	auto motionBlurPassCB = currentFrameResource->MotionBlurCB->Resource();
-	auto bloomPassCB = currentFrameResource->BloomCB->Resource();
 
-	RecordComputeCommands(timer);
+	auto depthBufferSrvDescGpu = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::DEPTH_BUFFER, RTVDescriptorSize);
 
-	if (mRenderType != RenderType::Direct)
+	ThrowIfFailed(currentFrameResource->graphicsCommandListAllocator->Reset());
+	ThrowIfFailed(GraphicsCommandList->Reset(currentFrameResource->graphicsCommandListAllocator.Get(), nullptr));
+	GraphicsCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+	// compute pass
 	{
-		if (mRenderType == RenderType::AsyncShadowMap)
-		{
-			ID3D12CommandList* computeCmdsLists[] = { ComputeCommandList.Get() };
-			ComputeCommandQueue->ExecuteCommandLists(_countof(computeCmdsLists), computeCmdsLists);
+		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList = GraphicsCommandList;
+		Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator = currentFrameResource->graphicsCommandListAllocator;
 
-			currentFrameResource->ComputeFence = ++currentComputeFence;
-			ComputeCommandQueue->Signal(ComputeFence.Get(), currentComputeFence);
+		if (mRenderType != RenderType::Direct)
+		{
+			commandList = ComputeCommandList;
+			commandAllocator = currentFrameResource->computeCommandListAllocator;
+
+			ThrowIfFailed(commandAllocator->Reset());
+			ThrowIfFailed(commandList->Reset(commandAllocator.Get(), nullptr));
+			commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+		}
+		else
+		{
+			subdCulledBuffIdx = 0;
 		}
 
-		ThrowIfFailed(currentGraphicsCommandListAllocator->Reset());
-		ThrowIfFailed(GraphicsCommandList->Reset(currentGraphicsCommandListAllocator.Get(), nullptr));
-		GraphicsCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-	}
-	else
-	{
-		subdCulledBuffIdx = 1;
+		if (imguiParams.Freeze == false)
+		{
+			commandList->SetPipelineState(PSOs["tessellationUpdate"].Get());
+			commandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
+
+			commandList->SetComputeRootConstantBufferView(0, objectCB->GetGPUVirtualAddress());
+			commandList->SetComputeRootConstantBufferView(1, tessellationCB->GetGPUVirtualAddress());
+			commandList->SetComputeRootConstantBufferView(2, perFrameCB->GetGPUVirtualAddress());
+
+			commandList->SetComputeRootDescriptorTable(3, MeshDataVertexGPUUAV);
+			commandList->SetComputeRootDescriptorTable(4, MeshDataIndexGPUUAV);
+			commandList->SetComputeRootDescriptorTable(5, subdCulledBuffIdx == 0 ? DrawArgsGPUUAV0 : DrawArgsGPUUAV1);
+			commandList->SetComputeRootDescriptorTable(6 + pingPongCounter, SubdBufferInGPUUAV);
+			commandList->SetComputeRootDescriptorTable(7 - pingPongCounter, SubdBufferOutGPUUAV);
+			commandList->SetComputeRootDescriptorTable(8, subdCulledBuffIdx == 0 ? SubdBufferOutCulledGPUUAV0 : SubdBufferOutCulledGPUUAV1);
+			commandList->SetComputeRootDescriptorTable(9, SubdCounterGPUUAV);
+
+			commandList->Dispatch(10000, 1, 1); // TODO: figure out how many threads group to run
+
+			commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferIn.Get())); // TODO: are these lines necessary?
+			commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferOut.Get()));
+			commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(subdCulledBuffIdx == 0 ? RWSubdBufferOutCulled0.Get() : RWSubdBufferOutCulled1.Get()));
+
+			commandList->SetPipelineState(PSOs["tessellationCopyDraw"].Get());
+			commandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
+			commandList->Dispatch(1, 1, 1);
+		}
+
+		if (mRenderType != RenderType::Direct)
+			ThrowIfFailed(commandList->Close());
 	}
 
-	// shadow pass
+	if (mRenderType == RenderType::AsyncShadowMap)
+		ExecuteComputeCommands(true);
+
+	if (mRenderType == RenderType::Direct)
+		subdCulledBuffIdx = 1;
+	
+	// shadow map pass
 	{
 		GraphicsCommandList->RSSetViewports(1, &mShadowMap->Viewport());
 		GraphicsCommandList->RSSetScissorRects(1, &mShadowMap->ScissorRect());
@@ -219,16 +258,12 @@ void Game::Draw(const Timer& timer)
 	if (mRenderType == RenderType::AsyncShadowMap)
 	{
 		ThrowIfFailed(GraphicsCommandList->Close());
-		ID3D12CommandList* cmdsLists1[] = { GraphicsCommandList.Get() };
-		GraphicsCommandQueue->ExecuteCommandLists(_countof(cmdsLists1), cmdsLists1);
-
+		
+		ExecuteGraphicsCommands(false);
+		
 		GraphicsCommandQueue->Wait(ComputeFence.Get(), currentComputeFence);
 
-		ThrowIfFailed(GraphicsCommandList->Reset(currentGraphicsCommandListAllocator.Get(), nullptr));
-		GraphicsCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-
-		GraphicsCommandList->RSSetViewports(1, &ScreenViewPort);
-		GraphicsCommandList->RSSetScissorRects(1, &ScissorRect);
+		ResetGraphicsCommands();
 	}
 
 	// main draw pass
@@ -286,22 +321,9 @@ void Game::Draw(const Timer& timer)
 			D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT, D3D12_RESOURCE_STATE_UNORDERED_ACCESS));
 	}
 
-	auto accumBuffer0RtvDescCpu = CD3DX12_CPU_DESCRIPTOR_HANDLE(RTVHeap->GetCPUDescriptorHandleForHeapStart(), (int)RTVIndex::ACCUMULATION_BUFFER + 0, RTVDescriptorSize);
-	auto accumBuffer1RtvDescCpu = CD3DX12_CPU_DESCRIPTOR_HANDLE(RTVHeap->GetCPUDescriptorHandleForHeapStart(), (int)RTVIndex::ACCUMULATION_BUFFER + 1, RTVDescriptorSize);
-	auto accumBuffer0SrvDescGpu = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::ACCUMULATION_BUFFER + 0, RTVDescriptorSize);
-	auto accumBuffer1SrvDescGpu = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::ACCUMULATION_BUFFER + 1, RTVDescriptorSize);
-
-	auto bloomBuffer0RtvDescCpu = CD3DX12_CPU_DESCRIPTOR_HANDLE(RTVHeap->GetCPUDescriptorHandleForHeapStart(), (int)RTVIndex::BLOOM_BUFFER + 0, RTVDescriptorSize);
-	auto bloomBuffer1RtvDescCpu = CD3DX12_CPU_DESCRIPTOR_HANDLE(RTVHeap->GetCPUDescriptorHandleForHeapStart(), (int)RTVIndex::BLOOM_BUFFER + 1, RTVDescriptorSize);
-	auto bloomBuffer0SrvDescGpu = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::BLOOM_BUFFER + 0, RTVDescriptorSize);
-	auto bloomBuffer1SrvDescGpu = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::BLOOM_BUFFER + 1, RTVDescriptorSize);
-	auto bloomWeightsBufferSrvDescGpu = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::BLOOM_WEIGHTS, RTVDescriptorSize);
-
-	auto depthBufferSrvDescGpu = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::DEPTH_BUFFER, RTVDescriptorSize);
-
 	// light pass
 	{
-		GraphicsCommandList->OMSetRenderTargets(1, &accumBuffer0RtvDescCpu, true, nullptr);
+		GraphicsCommandList->OMSetRenderTargets(1, &GetAccumBufferRtvDesc(), true, nullptr);
 
 		for (int i = 0; i < GBufferCount; i++)
 		{
@@ -325,106 +347,110 @@ void Game::Draw(const Timer& timer)
 
 		GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
 
-		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(AccumulationBuffer[0].Get(),
+		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(AccumulationBuffer[mAccumBuffRTVIdx].Get(),
 			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+		mAccumBuffRTVIdx = 1 - mAccumBuffRTVIdx;
 	}
 
 	if (mRenderType == RenderType::AsyncPostProcess)
 	{
 		ThrowIfFailed(GraphicsCommandList->Close());
-		ID3D12CommandList* cmdsLists1[] = { GraphicsCommandList.Get() };
-		GraphicsCommandQueue->ExecuteCommandLists(_countof(cmdsLists1), cmdsLists1);
-
-		currentFrameResource->GraphicsFence = ++currentGraphicsFence;
-		GraphicsCommandQueue->Signal(GraphicsFence.Get(), currentGraphicsFence);
-
-		ThrowIfFailed(GraphicsCommandList->Reset(currentGraphicsCommandListAllocator.Get(), nullptr));
-		GraphicsCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-
-		GraphicsCommandList->RSSetViewports(1, &ScreenViewPort);
-		GraphicsCommandList->RSSetScissorRects(1, &ScissorRect);
+		
+		ExecuteGraphicsCommands(true);
+		ResetGraphicsCommands();
 
 		ComputeCommandQueue->Wait(GraphicsFence.Get(), currentGraphicsFence);
 
-		ID3D12CommandList* computeCmdsLists[] = { ComputeCommandList.Get() };
-		ComputeCommandQueue->ExecuteCommandLists(_countof(computeCmdsLists), computeCmdsLists);
-
-		currentFrameResource->ComputeFence = ++currentComputeFence;
-		ComputeCommandQueue->Signal(ComputeFence.Get(), currentComputeFence);
+		ExecuteComputeCommands(true);
 	}
 
-	// bloom threshold pass
+	// bloom pass
 	{
-		GraphicsCommandList->OMSetRenderTargets(1, &bloomBuffer0RtvDescCpu, true, nullptr);
+		auto bloomWeightsBufferSrvDescGpu = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::BLOOM_WEIGHTS, RTVDescriptorSize);
+		auto bloomPassCB = currentFrameResource->BloomCB->Resource();
 
-		GraphicsCommandList->SetPipelineState(PSOs["BloomThresholdPass"].Get());
-		GraphicsCommandList->SetGraphicsRootSignature(bloomRootSignature.Get());
+		// bloom threshold pass
+		{
+			auto bloomBufferRtvDesc = CD3DX12_CPU_DESCRIPTOR_HANDLE(RTVHeap->GetCPUDescriptorHandleForHeapStart(), (int)RTVIndex::BLOOM_BUFFER + mBloomBuffRTVIdx, RTVDescriptorSize);
 
-		GraphicsCommandList->IASetVertexBuffers(0, 1, &ssQuadMesh->VertexBufferView());
-		GraphicsCommandList->IASetIndexBuffer(&ssQuadMesh->IndexBufferView());
-		GraphicsCommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			GraphicsCommandList->OMSetRenderTargets(1, &bloomBufferRtvDesc, true, nullptr);
 
-		GraphicsCommandList->SetGraphicsRootConstantBufferView(0, bloomPassCB->GetGPUVirtualAddress());
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(1, accumBuffer0SrvDescGpu);
-		//CommandList->SetGraphicsRootDescriptorTable(2, bloomBuffer1SrvDescGpu);
+			GraphicsCommandList->SetPipelineState(PSOs["BloomThresholdPass"].Get());
+			GraphicsCommandList->SetGraphicsRootSignature(bloomRootSignature.Get());
 
-		GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
-	}
+			GraphicsCommandList->IASetVertexBuffers(0, 1, &ssQuadMesh->VertexBufferView());
+			GraphicsCommandList->IASetIndexBuffer(&ssQuadMesh->IndexBufferView());
+			GraphicsCommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-	// TODO: make downsampling and upsampling
-	// bloom H pass
-	{
-		GraphicsCommandList->OMSetRenderTargets(1, &bloomBuffer1RtvDescCpu, true, nullptr);
+			GraphicsCommandList->SetGraphicsRootConstantBufferView(0, bloomPassCB->GetGPUVirtualAddress());
+			GraphicsCommandList->SetGraphicsRootDescriptorTable(1, GetAccumBufferSrvDesc());
+			//CommandList->SetGraphicsRootDescriptorTable(2, bloomBuffer1SrvDescGpu);
 
-		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(BloomBuffer[0].Get(),
-			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+			GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
 
-		GraphicsCommandList->SetPipelineState(PSOs["BloomHPass"].Get());
-		GraphicsCommandList->SetGraphicsRootSignature(bloomRootSignature.Get());
+			GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(BloomBuffer[mBloomBuffRTVIdx].Get(),
+				D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 
-		GraphicsCommandList->IASetVertexBuffers(0, 1, &ssQuadMesh->VertexBufferView());
-		GraphicsCommandList->IASetIndexBuffer(&ssQuadMesh->IndexBufferView());
-		GraphicsCommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			mBloomBuffRTVIdx = 1 - mBloomBuffRTVIdx;
+		}
 
-		GraphicsCommandList->SetGraphicsRootConstantBufferView(0, bloomPassCB->GetGPUVirtualAddress());
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(1, accumBuffer0SrvDescGpu);
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(2, bloomBuffer0SrvDescGpu);
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(3, bloomWeightsBufferSrvDescGpu);
+		// TODO: make downsampling and upsampling
+		// bloom H pass
+		{
+			GraphicsCommandList->OMSetRenderTargets(1, &GetBloomBufferRtvDesc(), true, nullptr);
 
-		GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
-	}
+			GraphicsCommandList->SetPipelineState(PSOs["BloomHPass"].Get());
+			GraphicsCommandList->SetGraphicsRootSignature(bloomRootSignature.Get());
 
-	// bloom V pass
-	{
-		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(BloomBuffer[0].Get(),
-			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
+			GraphicsCommandList->IASetVertexBuffers(0, 1, &ssQuadMesh->VertexBufferView());
+			GraphicsCommandList->IASetIndexBuffer(&ssQuadMesh->IndexBufferView());
+			GraphicsCommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		GraphicsCommandList->OMSetRenderTargets(1, &bloomBuffer0RtvDescCpu, true, nullptr);
+			GraphicsCommandList->SetGraphicsRootConstantBufferView(0, bloomPassCB->GetGPUVirtualAddress());
+			GraphicsCommandList->SetGraphicsRootDescriptorTable(1, GetAccumBufferSrvDesc());
+			GraphicsCommandList->SetGraphicsRootDescriptorTable(2, GetBloomBufferSrvDesc());
+			GraphicsCommandList->SetGraphicsRootDescriptorTable(3, bloomWeightsBufferSrvDescGpu);
 
-		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(BloomBuffer[1].Get(),
-			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+			GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
 
-		GraphicsCommandList->SetPipelineState(PSOs["BloomVPass"].Get());
-		GraphicsCommandList->SetGraphicsRootSignature(bloomRootSignature.Get());
+			mBloomBuffRTVIdx = 1 - mBloomBuffRTVIdx;
+		}
 
-		GraphicsCommandList->IASetVertexBuffers(0, 1, &ssQuadMesh->VertexBufferView());
-		GraphicsCommandList->IASetIndexBuffer(&ssQuadMesh->IndexBufferView());
-		GraphicsCommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+		// bloom V pass
+		{
+			GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(BloomBuffer[mBloomBuffRTVIdx].Get(),
+				D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
 
-		GraphicsCommandList->SetGraphicsRootConstantBufferView(0, bloomPassCB->GetGPUVirtualAddress());
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(1, accumBuffer0SrvDescGpu);
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(2, bloomBuffer1SrvDescGpu);
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(3, bloomWeightsBufferSrvDescGpu);
+			GraphicsCommandList->OMSetRenderTargets(1, &GetBloomBufferRtvDesc(), true, nullptr);
 
-		GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
+			GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(BloomBuffer[(mBloomBuffRTVIdx + 1) % 2].Get(),
+				D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 
-		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(BloomBuffer[0].Get(),
-			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+			GraphicsCommandList->SetPipelineState(PSOs["BloomVPass"].Get());
+			GraphicsCommandList->SetGraphicsRootSignature(bloomRootSignature.Get());
+
+			GraphicsCommandList->IASetVertexBuffers(0, 1, &ssQuadMesh->VertexBufferView());
+			GraphicsCommandList->IASetIndexBuffer(&ssQuadMesh->IndexBufferView());
+			GraphicsCommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+			GraphicsCommandList->SetGraphicsRootConstantBufferView(0, bloomPassCB->GetGPUVirtualAddress());
+			GraphicsCommandList->SetGraphicsRootDescriptorTable(1, GetAccumBufferSrvDesc());
+			GraphicsCommandList->SetGraphicsRootDescriptorTable(2, GetBloomBufferSrvDesc());
+			GraphicsCommandList->SetGraphicsRootDescriptorTable(3, bloomWeightsBufferSrvDescGpu);
+
+			GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
+
+			GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(BloomBuffer[mBloomBuffRTVIdx].Get(),
+				D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+			mBloomBuffRTVIdx = 1 - mBloomBuffRTVIdx;
+		}
 	}
 
 	// motion blur pass
 	{
-		GraphicsCommandList->OMSetRenderTargets(1, &accumBuffer1RtvDescCpu, true, nullptr);
+		GraphicsCommandList->OMSetRenderTargets(1, &GetAccumBufferRtvDesc(), true, nullptr);
 
 		GraphicsCommandList->SetPipelineState(PSOs["MotionBlurPass"].Get());
 		GraphicsCommandList->SetGraphicsRootSignature(motionBlurRootSignature.Get());
@@ -433,19 +459,21 @@ void Game::Draw(const Timer& timer)
 		GraphicsCommandList->IASetIndexBuffer(&ssQuadMesh->IndexBufferView());
 		GraphicsCommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		GraphicsCommandList->SetGraphicsRootConstantBufferView(0, motionBlurPassCB->GetGPUVirtualAddress());
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(1, accumBuffer0SrvDescGpu);
+		GraphicsCommandList->SetGraphicsRootConstantBufferView(0, currentFrameResource->MotionBlurCB->Resource()->GetGPUVirtualAddress());
+		GraphicsCommandList->SetGraphicsRootDescriptorTable(1, GetAccumBufferSrvDesc());
 		GraphicsCommandList->SetGraphicsRootDescriptorTable(2, depthBufferSrvDescGpu);
 
 		GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
+
+		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(AccumulationBuffer[mAccumBuffRTVIdx].Get(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+
+		mAccumBuffRTVIdx = 1 - mAccumBuffRTVIdx;
 	}
 
-	// render quad pass
+	// final pass
 	{
 		GraphicsCommandList->OMSetRenderTargets(1, &CurrentBackBufferView(), true, &DepthStencilView());
-
-		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(AccumulationBuffer[1].Get(),
-			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 
 		GraphicsCommandList->SetPipelineState(PSOs["RenderQuadPass"].Get());
 		GraphicsCommandList->SetGraphicsRootSignature(finalPassRootSignature.Get());
@@ -455,58 +483,50 @@ void Game::Draw(const Timer& timer)
 		GraphicsCommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 		GraphicsCommandList->SetGraphicsRootConstantBufferView(0, lightPassCB->GetGPUVirtualAddress());
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(1, accumBuffer1SrvDescGpu);
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(2, bloomBuffer0SrvDescGpu);
+		GraphicsCommandList->SetGraphicsRootDescriptorTable(1, GetAccumBufferSrvDesc());
+		GraphicsCommandList->SetGraphicsRootDescriptorTable(2, GetBloomBufferSrvDesc());
 
 		GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
 	}
 
-	ImguiOutput imguiOutput;
-	ImGuiDraw(imguiOutput);
-
-	for (int i = 0; i < GBufferCount; i++)
+	// pre-render barriers
 	{
-		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GBuffer[i].Get(),
-			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
+		for (int i = 0; i < GBufferCount; i++)
+		{
+			GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(GBuffer[i].Get(),
+				D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
+		}
+
+		for (int i = 0; i < 2; i++)
+		{
+			GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(AccumulationBuffer[i].Get(),
+				D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
+
+			GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(BloomBuffer[i].Get(),
+				D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
+		}
+
+		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(DepthStencilBuffer.Get(),
+			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+
+		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 	}
-
-	for (int i = 0; i < 2; i++)
-	{
-		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(AccumulationBuffer[i].Get(),
-			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
-
-		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(BloomBuffer[i].Get(),
-			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
-	}
-
-	GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(DepthStencilBuffer.Get(),
-		D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
-
-	// indicate a state transition on the resource usage
-	GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
-		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
-
+	
 	if (mRenderType == RenderType::AsyncAll)
 		GraphicsCommandQueue->Wait(ComputeFence.Get(), currentComputeFence);
 
+	ImguiOutput imguiOutput;
+	RecordImGuiCommands(imguiOutput);
+
 	ThrowIfFailed(GraphicsCommandList->Close());
-	ID3D12CommandList* cmdsLists[] = { GraphicsCommandList.Get() };
-	GraphicsCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
+	ExecuteGraphicsCommands(true);
 
 	if (mRenderType == RenderType::AsyncAll)
-	{
-		ID3D12CommandList* computeCmdsLists[] = { ComputeCommandList.Get() };
-		ComputeCommandQueue->ExecuteCommandLists(_countof(computeCmdsLists), computeCmdsLists);
-
-		currentFrameResource->ComputeFence = ++currentComputeFence;
-		ComputeCommandQueue->Signal(ComputeFence.Get(), currentComputeFence);
-	}
+		ExecuteComputeCommands(true);
 
 	ThrowIfFailed(SwapChain->Present(0, 0));
 	currentBackBuffer = (currentBackBuffer + 1) % SwapChainBufferCount;
-
-	currentFrameResource->GraphicsFence = ++currentGraphicsFence;
-	GraphicsCommandQueue->Signal(GraphicsFence.Get(), currentGraphicsFence);
 
 	if (imguiOutput.HasChanges())
 	{
@@ -528,7 +548,6 @@ void Game::Draw(const Timer& timer)
 			BuildPSOs();
 		}
 
-		// execute the initialization commands
 		ThrowIfFailed(GraphicsCommandList->Close());
 		ID3D12CommandList* cmdsLists[] = { GraphicsCommandList.Get() };
 		GraphicsCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
@@ -540,62 +559,39 @@ void Game::Draw(const Timer& timer)
 	PrintInfoMessages();
 }
 
-void Game::RecordComputeCommands(const Timer& timer)
+void Game::ExecuteGraphicsCommands(bool withSignal)
+{
+	ID3D12CommandList* cmdsLists[] = { GraphicsCommandList.Get() };
+	GraphicsCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
+
+	if (withSignal)
+	{
+		currentFrameResource->GraphicsFence = ++currentGraphicsFence;
+		GraphicsCommandQueue->Signal(GraphicsFence.Get(), currentGraphicsFence);
+	}
+}
+
+void Game::ResetGraphicsCommands()
 {
 	ID3D12DescriptorHeap* descriptorHeaps[] = { CBVSRVUAVHeap.Get() };
 
-	auto objectCB = currentFrameResource->ObjectCB->Resource();
-	auto tessellationCB = currentFrameResource->TessellationCB->Resource();
-	auto perFrameCB = currentFrameResource->PerFrameCB->Resource();
+	ThrowIfFailed(GraphicsCommandList->Reset(currentFrameResource->graphicsCommandListAllocator.Get(), nullptr));
+	GraphicsCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
-	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList = ComputeCommandList;
-	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator = currentFrameResource->computeCommandListAllocator;
-
-	if (mRenderType == RenderType::Direct)
-	{
-		commandList = GraphicsCommandList;
-		commandAllocator = currentFrameResource->graphicsCommandListAllocator;
-		subdCulledBuffIdx = 0;
-	}
-
-	ThrowIfFailed(commandAllocator->Reset());
-	ThrowIfFailed(commandList->Reset(commandAllocator.Get(), nullptr));
-	commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-
-	// compute pass
-	if (imguiParams.Freeze == false)
-	{
-		commandList->SetPipelineState(PSOs["tessellationUpdate"].Get());
-		commandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
-
-		commandList->SetComputeRootConstantBufferView(0, objectCB->GetGPUVirtualAddress());
-		commandList->SetComputeRootConstantBufferView(1, tessellationCB->GetGPUVirtualAddress());
-		commandList->SetComputeRootConstantBufferView(2, perFrameCB->GetGPUVirtualAddress());
-
-		commandList->SetComputeRootDescriptorTable(3, MeshDataVertexGPUUAV);
-		commandList->SetComputeRootDescriptorTable(4, MeshDataIndexGPUUAV);
-		commandList->SetComputeRootDescriptorTable(5, subdCulledBuffIdx == 0 ? DrawArgsGPUUAV0 : DrawArgsGPUUAV1);
-		commandList->SetComputeRootDescriptorTable(6 + pingPongCounter, SubdBufferInGPUUAV);
-		commandList->SetComputeRootDescriptorTable(7 - pingPongCounter, SubdBufferOutGPUUAV);
-		commandList->SetComputeRootDescriptorTable(8, subdCulledBuffIdx == 0 ? SubdBufferOutCulledGPUUAV0 : SubdBufferOutCulledGPUUAV1);
-		commandList->SetComputeRootDescriptorTable(9, SubdCounterGPUUAV);
-
-		commandList->Dispatch(10000, 1, 1); // TODO: figure out how many threads group to run
-
-		commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferIn.Get())); // TODO: are these lines necessary?
-		commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferOut.Get()));
-		commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(subdCulledBuffIdx == 0 ? RWSubdBufferOutCulled0.Get() : RWSubdBufferOutCulled1.Get()));
-
-		commandList->SetPipelineState(PSOs["tessellationCopyDraw"].Get());
-		commandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
-		commandList->Dispatch(1, 1, 1);
-	}
-
-	if (mRenderType != RenderType::Direct)
-		ThrowIfFailed(commandList->Close());
+	GraphicsCommandList->RSSetViewports(1, &ScreenViewPort);
+	GraphicsCommandList->RSSetScissorRects(1, &ScissorRect);
 }
 
-void Game::ImGuiDraw(ImguiOutput& output)
+void Game::ExecuteComputeCommands(bool withSignal)
+{
+	ID3D12CommandList* computeCmdsLists[] = { ComputeCommandList.Get() };
+	ComputeCommandQueue->ExecuteCommandLists(_countof(computeCmdsLists), computeCmdsLists);
+
+	currentFrameResource->ComputeFence = ++currentComputeFence;
+	ComputeCommandQueue->Signal(ComputeFence.Get(), currentComputeFence);
+}
+
+void Game::RecordImGuiCommands(ImguiOutput& output)
 {
 	ImGui_ImplDX12_NewFrame();
 	ImGui_ImplWin32_NewFrame();
@@ -1833,6 +1829,26 @@ void Game::BuildFrameResources()
 	{
 		FrameResources.push_back(std::make_unique<FrameResource>(Device.Get()));
 	}
+}
+
+CD3DX12_CPU_DESCRIPTOR_HANDLE Game::GetAccumBufferRtvDesc()
+{
+	return CD3DX12_CPU_DESCRIPTOR_HANDLE(RTVHeap->GetCPUDescriptorHandleForHeapStart(), (int)RTVIndex::ACCUMULATION_BUFFER + mAccumBuffRTVIdx, RTVDescriptorSize);
+}
+
+CD3DX12_GPU_DESCRIPTOR_HANDLE Game::GetAccumBufferSrvDesc()
+{
+	return CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::ACCUMULATION_BUFFER + ((mAccumBuffRTVIdx + 1) % 2), CBVSRVUAVDescriptorSize);
+}
+
+CD3DX12_CPU_DESCRIPTOR_HANDLE Game::GetBloomBufferRtvDesc()
+{
+	return CD3DX12_CPU_DESCRIPTOR_HANDLE(RTVHeap->GetCPUDescriptorHandleForHeapStart(), (int)RTVIndex::BLOOM_BUFFER + mBloomBuffRTVIdx, RTVDescriptorSize);
+}
+
+CD3DX12_GPU_DESCRIPTOR_HANDLE Game::GetBloomBufferSrvDesc()
+{
+	return CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::BLOOM_BUFFER + ((mBloomBuffRTVIdx + 1) % 2), CBVSRVUAVDescriptorSize);
 }
 
 std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> Game::GetStaticSamplers()
