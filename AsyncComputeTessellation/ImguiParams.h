@@ -1,5 +1,13 @@
 #pragma once
 
+enum class RenderType
+{
+	Direct = 0,
+	AsyncAll = 1,
+	AsyncShadowMap = 2,
+	AsyncPostProcess = 3,
+};
+
 enum MeshMode
 {
 	TERRAIN = 0,
@@ -9,6 +17,7 @@ enum MeshMode
 struct ImguiParams
 {
 	bool ShowDebugWindow = false;
+	RenderType RenderType = RenderType::Direct;
 
 	// Tessellation Parameters / View Mode
 	MeshMode MeshMode = MeshMode::TERRAIN;

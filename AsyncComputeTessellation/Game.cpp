@@ -11,6 +11,8 @@ Game::Game(HINSTANCE hInstance) : DXCore(hInstance)
 	bloom = nullptr;
 	pingPongCounter = 0;
 	subdCulledBuffIdx = 0;
+
+	mRenderType = RenderType::Direct;
 }
 
 Game::~Game()
@@ -131,7 +133,6 @@ void Game::Update(const Timer& timer)
 void Game::Draw(const Timer& timer)
 {
 	auto currentGraphicsCommandListAllocator = currentFrameResource->graphicsCommandListAllocator;
-	auto currentComputeCommandListAllocator = currentFrameResource->computeCommandListAllocator;
 
 	ID3D12DescriptorHeap* descriptorHeaps[] = { CBVSRVUAVHeap.Get() };
 
@@ -144,9 +145,16 @@ void Game::Draw(const Timer& timer)
 
 	RecordComputeCommands(timer);
 
-	ThrowIfFailed(currentGraphicsCommandListAllocator->Reset());
-	ThrowIfFailed(GraphicsCommandList->Reset(currentGraphicsCommandListAllocator.Get(), nullptr));
-	GraphicsCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+	if (mRenderType != RenderType::Direct)
+	{
+		ThrowIfFailed(currentGraphicsCommandListAllocator->Reset());
+		ThrowIfFailed(GraphicsCommandList->Reset(currentGraphicsCommandListAllocator.Get(), nullptr));
+		GraphicsCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+	}
+	else
+	{
+		subdCulledBuffIdx = 1;
+	}
 
 	// shadow pass
 	{
@@ -178,7 +186,7 @@ void Game::Draw(const Timer& timer)
 		GraphicsCommandList->SetGraphicsRootDescriptorTable(5, subdCulledBuffIdx == 0 ? SubdBufferOutCulledGPUSRV1 : SubdBufferOutCulledGPUSRV0);
 		//CommandList->SetGraphicsRootDescriptorTable(6, mShadowMap->Srv());
 
-		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(subdCulledBuffIdx == 0 ? 
+		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(subdCulledBuffIdx == 0 ?
 			RWDrawArgs1.Get() : RWDrawArgs0.Get(),
 			D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
 
@@ -198,6 +206,20 @@ void Game::Draw(const Timer& timer)
 		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(mShadowMap->Resource(),
 			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
 	}
+
+	/*ThrowIfFailed(GraphicsCommandList->Close());
+	ID3D12CommandList* cmdsLists1[] = { GraphicsCommandList.Get() };
+	GraphicsCommandQueue->ExecuteCommandLists(_countof(cmdsLists1), cmdsLists1);
+
+	currentFrameResource->GraphicsFence = ++currentGraphicsFence;
+	GraphicsCommandQueue->Signal(GraphicsFence.Get(), currentGraphicsFence);
+	GraphicsCommandQueue->Wait(ComputeFence.Get(), currentComputeFence);
+
+	ThrowIfFailed(GraphicsCommandList->Reset(currentGraphicsCommandListAllocator.Get(), nullptr));
+	GraphicsCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+	GraphicsCommandList->RSSetViewports(1, &ScreenViewPort);
+	GraphicsCommandList->RSSetScissorRects(1, &ScissorRect);*/
 
 	// main draw pass
 	{
@@ -237,7 +259,7 @@ void Game::Draw(const Timer& timer)
 		GraphicsCommandList->SetGraphicsRootDescriptorTable(4, MeshDataIndexGPUSRV);
 		GraphicsCommandList->SetGraphicsRootDescriptorTable(5, subdCulledBuffIdx == 0 ? SubdBufferOutCulledGPUSRV1 : SubdBufferOutCulledGPUSRV0);
 		GraphicsCommandList->SetGraphicsRootDescriptorTable(6, mShadowMap->Srv());
-		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(subdCulledBuffIdx == 0 ? 
+		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(subdCulledBuffIdx == 0 ?
 			RWDrawArgs1.Get() : RWDrawArgs0.Get(),
 			D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
 
@@ -366,7 +388,7 @@ void Game::Draw(const Timer& timer)
 			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 	}
 
-	// motion blure pass
+	// motion blur pass
 	{
 		GraphicsCommandList->OMSetRenderTargets(1, &accumBuffer1RtvDescCpu, true, nullptr);
 
@@ -430,27 +452,26 @@ void Game::Draw(const Timer& timer)
 	GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(CurrentBackBuffer(),
 		D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 
-	GraphicsCommandQueue->Wait(ComputeFence.Get(), currentComputeFence + 1);
+	if (mRenderType != RenderType::Direct)
+		GraphicsCommandQueue->Wait(ComputeFence.Get(), currentComputeFence);
 
 	ThrowIfFailed(GraphicsCommandList->Close());
 	ID3D12CommandList* cmdsLists[] = { GraphicsCommandList.Get() };
 	GraphicsCommandQueue->ExecuteCommandLists(_countof(cmdsLists), cmdsLists);
 
-	ID3D12CommandList* computeCmdsLists[] = { ComputeCommandList.Get() };
-	ComputeCommandQueue->ExecuteCommandLists(_countof(computeCmdsLists), computeCmdsLists);
+	if (mRenderType != RenderType::Direct)
+	{
+		ID3D12CommandList* computeCmdsLists[] = { ComputeCommandList.Get() };
+		ComputeCommandQueue->ExecuteCommandLists(_countof(computeCmdsLists), computeCmdsLists);
 
-	currentFrameResource->ComputeFence = ++currentComputeFence;
-	ComputeCommandQueue->Signal(ComputeFence.Get(), currentComputeFence);
+		currentFrameResource->ComputeFence = ++currentComputeFence;
+		ComputeCommandQueue->Signal(ComputeFence.Get(), currentComputeFence);
+	}
 
 	ThrowIfFailed(SwapChain->Present(0, 0));
 	currentBackBuffer = (currentBackBuffer + 1) % SwapChainBufferCount;
 
-	// advance the fence value to mark commands up to this fence point
 	currentFrameResource->GraphicsFence = ++currentGraphicsFence;
-
-	// add an instruction to the command queue to set a new fence point.
-	// because we are on the GPU timeline, the new fence point won't be 
-	// set until the GPU finishes processing all the commands prior to this Signal()
 	GraphicsCommandQueue->Signal(GraphicsFence.Get(), currentGraphicsFence);
 
 	if (imguiOutput.HasChanges())
@@ -487,48 +508,57 @@ void Game::Draw(const Timer& timer)
 
 void Game::RecordComputeCommands(const Timer& timer)
 {
-	auto currentComputeCommandListAllocator = currentFrameResource->computeCommandListAllocator;
-
 	ID3D12DescriptorHeap* descriptorHeaps[] = { CBVSRVUAVHeap.Get() };
 
 	auto objectCB = currentFrameResource->ObjectCB->Resource();
 	auto tessellationCB = currentFrameResource->TessellationCB->Resource();
 	auto perFrameCB = currentFrameResource->PerFrameCB->Resource();
 
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList = ComputeCommandList;
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator = currentFrameResource->computeCommandListAllocator;
+
+	if (mRenderType == RenderType::Direct)
+	{
+		commandList = GraphicsCommandList;
+		commandAllocator = currentFrameResource->graphicsCommandListAllocator;
+		subdCulledBuffIdx = 0;
+	}
+
+	ThrowIfFailed(commandAllocator->Reset());
+	ThrowIfFailed(commandList->Reset(commandAllocator.Get(), nullptr));
+	commandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
 	// compute pass
 	if (imguiParams.Freeze == false)
 	{
-		ThrowIfFailed(currentComputeCommandListAllocator->Reset());
-		ThrowIfFailed(ComputeCommandList->Reset(currentComputeCommandListAllocator.Get(), nullptr));
-		ComputeCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+		commandList->SetPipelineState(PSOs["tessellationUpdate"].Get());
+		commandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
 
-		ComputeCommandList->SetPipelineState(PSOs["tessellationUpdate"].Get());
-		ComputeCommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
+		commandList->SetComputeRootConstantBufferView(0, objectCB->GetGPUVirtualAddress());
+		commandList->SetComputeRootConstantBufferView(1, tessellationCB->GetGPUVirtualAddress());
+		commandList->SetComputeRootConstantBufferView(2, perFrameCB->GetGPUVirtualAddress());
 
-		ComputeCommandList->SetComputeRootConstantBufferView(0, objectCB->GetGPUVirtualAddress());
-		ComputeCommandList->SetComputeRootConstantBufferView(1, tessellationCB->GetGPUVirtualAddress());
-		ComputeCommandList->SetComputeRootConstantBufferView(2, perFrameCB->GetGPUVirtualAddress());
+		commandList->SetComputeRootDescriptorTable(3, MeshDataVertexGPUUAV);
+		commandList->SetComputeRootDescriptorTable(4, MeshDataIndexGPUUAV);
+		commandList->SetComputeRootDescriptorTable(5, subdCulledBuffIdx == 0 ? DrawArgsGPUUAV0 : DrawArgsGPUUAV1);
+		commandList->SetComputeRootDescriptorTable(6 + pingPongCounter, SubdBufferInGPUUAV);
+		commandList->SetComputeRootDescriptorTable(7 - pingPongCounter, SubdBufferOutGPUUAV);
+		commandList->SetComputeRootDescriptorTable(8, subdCulledBuffIdx == 0 ? SubdBufferOutCulledGPUUAV0 : SubdBufferOutCulledGPUUAV1);
+		commandList->SetComputeRootDescriptorTable(9, SubdCounterGPUUAV);
 
-		ComputeCommandList->SetComputeRootDescriptorTable(3, MeshDataVertexGPUUAV);
-		ComputeCommandList->SetComputeRootDescriptorTable(4, MeshDataIndexGPUUAV);
-		ComputeCommandList->SetComputeRootDescriptorTable(5, subdCulledBuffIdx == 0 ? DrawArgsGPUUAV0 : DrawArgsGPUUAV1);
-		ComputeCommandList->SetComputeRootDescriptorTable(6 + pingPongCounter, SubdBufferInGPUUAV);
-		ComputeCommandList->SetComputeRootDescriptorTable(7 - pingPongCounter, SubdBufferOutGPUUAV);
-		ComputeCommandList->SetComputeRootDescriptorTable(8, subdCulledBuffIdx == 0 ? SubdBufferOutCulledGPUUAV0 : SubdBufferOutCulledGPUUAV1);
-		ComputeCommandList->SetComputeRootDescriptorTable(9, SubdCounterGPUUAV);
+		commandList->Dispatch(10000, 1, 1); // TODO: figure out how many threads group to run
 
-		ComputeCommandList->Dispatch(10000, 1, 1); // TODO: figure out how many threads group to run
+		commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferIn.Get())); // TODO: are these lines necessary?
+		commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferOut.Get()));
+		commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(subdCulledBuffIdx == 0 ? RWSubdBufferOutCulled0.Get() : RWSubdBufferOutCulled1.Get()));
 
-		ComputeCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferIn.Get())); // TODO: are these lines necessary?
-		ComputeCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferOut.Get()));
-		ComputeCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(subdCulledBuffIdx == 0 ? RWSubdBufferOutCulled0.Get() : RWSubdBufferOutCulled1.Get()));
-
-		ComputeCommandList->SetPipelineState(PSOs["tessellationCopyDraw"].Get());
-		ComputeCommandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
-		ComputeCommandList->Dispatch(1, 1, 1);
-
-		ThrowIfFailed(ComputeCommandList->Close());
+		commandList->SetPipelineState(PSOs["tessellationCopyDraw"].Get());
+		commandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
+		commandList->Dispatch(1, 1, 1);
 	}
+
+	if (mRenderType != RenderType::Direct)
+		ThrowIfFailed(commandList->Close());
 }
 
 void Game::ImGuiDraw(ImguiOutput& output)
@@ -546,6 +576,11 @@ void Game::ImGuiDraw(ImguiOutput& output)
 	ImGui::Checkbox("Demo Window", &imguiParams.ShowDebugWindow);
 
 	output = {};
+
+	if (ImGui::Combo("Render Type", (int*)&imguiParams.RenderType, "Direct\0Async All\0Async Shadow Map\0Async Post Process\0\0"))
+	{
+		mRenderType = imguiParams.RenderType;
+	}
 
 	if (ImGui::CollapsingHeader("Tessellation parameters"))
 	{

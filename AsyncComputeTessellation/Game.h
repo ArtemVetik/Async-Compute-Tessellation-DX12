@@ -18,7 +18,6 @@ using Microsoft::WRL::ComPtr;
 using namespace DirectX;
 using namespace DirectX::PackedVector;
 
-
 class Game : public DXCore
 {
 public:
@@ -30,6 +29,8 @@ public:
 	virtual bool Initialize()override;
 
 private:
+	RenderType mRenderType;
+
 	std::vector<std::unique_ptr<FrameResource>> FrameResources;
 	FrameResource* currentFrameResource = nullptr;
 	int currentFrameResourceIndex = 0;
