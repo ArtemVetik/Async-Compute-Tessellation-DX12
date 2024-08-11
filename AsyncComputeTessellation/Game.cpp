@@ -175,13 +175,13 @@ void Game::Draw(const Timer& timer)
 			commandList->SetComputeRootConstantBufferView(1, tessellationCB->GetGPUVirtualAddress());
 			commandList->SetComputeRootConstantBufferView(2, perFrameCB->GetGPUVirtualAddress());
 
-			commandList->SetComputeRootDescriptorTable(3, MeshDataVertexGPUUAV);
-			commandList->SetComputeRootDescriptorTable(4, MeshDataIndexGPUUAV);
-			commandList->SetComputeRootDescriptorTable(5, subdCulledBuffIdx == 0 ? DrawArgsGPUUAV0 : DrawArgsGPUUAV1);
-			commandList->SetComputeRootDescriptorTable(6 + pingPongCounter, SubdBufferInGPUUAV);
-			commandList->SetComputeRootDescriptorTable(7 - pingPongCounter, SubdBufferOutGPUUAV);
-			commandList->SetComputeRootDescriptorTable(8, subdCulledBuffIdx == 0 ? SubdBufferOutCulledGPUUAV0 : SubdBufferOutCulledGPUUAV1);
-			commandList->SetComputeRootDescriptorTable(9, SubdCounterGPUUAV);
+			commandList->SetComputeRootDescriptorTable(3, GetSrvResourceDesc(CBVSRVUAVIndex::MESH_DATA_VERTEX_UAV));
+			commandList->SetComputeRootDescriptorTable(4, GetSrvResourceDesc(CBVSRVUAVIndex::MESH_DATA_INDEX_UAV));
+			commandList->SetComputeRootDescriptorTable(5, subdCulledBuffIdx == 0 ? GetSrvResourceDesc(CBVSRVUAVIndex::DRAW_ARGS_UAV_0) : GetSrvResourceDesc(CBVSRVUAVIndex::DRAW_ARGS_UAV_1));
+			commandList->SetComputeRootDescriptorTable(6 + pingPongCounter, GetSrvResourceDesc(CBVSRVUAVIndex::SUBD_IN_UAV));
+			commandList->SetComputeRootDescriptorTable(7 - pingPongCounter, GetSrvResourceDesc(CBVSRVUAVIndex::SUBD_OUT_UAV));
+			commandList->SetComputeRootDescriptorTable(8, subdCulledBuffIdx == 0 ? GetSrvResourceDesc(CBVSRVUAVIndex::SUBD_OUT_CULL_UAV_0) : GetSrvResourceDesc(CBVSRVUAVIndex::SUBD_OUT_CULL_UAV_1));
+			commandList->SetComputeRootDescriptorTable(9, GetSrvResourceDesc(CBVSRVUAVIndex::SUBD_COUNTER_UAV));
 
 			commandList->Dispatch(10000, 1, 1); // TODO: figure out how many threads group to run
 
@@ -229,9 +229,9 @@ void Game::Draw(const Timer& timer)
 		GraphicsCommandList->SetGraphicsRootConstantBufferView(1, tessellationCB->GetGPUVirtualAddress());
 		GraphicsCommandList->SetGraphicsRootConstantBufferView(2, perFrameCB->GetGPUVirtualAddress());
 
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(3, MeshDataVertexGPUSRV);
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(4, MeshDataIndexGPUSRV);
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(5, subdCulledBuffIdx == 0 ? SubdBufferOutCulledGPUSRV1 : SubdBufferOutCulledGPUSRV0);
+		GraphicsCommandList->SetGraphicsRootDescriptorTable(3, GetSrvResourceDesc(CBVSRVUAVIndex::MESH_DATA_VERTEX_SRV));
+		GraphicsCommandList->SetGraphicsRootDescriptorTable(4, GetSrvResourceDesc(CBVSRVUAVIndex::MESH_DATA_INDEX_SRV));
+		GraphicsCommandList->SetGraphicsRootDescriptorTable(5, subdCulledBuffIdx == 0 ? GetSrvResourceDesc(CBVSRVUAVIndex::SUBD_OUT_CULL_SRV_1) : GetSrvResourceDesc(CBVSRVUAVIndex::SUBD_OUT_CULL_SRV_0));
 		//CommandList->SetGraphicsRootDescriptorTable(6, mShadowMap->Srv());
 
 		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(subdCulledBuffIdx == 0 ?
@@ -300,9 +300,9 @@ void Game::Draw(const Timer& timer)
 		GraphicsCommandList->SetGraphicsRootConstantBufferView(1, tessellationCB->GetGPUVirtualAddress());
 		GraphicsCommandList->SetGraphicsRootConstantBufferView(2, perFrameCB->GetGPUVirtualAddress());
 
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(3, MeshDataVertexGPUSRV);
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(4, MeshDataIndexGPUSRV);
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(5, subdCulledBuffIdx == 0 ? SubdBufferOutCulledGPUSRV1 : SubdBufferOutCulledGPUSRV0);
+		GraphicsCommandList->SetGraphicsRootDescriptorTable(3, GetSrvResourceDesc(CBVSRVUAVIndex::MESH_DATA_VERTEX_SRV));
+		GraphicsCommandList->SetGraphicsRootDescriptorTable(4, GetSrvResourceDesc(CBVSRVUAVIndex::MESH_DATA_INDEX_SRV));
+		GraphicsCommandList->SetGraphicsRootDescriptorTable(5, subdCulledBuffIdx == 0 ? GetSrvResourceDesc(CBVSRVUAVIndex::SUBD_OUT_CULL_SRV_1) : GetSrvResourceDesc(CBVSRVUAVIndex::SUBD_OUT_CULL_SRV_0));
 		GraphicsCommandList->SetGraphicsRootDescriptorTable(6, mShadowMap->Srv());
 		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(subdCulledBuffIdx == 0 ?
 			RWDrawArgs1.Get() : RWDrawArgs0.Get(),
@@ -342,7 +342,7 @@ void Game::Draw(const Timer& timer)
 		GraphicsCommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 		GraphicsCommandList->SetGraphicsRootConstantBufferView(0, lightPassCB->GetGPUVirtualAddress());
-		GraphicsCommandList->SetGraphicsRootDescriptorTable(1, GBufferGPUSRV);
+		GraphicsCommandList->SetGraphicsRootDescriptorTable(1, GetSrvResourceDesc(CBVSRVUAVIndex::G_BUFFER));
 		GraphicsCommandList->SetGraphicsRootDescriptorTable(2, depthBufferSrvDescGpu);
 
 		GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
@@ -885,9 +885,8 @@ void Game::BuildUAVs()
 		meshDataVertexUAVDescription.Buffer.CounterOffsetInBytes = 0;
 		meshDataVertexUAVDescription.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
 
-		MeshDataVertexCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::MESH_DATA_VERTEX_UAV, CBVSRVUAVDescriptorSize);
-		MeshDataVertexGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, (int)CBVSRVUAVIndex::MESH_DATA_VERTEX_UAV, CBVSRVUAVDescriptorSize);
-		Device->CreateUnorderedAccessView(RWMeshDataVertex.Get(), nullptr, &meshDataVertexUAVDescription, MeshDataVertexCPUUAV);
+		auto meshDataVertexCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::MESH_DATA_VERTEX_UAV, CBVSRVUAVDescriptorSize);
+		Device->CreateUnorderedAccessView(RWMeshDataVertex.Get(), nullptr, &meshDataVertexUAVDescription, meshDataVertexCPUUAV);
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC meshDataVertexSRVDescription = {};
 		meshDataVertexSRVDescription.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -897,9 +896,8 @@ void Game::BuildUAVs()
 		meshDataVertexSRVDescription.Buffer.NumElements = vertexCount;
 		meshDataVertexSRVDescription.Buffer.StructureByteStride = sizeof(Vertex);
 
-		MeshDataVertexCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::MESH_DATA_VERTEX_SRV, CBVSRVUAVDescriptorSize);
-		MeshDataVertexGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, (int)CBVSRVUAVIndex::MESH_DATA_VERTEX_SRV, CBVSRVUAVDescriptorSize);
-		Device->CreateShaderResourceView(RWMeshDataVertex.Get(), &meshDataVertexSRVDescription, MeshDataVertexCPUSRV);
+		auto meshDataVertexCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::MESH_DATA_VERTEX_SRV, CBVSRVUAVDescriptorSize);
+		Device->CreateShaderResourceView(RWMeshDataVertex.Get(), &meshDataVertexSRVDescription, meshDataVertexCPUSRV);
 	}
 
 	// Mesh Data Indices
@@ -924,9 +922,8 @@ void Game::BuildUAVs()
 		meshDataIndexUAVDescription.Buffer.CounterOffsetInBytes = 0;
 		meshDataIndexUAVDescription.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
 
-		MeshDataIndexCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::MESH_DATA_INDEX_UAV, CBVSRVUAVDescriptorSize);
-		MeshDataIndexGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, (int)CBVSRVUAVIndex::MESH_DATA_INDEX_UAV, CBVSRVUAVDescriptorSize);
-		Device->CreateUnorderedAccessView(RWMeshDataIndex.Get(), nullptr, &meshDataIndexUAVDescription, MeshDataIndexCPUUAV);
+		auto meshDataIndexCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::MESH_DATA_INDEX_UAV, CBVSRVUAVDescriptorSize);
+		Device->CreateUnorderedAccessView(RWMeshDataIndex.Get(), nullptr, &meshDataIndexUAVDescription, meshDataIndexCPUUAV);
 
 		D3D12_SHADER_RESOURCE_VIEW_DESC meshDataIndexSRVDescription = {};
 		meshDataIndexSRVDescription.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
@@ -936,9 +933,8 @@ void Game::BuildUAVs()
 		meshDataIndexSRVDescription.Buffer.NumElements = indexCount;
 		meshDataIndexSRVDescription.Buffer.StructureByteStride = sizeof(UINT);
 
-		MeshDataIndexCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::MESH_DATA_INDEX_SRV, CBVSRVUAVDescriptorSize);
-		MeshDataIndexGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, (int)CBVSRVUAVIndex::MESH_DATA_INDEX_SRV, CBVSRVUAVDescriptorSize);
-		Device->CreateShaderResourceView(RWMeshDataIndex.Get(), &meshDataIndexSRVDescription, MeshDataIndexCPUSRV);
+		auto meshDataIndexCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::MESH_DATA_INDEX_SRV, CBVSRVUAVDescriptorSize);
+		Device->CreateShaderResourceView(RWMeshDataIndex.Get(), &meshDataIndexSRVDescription, meshDataIndexCPUSRV);
 	}
 
 	// Draw Args
@@ -974,13 +970,11 @@ void Game::BuildUAVs()
 		drawArgsUAVDescription.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 		drawArgsUAVDescription.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
 
-		DrawArgsCPUUAV0 = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::DRAW_ARGS_UAV_0, CBVSRVUAVDescriptorSize);
-		DrawArgsGPUUAV0 = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, (int)CBVSRVUAVIndex::DRAW_ARGS_UAV_0, CBVSRVUAVDescriptorSize);
-		Device->CreateUnorderedAccessView(RWDrawArgs0.Get(), nullptr, &drawArgsUAVDescription, DrawArgsCPUUAV0);
+		auto drawArgsCPUUAV0 = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::DRAW_ARGS_UAV_0, CBVSRVUAVDescriptorSize);
+		Device->CreateUnorderedAccessView(RWDrawArgs0.Get(), nullptr, &drawArgsUAVDescription, drawArgsCPUUAV0);
 
-		DrawArgsCPUUAV1 = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::DRAW_ARGS_UAV_1, CBVSRVUAVDescriptorSize);
-		DrawArgsGPUUAV1 = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, (int)CBVSRVUAVIndex::DRAW_ARGS_UAV_1, CBVSRVUAVDescriptorSize);
-		Device->CreateUnorderedAccessView(RWDrawArgs1.Get(), nullptr, &drawArgsUAVDescription, DrawArgsCPUUAV1);
+		auto drawArgsCPUUAV1 = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::DRAW_ARGS_UAV_1, CBVSRVUAVDescriptorSize);
+		Device->CreateUnorderedAccessView(RWDrawArgs1.Get(), nullptr, &drawArgsUAVDescription, drawArgsCPUUAV1);
 	}
 
 	// Subd Buffer In/Out
@@ -1041,29 +1035,23 @@ void Game::BuildUAVs()
 		subdBufferSRVDescription.Buffer.NumElements = subdSize;
 		subdBufferSRVDescription.Buffer.StructureByteStride = sizeof(DirectX::XMUINT4);
 
-		SubdBufferInCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::SUBD_IN_UAV, CBVSRVUAVDescriptorSize);
-		SubdBufferInGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, (int)CBVSRVUAVIndex::SUBD_IN_UAV, CBVSRVUAVDescriptorSize);
-		Device->CreateUnorderedAccessView(RWSubdBufferIn.Get(), nullptr, &subdBufferUAVDescription, SubdBufferInCPUUAV);
+		auto subdBufferInCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::SUBD_IN_UAV, CBVSRVUAVDescriptorSize);
+		Device->CreateUnorderedAccessView(RWSubdBufferIn.Get(), nullptr, &subdBufferUAVDescription, subdBufferInCPUUAV);
 
-		SubdBufferOutCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::SUBD_OUT_UAV, CBVSRVUAVDescriptorSize);
-		SubdBufferOutGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, (int)CBVSRVUAVIndex::SUBD_OUT_UAV, CBVSRVUAVDescriptorSize);
-		Device->CreateUnorderedAccessView(RWSubdBufferOut.Get(), nullptr, &subdBufferUAVDescription, SubdBufferOutCPUUAV);
+		auto subdBufferOutCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::SUBD_OUT_UAV, CBVSRVUAVDescriptorSize);
+		Device->CreateUnorderedAccessView(RWSubdBufferOut.Get(), nullptr, &subdBufferUAVDescription, subdBufferOutCPUUAV);
 
-		SubdBufferOutCulledCPUUAV0 = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::SUBD_OUT_CULL_UAV_0, CBVSRVUAVDescriptorSize);
-		SubdBufferOutCulledGPUUAV0 = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, (int)CBVSRVUAVIndex::SUBD_OUT_CULL_UAV_0, CBVSRVUAVDescriptorSize);
-		Device->CreateUnorderedAccessView(RWSubdBufferOutCulled0.Get(), nullptr, &subdBufferUAVDescription, SubdBufferOutCulledCPUUAV0);
+		auto subdBufferOutCulledCPUUAV0 = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::SUBD_OUT_CULL_UAV_0, CBVSRVUAVDescriptorSize);
+		Device->CreateUnorderedAccessView(RWSubdBufferOutCulled0.Get(), nullptr, &subdBufferUAVDescription, subdBufferOutCulledCPUUAV0);
 
-		SubdBufferOutCulledCPUSRV0 = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::SUBD_OUT_CULL_SRV_0, CBVSRVUAVDescriptorSize);
-		SubdBufferOutCulledGPUSRV0 = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, (int)CBVSRVUAVIndex::SUBD_OUT_CULL_SRV_0, CBVSRVUAVDescriptorSize);
-		Device->CreateShaderResourceView(RWSubdBufferOutCulled0.Get(), &subdBufferSRVDescription, SubdBufferOutCulledCPUSRV0);
+		auto subdBufferOutCulledCPUSRV0 = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::SUBD_OUT_CULL_SRV_0, CBVSRVUAVDescriptorSize);
+		Device->CreateShaderResourceView(RWSubdBufferOutCulled0.Get(), &subdBufferSRVDescription, subdBufferOutCulledCPUSRV0);
 
-		SubdBufferOutCulledCPUUAV1 = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::SUBD_OUT_CULL_UAV_1, CBVSRVUAVDescriptorSize);
-		SubdBufferOutCulledGPUUAV1 = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, (int)CBVSRVUAVIndex::SUBD_OUT_CULL_UAV_1, CBVSRVUAVDescriptorSize);
-		Device->CreateUnorderedAccessView(RWSubdBufferOutCulled1.Get(), nullptr, &subdBufferUAVDescription, SubdBufferOutCulledCPUUAV1);
+		auto subdBufferOutCulledCPUUAV1 = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::SUBD_OUT_CULL_UAV_1, CBVSRVUAVDescriptorSize);
+		Device->CreateUnorderedAccessView(RWSubdBufferOutCulled1.Get(), nullptr, &subdBufferUAVDescription, subdBufferOutCulledCPUUAV1);
 
-		SubdBufferOutCulledCPUSRV1 = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::SUBD_OUT_CULL_SRV_1, CBVSRVUAVDescriptorSize);
-		SubdBufferOutCulledGPUSRV1 = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, (int)CBVSRVUAVIndex::SUBD_OUT_CULL_SRV_1, CBVSRVUAVDescriptorSize);
-		Device->CreateShaderResourceView(RWSubdBufferOutCulled1.Get(), &subdBufferSRVDescription, SubdBufferOutCulledCPUSRV1);
+		auto subdBufferOutCulledCPUSRV1 = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::SUBD_OUT_CULL_SRV_1, CBVSRVUAVDescriptorSize);
+		Device->CreateShaderResourceView(RWSubdBufferOutCulled1.Get(), &subdBufferSRVDescription, subdBufferOutCulledCPUSRV1);
 	}
 
 	// Subd Counter
@@ -1089,9 +1077,8 @@ void Game::BuildUAVs()
 		subdCounterUAVDescription.Buffer.Flags = D3D12_BUFFER_UAV_FLAG_NONE;
 		subdCounterUAVDescription.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
 
-		SubdCounterCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::SUBD_COUNTER_UAV, CBVSRVUAVDescriptorSize);
-		SubdCounterGPUUAV = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, (int)CBVSRVUAVIndex::SUBD_COUNTER_UAV, CBVSRVUAVDescriptorSize);
-		Device->CreateUnorderedAccessView(RWSubdCounter.Get(), 0, &subdCounterUAVDescription, SubdCounterCPUUAV);
+		auto subdCounterCPUUAV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::SUBD_COUNTER_UAV, CBVSRVUAVDescriptorSize);
+		Device->CreateUnorderedAccessView(RWSubdCounter.Get(), 0, &subdCounterUAVDescription, subdCounterCPUUAV);
 	}
 
 	// Shadow Maps
@@ -1100,11 +1087,6 @@ void Game::BuildUAVs()
 			CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::SHADOW_MAP_SRV, CBVSRVUAVDescriptorSize),
 			CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, (int)CBVSRVUAVIndex::SHADOW_MAP_SRV, CBVSRVUAVDescriptorSize),
 			CD3DX12_CPU_DESCRIPTOR_HANDLE(dsvCpuStart, (int)DSVIndex::SHADOW_MAP_DEPTH, DSVDescriptorSize));
-	}
-
-	// G Buffer Textures
-	{
-		GBufferGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::G_BUFFER, CBVSRVUAVDescriptorSize);
 	}
 
 	// Bloom Weights
@@ -1130,7 +1112,6 @@ void Game::BuildUAVs()
 		bloomWeightsSRVDescription.Buffer.StructureByteStride = sizeof(float);
 
 		auto BloomWeightsCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::BLOOM_WEIGHTS, CBVSRVUAVDescriptorSize);
-		BloomWeightsGPUSRV = CD3DX12_GPU_DESCRIPTOR_HANDLE(srvGpuStart, (int)CBVSRVUAVIndex::BLOOM_WEIGHTS, CBVSRVUAVDescriptorSize);
 		Device->CreateShaderResourceView(RWBloomWeights.Get(), &bloomWeightsSRVDescription, BloomWeightsCPUSRV);
 	}
 }
@@ -1849,6 +1830,11 @@ CD3DX12_CPU_DESCRIPTOR_HANDLE Game::GetBloomBufferRtvDesc()
 CD3DX12_GPU_DESCRIPTOR_HANDLE Game::GetBloomBufferSrvDesc()
 {
 	return CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::BLOOM_BUFFER + ((mBloomBuffRTVIdx + 1) % 2), CBVSRVUAVDescriptorSize);
+}
+
+CD3DX12_GPU_DESCRIPTOR_HANDLE Game::GetSrvResourceDesc(CBVSRVUAVIndex index)
+{
+	return CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), (int)index, CBVSRVUAVDescriptorSize);
 }
 
 std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> Game::GetStaticSamplers()
