@@ -65,6 +65,16 @@ struct ImguiParams
 	// Bloom
 	float Threshold = 1.0f;
 	int BloomKernelSize = 7;
+
+	// Stats
+	static const int PlotDataCount = 80;
+	float PlotRefreshTime = 0.0f;
+	int StatsOffset = 0;
+	bool ShowStats = false;
+	float ComputeTime[PlotDataCount];
+	float TotalTime[PlotDataCount];
+	float CurrentComputeTime = 0.0f;
+	float CurrentTotalTime = 0.0f;
 };
 
 struct ImguiOutput

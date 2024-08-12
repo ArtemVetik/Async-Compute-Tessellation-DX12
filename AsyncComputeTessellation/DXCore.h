@@ -83,6 +83,7 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> RTVHeap;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> DSVHeap;
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> CBVSRVUAVHeap;
+	Microsoft::WRL::ComPtr<ID3D12QueryHeap> QueryHeap;
 
 	D3D12_VIEWPORT ScreenViewPort;
 	D3D12_RECT ScissorRect;

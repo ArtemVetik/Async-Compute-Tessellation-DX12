@@ -55,6 +55,7 @@ private:
 	ComPtr<ID3D12Resource> RWSubdBufferOutCulled1 = nullptr;
 	ComPtr<ID3D12Resource> RWSubdCounter = nullptr;
 	ComPtr<ID3D12Resource> RWBloomWeights = nullptr;
+	ComPtr<ID3D12Resource> QueryResultBuffer[2];
 
 	std::unordered_map<std::string, ComPtr<ID3DBlob>> Shaders;
 	std::unordered_map<std::string, ComPtr<ID3D12PipelineState>> PSOs;
@@ -114,6 +115,8 @@ private:
 	CD3DX12_GPU_DESCRIPTOR_HANDLE GetBloomBufferSrvDesc();
 
 	CD3DX12_GPU_DESCRIPTOR_HANDLE GetSrvResourceDesc(CBVSRVUAVIndex index);
+
+	double GetQueryTimestamps(ID3D12Resource* queryBuffer);
 
 	std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> GetStaticSamplers();
 

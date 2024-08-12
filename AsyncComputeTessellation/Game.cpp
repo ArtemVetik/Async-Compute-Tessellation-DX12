@@ -98,7 +98,6 @@ void Game::Update(const Timer& timer)
 	mainCamera->Update(timer);
 	inputManager->UpdateController();
 
-	// Cycle through the circular frame resource array.
 	currentFrameResourceIndex = (currentFrameResourceIndex + 1) % gNumberFrameResources;
 	currentFrameResource = FrameResources[currentFrameResourceIndex].get();
 
@@ -116,6 +115,12 @@ void Game::Update(const Timer& timer)
 		ThrowIfFailed(ComputeFence->SetEventOnCompletion(currentFrameResource->ComputeFence, eventHandle));
 		WaitForSingleObject(eventHandle, INFINITE);
 		CloseHandle(eventHandle);
+	}
+
+	//
+	{
+		imguiParams.CurrentComputeTime = GetQueryTimestamps(QueryResultBuffer[0].Get());
+		imguiParams.CurrentTotalTime = GetQueryTimestamps(QueryResultBuffer[1].Get());
 	}
 
 	mLightRotationAngle += imguiParams.LightRotateSpeed * timer.GetDeltaTime();
@@ -147,6 +152,8 @@ void Game::Draw(const Timer& timer)
 	ThrowIfFailed(GraphicsCommandList->Reset(currentFrameResource->graphicsCommandListAllocator.Get(), nullptr));
 	GraphicsCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 
+	GraphicsCommandList->EndQuery(QueryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 2);
+
 	// compute pass
 	{
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList = GraphicsCommandList;
@@ -165,6 +172,8 @@ void Game::Draw(const Timer& timer)
 		{
 			subdCulledBuffIdx = 0;
 		}
+
+		commandList->EndQuery(QueryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 0);
 
 		if (imguiParams.Freeze == false)
 		{
@@ -193,6 +202,9 @@ void Game::Draw(const Timer& timer)
 			commandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
 			commandList->Dispatch(1, 1, 1);
 		}
+
+		commandList->EndQuery(QueryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 1);
+		commandList->ResolveQueryData(QueryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 0, 2, QueryResultBuffer[0].Get(), 0);
 
 		if (mRenderType != RenderType::Direct)
 			ThrowIfFailed(commandList->Close());
@@ -489,6 +501,9 @@ void Game::Draw(const Timer& timer)
 		GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
 	}
 
+	ImguiOutput imguiOutput;
+	RecordImGuiCommands(imguiOutput);
+
 	// pre-render barriers
 	{
 		for (int i = 0; i < GBufferCount; i++)
@@ -516,8 +531,8 @@ void Game::Draw(const Timer& timer)
 	if (mRenderType == RenderType::AsyncAll)
 		GraphicsCommandQueue->Wait(ComputeFence.Get(), currentComputeFence);
 
-	ImguiOutput imguiOutput;
-	RecordImGuiCommands(imguiOutput);
+	GraphicsCommandList->EndQuery(QueryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 3);
+	GraphicsCommandList->ResolveQueryData(QueryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 2, 2, QueryResultBuffer[1].Get(), 0);
 
 	ThrowIfFailed(GraphicsCommandList->Close());
 	ExecuteGraphicsCommands(true);
@@ -720,7 +735,39 @@ void Game::RecordImGuiCommands(ImguiOutput& output)
 		}
 	}
 
-	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+	ImGui::Checkbox("Show Stats", &imguiParams.ShowStats);
+
+	if (imguiParams.ShowStats)
+	{
+		ImGui::Begin("Stats");
+
+		if (imguiParams.PlotRefreshTime == 0)
+			imguiParams.PlotRefreshTime = ImGui::GetTime();
+
+		while (imguiParams.PlotRefreshTime < ImGui::GetTime())
+		{
+			imguiParams.ComputeTime[imguiParams.StatsOffset] = imguiParams.CurrentComputeTime;
+			imguiParams.TotalTime[imguiParams.StatsOffset] = imguiParams.CurrentTotalTime;
+
+			imguiParams.StatsOffset = (imguiParams.StatsOffset + 1) % imguiParams.PlotDataCount;
+			imguiParams.PlotRefreshTime += 1.0f / 30.0f;
+		}
+
+		auto computeMax = *std::max_element(imguiParams.ComputeTime, imguiParams.ComputeTime + imguiParams.PlotDataCount);
+		ImGui::PlotLines("GPU compute dT", imguiParams.ComputeTime,
+			imguiParams.PlotDataCount, imguiParams.StatsOffset,
+			std::to_string(imguiParams.CurrentComputeTime).c_str(),
+			0.0f, computeMax, ImVec2(0, imguiParams.PlotDataCount));
+
+		auto totalMax = *std::max_element(imguiParams.TotalTime, imguiParams.TotalTime + imguiParams.PlotDataCount);
+		ImGui::PlotLines("GPU render dT", imguiParams.TotalTime,
+			imguiParams.PlotDataCount, imguiParams.StatsOffset,
+			std::to_string(imguiParams.CurrentTotalTime).c_str(),
+			0.0f, computeMax, ImVec2(0, imguiParams.PlotDataCount));
+
+		ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
+		ImGui::End();
+	}
 
 	ImGui::End();
 
@@ -1113,6 +1160,22 @@ void Game::BuildUAVs()
 
 		auto BloomWeightsCPUSRV = CD3DX12_CPU_DESCRIPTOR_HANDLE(srvCpuStart, (int)CBVSRVUAVIndex::BLOOM_WEIGHTS, CBVSRVUAVDescriptorSize);
 		Device->CreateShaderResourceView(RWBloomWeights.Get(), &bloomWeightsSRVDescription, BloomWeightsCPUSRV);
+	}
+
+	// Query result buffer
+	{
+		D3D12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(4 * sizeof(UINT64));
+		
+		for (int i = 0; i < 2; i++)
+		{
+			Device->CreateCommittedResource(
+				&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK),
+				D3D12_HEAP_FLAG_NONE,
+				&resourceDesc,
+				D3D12_RESOURCE_STATE_COPY_DEST,
+				nullptr,
+				IID_PPV_ARGS(&QueryResultBuffer[i]));
+		}
 	}
 }
 
@@ -1835,6 +1898,24 @@ CD3DX12_GPU_DESCRIPTOR_HANDLE Game::GetBloomBufferSrvDesc()
 CD3DX12_GPU_DESCRIPTOR_HANDLE Game::GetSrvResourceDesc(CBVSRVUAVIndex index)
 {
 	return CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), (int)index, CBVSRVUAVDescriptorSize);
+}
+
+double Game::GetQueryTimestamps(ID3D12Resource* queryBuffer)
+{
+	UINT64* pTimestamps;
+	queryBuffer->Map(0, nullptr, reinterpret_cast<void**>(&pTimestamps));
+
+	UINT64 deltaTimeInTicks = pTimestamps[1] - pTimestamps[0];
+
+	UINT64 gpuFrequency;
+
+	ComputeCommandQueue->GetTimestampFrequency(&gpuFrequency);
+
+	double timeInMilliseconds = (deltaTimeInTicks / static_cast<double>(gpuFrequency)) * 1000.0;
+
+	queryBuffer->Unmap(0, nullptr);
+
+	return timeInMilliseconds;
 }
 
 std::array<const CD3DX12_STATIC_SAMPLER_DESC, 7> Game::GetStaticSamplers()
