@@ -1,6 +1,6 @@
 #include "Game.h"
 
-const int gNumberFrameResources = 1;
+const int gNumberFrameResources = 3;
 
 Game::Game(HINSTANCE hInstance) : DXCore(hInstance)
 {
@@ -148,6 +148,8 @@ void Game::Draw(const Timer& timer)
 
 	auto depthBufferSrvDescGpu = CD3DX12_GPU_DESCRIPTOR_HANDLE(CBVSRVUAVHeap->GetGPUDescriptorHandleForHeapStart(), (int)CBVSRVUAVIndex::DEPTH_BUFFER, RTVDescriptorSize);
 
+	GraphicsCommandQueue->Wait(ComputeFence.Get(), currentComputeFence);
+
 	ThrowIfFailed(currentFrameResource->graphicsCommandListAllocator->Reset());
 	ThrowIfFailed(GraphicsCommandList->Reset(currentFrameResource->graphicsCommandListAllocator.Get(), nullptr));
 	GraphicsCommandList->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
@@ -210,9 +212,6 @@ void Game::Draw(const Timer& timer)
 			ThrowIfFailed(commandList->Close());
 	}
 
-	if (mRenderType == RenderType::AsyncShadowMap)
-		ExecuteComputeCommands(true);
-
 	if (mRenderType == RenderType::Direct)
 		subdCulledBuffIdx = 1;
 	
@@ -271,8 +270,12 @@ void Game::Draw(const Timer& timer)
 	{
 		ThrowIfFailed(GraphicsCommandList->Close());
 		
+		GraphicsCommandQueue->Signal(GraphicsFence.Get(), ++currentGraphicsFence);
 		ExecuteGraphicsCommands(false);
 		
+		ComputeCommandQueue->Wait(GraphicsFence.Get(), currentGraphicsFence);
+		ExecuteComputeCommands(true);
+
 		GraphicsCommandQueue->Wait(ComputeFence.Get(), currentComputeFence);
 
 		ResetGraphicsCommands();
