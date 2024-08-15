@@ -361,7 +361,8 @@ void Game::Draw(const Timer& timer)
 		GraphicsCommandList->SetGraphicsRootDescriptorTable(1, GetSrvResourceDesc(CBVSRVUAVIndex::G_BUFFER));
 		GraphicsCommandList->SetGraphicsRootDescriptorTable(2, depthBufferSrvDescGpu);
 
-		GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
+		SubmeshGeometry quad = ssQuadMesh->DrawArgs["quad"];
+		GraphicsCommandList->DrawIndexedInstanced(quad.IndexCount, 1, quad.StartIndexLocation, quad.BaseVertexLocation, 0);
 
 		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(AccumulationBuffer[mAccumBuffRTVIdx].Get(),
 			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
@@ -403,7 +404,8 @@ void Game::Draw(const Timer& timer)
 			GraphicsCommandList->SetGraphicsRootDescriptorTable(1, GetAccumBufferSrvDesc());
 			//CommandList->SetGraphicsRootDescriptorTable(2, bloomBuffer1SrvDescGpu);
 
-			GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
+			SubmeshGeometry quad = ssQuadMesh->DrawArgs["quad"];
+			GraphicsCommandList->DrawIndexedInstanced(quad.IndexCount, 1, quad.StartIndexLocation, quad.BaseVertexLocation, 0);
 
 			GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(BloomBuffer[mBloomBuffRTVIdx].Get(),
 				D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
@@ -428,7 +430,8 @@ void Game::Draw(const Timer& timer)
 			GraphicsCommandList->SetGraphicsRootDescriptorTable(2, GetBloomBufferSrvDesc());
 			GraphicsCommandList->SetGraphicsRootDescriptorTable(3, bloomWeightsBufferSrvDescGpu);
 
-			GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
+			SubmeshGeometry quad = ssQuadMesh->DrawArgs["quad"];
+			GraphicsCommandList->DrawIndexedInstanced(quad.IndexCount, 1, quad.StartIndexLocation, quad.BaseVertexLocation, 0);
 
 			mBloomBuffRTVIdx = 1 - mBloomBuffRTVIdx;
 		}
@@ -455,7 +458,8 @@ void Game::Draw(const Timer& timer)
 			GraphicsCommandList->SetGraphicsRootDescriptorTable(2, GetBloomBufferSrvDesc());
 			GraphicsCommandList->SetGraphicsRootDescriptorTable(3, bloomWeightsBufferSrvDescGpu);
 
-			GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
+			SubmeshGeometry quad = ssQuadMesh->DrawArgs["quad"];
+			GraphicsCommandList->DrawIndexedInstanced(quad.IndexCount, 1, quad.StartIndexLocation, quad.BaseVertexLocation, 0);
 
 			GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(BloomBuffer[mBloomBuffRTVIdx].Get(),
 				D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
@@ -479,7 +483,8 @@ void Game::Draw(const Timer& timer)
 		GraphicsCommandList->SetGraphicsRootDescriptorTable(1, GetAccumBufferSrvDesc());
 		GraphicsCommandList->SetGraphicsRootDescriptorTable(2, depthBufferSrvDescGpu);
 
-		GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
+		SubmeshGeometry quad = ssQuadMesh->DrawArgs["quad"];
+		GraphicsCommandList->DrawIndexedInstanced(quad.IndexCount, 1, quad.StartIndexLocation, quad.BaseVertexLocation, 0);
 
 		GraphicsCommandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(AccumulationBuffer[mAccumBuffRTVIdx].Get(),
 			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
@@ -502,7 +507,8 @@ void Game::Draw(const Timer& timer)
 		GraphicsCommandList->SetGraphicsRootDescriptorTable(1, GetAccumBufferSrvDesc());
 		GraphicsCommandList->SetGraphicsRootDescriptorTable(2, GetBloomBufferSrvDesc());
 
-		GraphicsCommandList->DrawIndexedInstanced(6, 1, 0, 0, 0); // TODO: !
+		SubmeshGeometry quad = ssQuadMesh->DrawArgs["quad"];
+		GraphicsCommandList->DrawIndexedInstanced(quad.IndexCount, 1, quad.StartIndexLocation, quad.BaseVertexLocation, 0);
 	}
 
 	ImguiOutput imguiOutput;
@@ -1229,6 +1235,13 @@ void Game::BuildSSQuad()
 	ssQuadMesh->VertexBufferByteSize = vbByteSize;
 	ssQuadMesh->IndexFormat = DXGI_FORMAT_R16_UINT;
 	ssQuadMesh->IndexBufferByteSize = ibByteSize;
+
+	SubmeshGeometry quadSubmesh;
+	quadSubmesh.IndexCount = (UINT)quad.Indices32.size();
+	quadSubmesh.StartIndexLocation = 0;
+	quadSubmesh.BaseVertexLocation = 0;
+
+	ssQuadMesh->DrawArgs["quad"] = quadSubmesh;
 }
 
 void Game::BuildRootSignature()
