@@ -82,9 +82,10 @@ struct ImguiOutput
 	bool RebuildMesh = false;
 	bool ReuploadBuffers = false;
 	bool RecompileShaders = false;
+	bool FlushQueue = false;
 
 	bool HasChanges() const
 	{
-		return RebuildMesh || ReuploadBuffers || RecompileShaders;
+		return RebuildMesh || ReuploadBuffers || RecompileShaders || FlushQueue;
 	}
 };

@@ -139,6 +139,7 @@ void Game::Update(const Timer& timer)
 
 void Game::Draw(const Timer& timer)
 {
+	RenderType frameRenderType = mRenderType;
 	ID3D12DescriptorHeap* descriptorHeaps[] = { CBVSRVUAVHeap.Get() };
 
 	auto objectCB = currentFrameResource->ObjectCB->Resource();
@@ -161,7 +162,7 @@ void Game::Draw(const Timer& timer)
 		Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> commandList = GraphicsCommandList;
 		Microsoft::WRL::ComPtr<ID3D12CommandAllocator> commandAllocator = currentFrameResource->graphicsCommandListAllocator;
 
-		if (mRenderType != RenderType::Direct)
+		if (frameRenderType != RenderType::Direct)
 		{
 			commandList = ComputeCommandList;
 			commandAllocator = currentFrameResource->computeCommandListAllocator;
@@ -199,7 +200,7 @@ void Game::Draw(const Timer& timer)
 			commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferIn.Get())); // TODO: are these lines necessary?
 			commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(RWSubdBufferOut.Get()));
 			commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(subdCulledBuffIdx == 0 ? RWSubdBufferOutCulled0.Get() : RWSubdBufferOutCulled1.Get()));
-
+			
 			commandList->SetPipelineState(PSOs["tessellationCopyDraw"].Get());
 			commandList->SetComputeRootSignature(tessellationComputeRootSignature.Get());
 			commandList->Dispatch(1, 1, 1);
@@ -208,11 +209,11 @@ void Game::Draw(const Timer& timer)
 		commandList->EndQuery(QueryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 1);
 		commandList->ResolveQueryData(QueryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 0, 2, QueryResultBuffer[0].Get(), 0);
 
-		if (mRenderType != RenderType::Direct)
+		if (frameRenderType != RenderType::Direct)
 			ThrowIfFailed(commandList->Close());
 	}
 
-	if (mRenderType == RenderType::Direct)
+	if (frameRenderType == RenderType::Direct)
 		subdCulledBuffIdx = 1;
 	
 	// shadow map pass
@@ -266,7 +267,7 @@ void Game::Draw(const Timer& timer)
 			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
 	}
 
-	if (mRenderType == RenderType::AsyncShadowMap)
+	if (frameRenderType == RenderType::AsyncShadowMap)
 	{
 		ThrowIfFailed(GraphicsCommandList->Close());
 		
@@ -368,7 +369,7 @@ void Game::Draw(const Timer& timer)
 		mAccumBuffRTVIdx = 1 - mAccumBuffRTVIdx;
 	}
 
-	if (mRenderType == RenderType::AsyncPostProcess)
+	if (frameRenderType == RenderType::AsyncPostProcess)
 	{
 		ThrowIfFailed(GraphicsCommandList->Close());
 		
@@ -531,7 +532,7 @@ void Game::Draw(const Timer& timer)
 			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 	}
 	
-	if (mRenderType == RenderType::AsyncAll)
+	if (frameRenderType == RenderType::AsyncAll)
 		GraphicsCommandQueue->Wait(ComputeFence.Get(), currentComputeFence);
 
 	GraphicsCommandList->EndQuery(QueryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 3);
@@ -540,7 +541,7 @@ void Game::Draw(const Timer& timer)
 	ThrowIfFailed(GraphicsCommandList->Close());
 	ExecuteGraphicsCommands(true);
 
-	if (mRenderType == RenderType::AsyncAll)
+	if (frameRenderType == RenderType::AsyncAll)
 		ExecuteComputeCommands(true);
 
 	ThrowIfFailed(SwapChain->Present(0, 0));
@@ -628,6 +629,7 @@ void Game::RecordImGuiCommands(ImguiOutput& output)
 	if (ImGui::Combo("Render Type", (int*)&imguiParams.RenderType, "Direct\0Async All\0Async Shadow Map\0Async Post Process\0\0"))
 	{
 		mRenderType = imguiParams.RenderType;
+		output.FlushQueue = true;
 	}
 
 	if (ImGui::CollapsingHeader("Tessellation parameters"))
