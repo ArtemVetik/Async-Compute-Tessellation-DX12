@@ -4,6 +4,9 @@
 
 #include "GeometryGenerator.h"
 #include <algorithm>
+#include <assimp/Importer.hpp>
+#include <assimp/scene.h>
+#include <assimp/postprocess.h>
 
 using namespace DirectX;
 
@@ -652,6 +655,47 @@ GeometryGenerator::MeshData GeometryGenerator::CreateQuad(float x, float y, floa
 	meshData.Indices32[3] = 0;
 	meshData.Indices32[4] = 2;
 	meshData.Indices32[5] = 3;
+
+	return meshData;
+}
+
+GeometryGenerator::MeshData GeometryGenerator::LoadMesh(const char* path)
+{
+	Assimp::Importer importer;
+	const aiScene* scene = importer.ReadFile(path, aiProcessPreset_TargetRealtime_Fast);
+
+	GeometryGenerator::MeshData meshData;
+	for (int i = 0; i < scene->mMeshes[0]->mNumVertices; i++)
+	{
+		auto aiVertex = scene->mMeshes[0]->mVertices[i];
+		auto aiNormal = scene->mMeshes[0]->mNormals[i];
+
+		meshData.Vertices.push_back(Vertex(
+			{ aiVertex.x, aiVertex.y, aiVertex.z }, // p
+			{ aiNormal.x, aiNormal.y, aiNormal.z }, // n
+			{ }, // t
+			{ } // uv
+		));
+	}
+
+	for (size_t i = 0; i < scene->mMeshes[0]->mNumFaces; i++)
+	{
+		for (size_t k = 0; k < scene->mMeshes[0]->mFaces[i].mNumIndices; k += 3)
+		{
+			if (i % 2 == 0)
+			{
+				meshData.Indices32.push_back(scene->mMeshes[0]->mFaces[i].mIndices[k + 1]);
+				meshData.Indices32.push_back(scene->mMeshes[0]->mFaces[i].mIndices[k]);
+				meshData.Indices32.push_back(scene->mMeshes[0]->mFaces[i].mIndices[k + 2]);
+			}
+			else
+			{
+				meshData.Indices32.push_back(scene->mMeshes[0]->mFaces[i].mIndices[k + 2]);
+				meshData.Indices32.push_back(scene->mMeshes[0]->mFaces[i].mIndices[k]);
+				meshData.Indices32.push_back(scene->mMeshes[0]->mFaces[i].mIndices[k + 1]);
+			}
+		}
+	}
 
 	return meshData;
 }

@@ -16,7 +16,7 @@ void Bintree::InitMesh(MeshMode mode)
 	if (mode == MeshMode::TERRAIN)
 		mMeshData = geoGen.CreateGrid(250.0f, 250.0f, 2, 2);
 	else
-		mMeshData = geoGen.CreateSphere(100, 10, 10);
+		mMeshData = geoGen.LoadMesh("Models/Teapot.fbx");
 
 	mMeshData.InitAvgEdgeLength();
 }
