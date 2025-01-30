@@ -1,7 +1,20 @@
 #include <Windows.h>
 #include <crtdbg.h>
 #include "d3dUtil.h"
-#include "Game.h"
+//#include "Game.h"
+#include "../RenderEngine/RenderEngine.h"
+
+using namespace AsyncComputeTessellation;
+
+void UpdateWindowTitle(HWND window, int rFps, float rMspf)
+{
+	std::wstringstream out;
+	out.precision(6);
+
+	out << "Async Compute Tessellation (" << " fps: " << rFps << " frame time: " << rMspf << " ms)";
+
+	SetWindowText(window, out.str().c_str());
+}
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 	PSTR cmdLine, int showCmd)
@@ -18,7 +31,47 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 	freopen_s(&fp, "CONOUT$", "w", stderr);
 #endif
 
-	try
+	Window window(hInstance, 1280, 720);
+	window.Initialize();
+
+	Timer timer(window.GetMainWindow(), L"Async Compute Tessellation!");
+
+	RenderEngine render(timer);
+	render.StartUp(window);
+
+	MSG msg = { 0 };
+	int fps;
+	float mspf;
+
+	while (msg.message != WM_QUIT)
+	{
+		if (PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
+		{
+			TranslateMessage(&msg);
+			DispatchMessage(&msg);
+		}
+		else
+		{
+			timer.UpdateTimer();
+
+			if (!window.IsPaused())
+			{
+				if (timer.UpdateTitleBarStats(fps, mspf))
+					UpdateWindowTitle(window.GetMainWindow(), fps, mspf);
+
+				render.Update();
+				render.Render();
+			}
+			else
+			{
+				Sleep(100);
+			}
+		}
+	}
+
+	return (int)msg.wParam;
+
+	/*try
 	{
 		Game Game(hInstance);
 		if (!Game.Initialize())
@@ -30,5 +83,5 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 	{
 		MessageBox(nullptr, e.ToString().c_str(), L"HR Failed", MB_OK);
 		return 0;
-	}
+	}*/
 }
