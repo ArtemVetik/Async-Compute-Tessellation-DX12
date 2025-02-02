@@ -197,74 +197,10 @@
     <ClInclude Include="Vertex.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Common.hlsl">
-      <FileType>Document</FileType>
-    </None>
-    <None Include="WireframePS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Pixel</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.1</ShaderModel>
-      <FileType>Document</FileType>
-    </None>
-    <None Include="DefaultVS.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Vertex</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.1</ShaderModel>
-      <FileType>Document</FileType>
-    </None>
-    <None Include="LoD.hlsl">
-      <FileType>Document</FileType>
-    </None>
-    <None Include="TessellationCopyDraw.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.1</ShaderModel>
-      <FileType>Document</FileType>
-    </None>
-    <None Include="TessellationUpdate.hlsl">
-      <ShaderType Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">Compute</ShaderType>
-      <ShaderModel Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">5.1</ShaderModel>
-      <FileType>Document</FileType>
-    </None>
-    <None Include="Noise.hlsl">
-      <FileType>Document</FileType>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
     <Image Include="small.ico" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="ComputeShaderData.hlsl">
-      <FileType>Document</FileType>
-    </None>
-    <None Include="DefaultShaderData.hlsl">
-      <FileType>Document</FileType>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="ConstantBuffers.hlsl">
-      <FileType>Document</FileType>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="WireframeGS.hlsl">
-      <FileType>Document</FileType>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="DefaultPS.hlsl">
-      <FileType>Document</FileType>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Structs.hlsl">
-      <FileType>Document</FileType>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
     <None Include="LightingUtil.hlsl">
-      <FileType>Document</FileType>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="gpu_noise_lib.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>
@@ -289,9 +225,56 @@
     </None>
   </ItemGroup>
   <ItemGroup>
+    <ProjectReference Include="..\Core\InputSystem\InputSystem.vcxproj">
+      <Project>{32ac94c6-ef33-4add-92f9-41270d16e447}</Project>
+    </ProjectReference>
     <ProjectReference Include="..\RenderEngine\RenderEngine.vcxproj">
       <Project>{8113c4a0-3119-47d8-8c53-9745b28a6488}</Project>
     </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\Common.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\ComputeShaderData.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\ConstantBuffers.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\DefaultPS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\DefaultShaderData.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\DefaultVS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\gpu_noise_lib.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\LoD.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\Noise.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\Structs.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\TessellationCopyDraw.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\TessellationUpdate.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\WireframeGS.hlsl">
+      <FileType>Document</FileType>
+    </None>
+    <None Include="Shaders\WireframePS.hlsl">
+      <FileType>Document</FileType>
+    </None>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

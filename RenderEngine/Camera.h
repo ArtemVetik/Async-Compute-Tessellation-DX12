@@ -1,4 +1,5 @@
 #pragma once
+
 #include <DirectXColors.h>
 
 #include "framework.h"
@@ -10,6 +11,11 @@ namespace AsyncComputeTessellation
 	using namespace DirectX;
 	using namespace EduEngine;
 
+	struct FrustrumPlanes
+	{
+		DirectX::XMFLOAT4 Planes[6];
+	};
+
 	class RENDERENGINE_API Camera
 	{
 	public:
@@ -18,20 +24,24 @@ namespace AsyncComputeTessellation
 		void SetProjectionMatrix(UINT newWidth, UINT newHeight);
 		void SetProjectionMatrix(float* fov = nullptr, float* nearView = nullptr, float* farView = nullptr);
 
-		void Update(DirectX::XMFLOAT3 look, DirectX::XMFLOAT3 right, DirectX::XMFLOAT3 up, DirectX::XMFLOAT3 pos);
-		void SetViewport(XMFLOAT4 viewport);
-		void SetBackgroundColor(XMFLOAT4 color);
+		void Pitch(float angle);
+		void RotateY(float angle);
+		void Move(XMVECTOR deltaPos);
+		void Update();
 
-		XMFLOAT4X4 GetViewMatrix() const;
-		XMFLOAT4X4 GetProjectionMatrix() const;
+		XMFLOAT4X4 GetViewMatrix() const { return m_ViewMatrix; }
+		XMFLOAT4X4 GetProjectionMatrix() const { return m_ProjectionMatrix; }
+		XMFLOAT3 GetPosition() const { return m_Position; }
+		XMFLOAT3 GetLook() const { return m_Look; }
+		XMFLOAT3 GetRight() const { return m_Right; }
+		XMFLOAT3 GetUp() const { return m_Up; }
+		float GetNear() const { return m_NearValue; }
+		float GetFar() const { return m_FarValue; }
+		float GetFovY() const { return m_FovY; }
+		float GetFovX() const { return m_FovX; }
+
 		XMMATRIX GetViewProjMatrix() const;
-		XMFLOAT3 GetPosition() const;
-		XMFLOAT4 GetViewport() const;
-		XMFLOAT4 GetBackgroundColor() const;
-		float GetNear() const;
-		float GetFar() const;
-		float GetFovY() const;
-		float GetFovX() const;
+		FrustrumPlanes GetFrustrumPlanes(XMMATRIX worldMatrix) const;
 
 	private:
 		RenderDeviceD3D12* m_Device;
@@ -42,13 +52,15 @@ namespace AsyncComputeTessellation
 		float m_FovY = 55.0f * (3.14f / 180.0f);
 		float m_FovX;
 
-		XMFLOAT4 m_Viewport;
-		XMFLOAT4 m_BackgroundColor;
 		XMFLOAT4X4 m_ViewMatrix;
 		XMFLOAT4X4 m_ProjectionMatrix;
 		float m_NearValue;
 		float m_FarValue;
 
-		XMFLOAT3 m_Position;
+		XMFLOAT3 m_Position = { 0.0f, 0.0f, 0.0f };
+		XMFLOAT3 m_Right = { 1.0f, 0.0f, 0.0f };
+		XMFLOAT3 m_Up = { 0.0f, 1.0f, 0.0f };
+		XMFLOAT3 m_Look = { 0.0f, 0.0f, 1.0f };
+		bool m_ViewDirty;
 	};
 }

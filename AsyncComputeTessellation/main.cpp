@@ -3,6 +3,7 @@
 #include "d3dUtil.h"
 //#include "Game.h"
 #include "../RenderEngine/RenderEngine.h"
+#include "../Core/InputSystem/InputManager.h"
 
 using namespace AsyncComputeTessellation;
 
@@ -36,6 +37,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 
 	Timer timer(window.GetMainWindow(), L"Async Compute Tessellation!");
 
+	InputManager::GetInstance().Initialize(hInstance, window.GetMainWindow());
+
 	RenderEngine render(timer);
 	render.StartUp(window);
 
@@ -54,12 +57,14 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 		{
 			timer.UpdateTimer();
 
+			InputManager::GetInstance().Update();
+
 			if (!window.IsPaused())
 			{
 				if (timer.UpdateTitleBarStats(fps, mspf))
 					UpdateWindowTitle(window.GetMainWindow(), fps, mspf);
 
-				render.Update();
+				render.Update(timer);
 				render.Render();
 			}
 			else

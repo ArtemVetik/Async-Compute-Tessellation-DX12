@@ -28,9 +28,9 @@ void cullPass(uint4 key)
     mesh_coord[R] = ts_Leaf_to_MeshPosition(unit_R, key);
     
 #if USE_DISPLACE
-    mesh_coord[O] = displaceVertex(mesh_coord[O], predictedCamPosition);
-    mesh_coord[U] = displaceVertex(mesh_coord[U], predictedCamPosition);
-    mesh_coord[R] = displaceVertex(mesh_coord[R], predictedCamPosition);
+    mesh_coord[O] = displaceVertex(mesh_coord[O], gPredictedCamPosition);
+    mesh_coord[U] = displaceVertex(mesh_coord[U], gPredictedCamPosition);
+    mesh_coord[R] = displaceVertex(mesh_coord[R], gPredictedCamPosition);
 #endif
 
     b_min = min(b_min, mesh_coord[O]);
@@ -41,7 +41,7 @@ void cullPass(uint4 key)
     b_max = max(b_max, mesh_coord[U]);
     b_max = max(b_max, mesh_coord[R]);
     
-    float4x4 mvp = mul(mul(world, view), projection);
+    float4x4 mvp = mul(gWorld, gViewProj);
     if (culltest(mvp, b_min.xyz, b_max.xyz))
         cull_writeKey(key);
 }
@@ -65,7 +65,7 @@ void main(uint id : SV_DispatchThreadID, uint groupId : SV_GroupIndex)
     // store it in a shared variable
     if (groupId == 0)
     {
-        cam_height_local = getHeight(predictedCamPosition.xz, screenRes);
+        cam_height_local = getHeight(gPredictedCamPosition.xz, gScreenRes);
     }
     GroupMemoryBarrierWithGroupSync();
 #endif
@@ -75,8 +75,8 @@ void main(uint id : SV_DispatchThreadID, uint groupId : SV_GroupIndex)
     
     int targetLod = 0, parentLod = 0;
 #if UNIFORM_TESSELLATION
-    targetLod = subdivisionLevel;
-    parentLod = subdivisionLevel;
+    targetLod = gSubdivisionLevel;
+    parentLod = gSubdivisionLevel;
 #else 
     float parentTargetLevel, targetLevel;
 #if USE_DISPLACE

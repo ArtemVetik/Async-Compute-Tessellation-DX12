@@ -29,7 +29,7 @@ float gridFactor(float2 vBC, float width)
     return min(min(a3.x, a3.y), a3.z);
 }
 
-ps_output main(VertexOut pin) : SV_Target
+float4 main(VertexOut pin) : SV_Target
 {
     ps_output output;
     
@@ -42,5 +42,6 @@ ps_output main(VertexOut pin) : SV_Target
     output.albedo = float4(c.xyz * wireframe_factor, 1);
     output.normal = float4(normalize(pin.NormalW), 1);
     
-    return output;
+    return output.albedo;
+    //return output;
 }

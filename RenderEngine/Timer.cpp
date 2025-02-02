@@ -1,5 +1,7 @@
 #include "Timer.h"
 
+#include <utility>
+
 namespace AsyncComputeTessellation
 {
 	Timer::Timer(HWND handle, LPCTSTR windowTitle) : m_Window(handle), m_WindowTitle(windowTitle)
@@ -36,7 +38,7 @@ namespace AsyncComputeTessellation
 		QueryPerformanceCounter((LARGE_INTEGER*)&now);
 		m_CurrentTime = now;
 
-		m_DeltaTime = max((float)((m_CurrentTime - m_PreviousTime) * m_PerfCounterSeconds), 0.0f);
+		m_DeltaTime = std::max((float)((m_CurrentTime - m_PreviousTime) * m_PerfCounterSeconds), 0.0f);
 
 		m_TotalTime = (float)((m_CurrentTime - m_StartTime) * m_PerfCounterSeconds);
 

@@ -153,8 +153,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="AdaptiveTessellation.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="framework.h" />
+    <ClInclude Include="GeometryGenerator.h" />
     <ClInclude Include="imgui\imconfig.h" />
     <ClInclude Include="imgui\imgui.h" />
     <ClInclude Include="imgui\imgui_impl_dx12.h" />
@@ -163,13 +165,20 @@
     <ClInclude Include="imgui\imstb_rectpack.h" />
     <ClInclude Include="imgui\imstb_textedit.h" />
     <ClInclude Include="imgui\imstb_truetype.h" />
+    <ClInclude Include="MeshUtils.h" />
     <ClInclude Include="RenderEngine.h" />
+    <ClInclude Include="RenderPasses.h" />
+    <ClInclude Include="TessellationMesh.h" />
+    <ClInclude Include="TessellationUI.h" />
     <ClInclude Include="Timer.h" />
+    <ClInclude Include="Vertex.h" />
     <ClInclude Include="Window.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="AdaptiveTessellation.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="GeometryGenerator.cpp" />
     <ClCompile Include="imgui\imgui.cpp" />
     <ClCompile Include="imgui\imgui_demo.cpp" />
     <ClCompile Include="imgui\imgui_draw.cpp" />
@@ -178,6 +187,8 @@
     <ClCompile Include="imgui\imgui_tables.cpp" />
     <ClCompile Include="imgui\imgui_widgets.cpp" />
     <ClCompile Include="RenderEngine.cpp" />
+    <ClCompile Include="TessellationMesh.cpp" />
+    <ClCompile Include="TessellationUI.cpp" />
     <ClCompile Include="Timer.cpp" />
     <ClCompile Include="Window.cpp" />
   </ItemGroup>
@@ -190,6 +201,9 @@
     </ProjectReference>
     <ProjectReference Include="..\Core\Graphics\Graphics.vcxproj">
       <Project>{21d60465-4dec-4328-8bfb-480f0ff4adb5}</Project>
+    </ProjectReference>
+    <ProjectReference Include="..\Core\InputSystem\InputSystem.vcxproj">
+      <Project>{32ac94c6-ef33-4add-92f9-41270d16e447}</Project>
     </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

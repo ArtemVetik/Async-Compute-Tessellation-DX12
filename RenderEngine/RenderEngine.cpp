@@ -1,4 +1,5 @@
 #include "RenderEngine.h"
+#include "../Core/InputSystem/InputManager.h"
 
 namespace AsyncComputeTessellation
 {
@@ -55,10 +56,12 @@ namespace AsyncComputeTessellation
 		Resize(mainWindow.GetClientWidth(), mainWindow.GetClientHeight());
 
 		m_Device->GetCommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT).Reset();
-		
+
 		m_ImGuiTex = m_Device->AllocateGPUDescriptor(QueueID::Direct, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
 
 		InitImGui(mainWindow);
+
+		m_AdaptiveTessellation = std::make_unique<AdaptiveTessellation>(m_Device.get(), m_Camera.get());
 
 		return true;
 	}
@@ -81,7 +84,7 @@ namespace AsyncComputeTessellation
 		dCommandContext.GetCmdList()->ClearDepthStencilView(m_SwapChain->DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 		dCommandContext.GetCmdList()->ClearRenderTargetView(m_SwapChain->CurrentBackBufferView(), color, 0, nullptr);
 
-		// ...
+		m_AdaptiveTessellation->Compute(m_Timer);
 
 		auto& directCommandQueue = m_Device->GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
 
@@ -108,9 +111,40 @@ namespace AsyncComputeTessellation
 		}
 	}
 
-	void RenderEngine::Update()
+	void RenderEngine::Update(const Timer& timer)
 	{
-		
+		XMVECTOR direction = XMLoadFloat3(&m_Camera->GetLook());
+		XMVECTOR lrVector = XMLoadFloat3(&m_Camera->GetRight());
+		XMVECTOR upVector = XMLoadFloat3(&m_Camera->GetUp());
+
+		float moveScale = 35.0f;
+		float rotateScale = 0.01f;
+
+		if (InputManager::GetInstance().IsKeyPressed(DIK_W))
+			m_Camera->Move(direction * moveScale * timer.GetDeltaTime());
+		if (InputManager::GetInstance().IsKeyPressed(DIK_S))
+			m_Camera->Move(-direction * moveScale * timer.GetDeltaTime());
+		if (InputManager::GetInstance().IsKeyPressed(DIK_A))
+			m_Camera->Move(-lrVector * moveScale * timer.GetDeltaTime());
+		if (InputManager::GetInstance().IsKeyPressed(DIK_D))
+			m_Camera->Move(lrVector * moveScale * timer.GetDeltaTime());
+		if (InputManager::GetInstance().IsKeyPressed(DIK_E))
+			m_Camera->Move(upVector * moveScale * timer.GetDeltaTime());
+		if (InputManager::GetInstance().IsKeyPressed(DIK_Q))
+			m_Camera->Move(-upVector * moveScale * timer.GetDeltaTime());
+
+		auto mouseState = InputManager::GetInstance().GetMouseState();
+
+		if ((mouseState.rgbButtons[1] & 0x80) != 0)
+		{
+			if (mouseState.lX)
+				m_Camera->RotateY(mouseState.lX * rotateScale);
+
+			if (mouseState.lY)
+				m_Camera->Pitch(mouseState.lY * rotateScale);
+		}
+
+		m_Camera->Update();
 	}
 
 	void RenderEngine::RecordImGuiCommands()
@@ -119,7 +153,13 @@ namespace AsyncComputeTessellation
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 
-		ImGui::ShowDemoWindow();
+		static int counter = 0;
+		ImGui::Begin("App parameters | TEST");
+		ImGui::Text("Test application parameters.");
+
+		m_AdaptiveTessellation->UpdateParams(m_SwapChain->GetWidth(), m_SwapChain->GetHeight());
+
+		ImGui::End();
 
 		ImGui::Render();
 		ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_Device->GetCommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT).GetCmdList());

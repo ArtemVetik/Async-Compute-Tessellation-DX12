@@ -1,10 +1,12 @@
 #pragma once
+
 #include <memory>
 
 #include "framework.h"
 #include "Window.h"
 #include "Timer.h"
 #include "Camera.h"
+#include "AdaptiveTessellation.h"
 
 #include "../Core/Graphics/SwapChain.h"
 #include "../Core/EduMath/SimpleMath.h"
@@ -29,7 +31,7 @@ namespace AsyncComputeTessellation
 		bool StartUp(const Window& mainWindow);
 
 		void Render();
-		void Update();
+		void Update(const Timer& timer);
 
 		void RecordImGuiCommands();
 		void PendingResize(UINT w, UINT h);
@@ -38,15 +40,17 @@ namespace AsyncComputeTessellation
 
 	private:
 		void InitImGui(const Window& mainWindow);
-
 		void Resize(UINT w, UINT h);
 
+	private:
 		static RenderEngine* m_Instance;
 
 		std::unique_ptr<RenderDeviceD3D12> m_Device;
 		std::unique_ptr<SwapChain> m_SwapChain;
 
 		std::unique_ptr<Camera> m_Camera;
+		std::unique_ptr<AdaptiveTessellation> m_AdaptiveTessellation;
+
 		DescriptorHeapAllocation m_ImGuiTex;
 
 		D3D12_VIEWPORT m_Viewport;

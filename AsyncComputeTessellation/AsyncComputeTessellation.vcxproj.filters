@@ -13,11 +13,17 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
-    <Filter Include="Shaders">
-      <UniqueIdentifier>{0389d840-f3d2-4db4-bb4d-6840509a589f}</UniqueIdentifier>
-    </Filter>
     <Filter Include="imgui">
       <UniqueIdentifier>{3e3e2a5c-86d5-47b8-b321-8830fd29ac4f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ShadersOld">
+      <UniqueIdentifier>{0389d840-f3d2-4db4-bb4d-6840509a589f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{c9b04566-f03c-4c5f-81e9-daccb1c0fabb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders\Tessellation">
+      <UniqueIdentifier>{3a322790-659e-4d61-8643-683af5d90d57}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -198,61 +204,61 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Noise.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="LoD.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Common.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="TessellationCopyDraw.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="TessellationUpdate.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="WireframePS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="DefaultVS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="DefaultShaderData.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="ComputeShaderData.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="ConstantBuffers.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="WireframeGS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="DefaultPS.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="Structs.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="LightingUtil.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="gpu_noise_lib.hlsl">
-      <Filter>Shaders</Filter>
+      <Filter>ShadersOld</Filter>
     </None>
     <None Include="LightPass.hlsl">
-      <Filter>Shaders</Filter>
+      <Filter>ShadersOld</Filter>
     </None>
     <None Include="RenderQuad.hlsl">
-      <Filter>Shaders</Filter>
+      <Filter>ShadersOld</Filter>
     </None>
     <None Include="MotionBlur.hlsl">
-      <Filter>Shaders</Filter>
+      <Filter>ShadersOld</Filter>
     </None>
     <None Include="BloomShader.hlsl">
+      <Filter>ShadersOld</Filter>
+    </None>
+    <None Include="Shaders\WireframePS.hlsl">
+      <Filter>Shaders\Tessellation</Filter>
+    </None>
+    <None Include="Shaders\WireframeGS.hlsl">
+      <Filter>Shaders\Tessellation</Filter>
+    </None>
+    <None Include="Shaders\TessellationUpdate.hlsl">
+      <Filter>Shaders\Tessellation</Filter>
+    </None>
+    <None Include="Shaders\TessellationCopyDraw.hlsl">
+      <Filter>Shaders\Tessellation</Filter>
+    </None>
+    <None Include="Shaders\Common.hlsl">
+      <Filter>Shaders\Tessellation</Filter>
+    </None>
+    <None Include="Shaders\ComputeShaderData.hlsl">
+      <Filter>Shaders\Tessellation</Filter>
+    </None>
+    <None Include="Shaders\ConstantBuffers.hlsl">
+      <Filter>Shaders\Tessellation</Filter>
+    </None>
+    <None Include="Shaders\DefaultPS.hlsl">
+      <Filter>Shaders\Tessellation</Filter>
+    </None>
+    <None Include="Shaders\DefaultShaderData.hlsl">
+      <Filter>Shaders\Tessellation</Filter>
+    </None>
+    <None Include="Shaders\DefaultVS.hlsl">
+      <Filter>Shaders\Tessellation</Filter>
+    </None>
+    <None Include="Shaders\LoD.hlsl">
+      <Filter>Shaders\Tessellation</Filter>
+    </None>
+    <None Include="Shaders\Noise.hlsl">
+      <Filter>Shaders\Tessellation</Filter>
+    </None>
+    <None Include="Shaders\Structs.hlsl">
+      <Filter>Shaders\Tessellation</Filter>
+    </None>
+    <None Include="Shaders\gpu_noise_lib.hlsl">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>
