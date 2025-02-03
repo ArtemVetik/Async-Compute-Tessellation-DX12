@@ -36,10 +36,14 @@ namespace AsyncComputeTessellation
 	{
 		auto& commandContext = m_Device->GetCommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT);
 
-		commandContext.SetRenderTargets(1, &(gBuffer->GetAccumBuffRTVView()), true, nullptr);
+		for (int i = 0; i < TessellationGBufferPass::GBufferCount; i++)
+			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(gBuffer->GetGBuffer(i),
+				D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_SwapChain->GetDepthStencilBuffer(),
+			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
+		commandContext.FlushResourceBarriers();
 
-		const float color[4] = { 0, 0, 0, 1 };
-		commandContext.GetCmdList()->ClearRenderTargetView(m_SwapChain->CurrentBackBufferView(), color, 0, nullptr);
+		commandContext.SetRenderTargets(1, &(gBuffer->GetAccumBuffRTVView()), true, nullptr);
 
 		commandContext.GetCmdList()->SetPipelineState(m_DeferredLightPass->GetD3D12PipelineState());
 		commandContext.GetCmdList()->SetGraphicsRootSignature(m_DeferredLightPass->GetD3D12RootSignature());
@@ -112,7 +116,7 @@ namespace AsyncComputeTessellation
 	{
 		auto& commandContext = m_Device->GetCommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT);
 
-		commandContext.SetRenderTargets(1, &(m_SwapChain->CurrentBackBufferView()), true, &(m_SwapChain->DepthStencilView()));
+		commandContext.SetRenderTargets(1, &(m_SwapChain->CurrentBackBufferView()), true, nullptr);
 
 		commandContext.GetCmdList()->SetPipelineState(m_ToneMappingPass->GetD3D12PipelineState());
 		commandContext.GetCmdList()->SetGraphicsRootSignature(m_ToneMappingPass->GetD3D12RootSignature());
@@ -121,9 +125,23 @@ namespace AsyncComputeTessellation
 		commandContext.GetCmdList()->IASetIndexBuffer(&(m_QuadIndexBuff->GetView()));
 		commandContext.GetCmdList()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(gBuffer->GetAccumBuffer(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+		commandContext.FlushResourceBarriers();
+
 		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(0, gBuffer->GetAccumBuffSRVView());
 
 		commandContext.GetCmdList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
+
+		for (int i = 0; i < TessellationGBufferPass::GBufferCount; i++)
+			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(gBuffer->GetGBuffer(i),
+				D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
+		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(gBuffer->GetAccumBuffer(),
+			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
+		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_SwapChain->GetDepthStencilBuffer(),
+			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
+
+		commandContext.FlushResourceBarriers(); // TODO: maybe it's not necessary?
 	}
 
 	void DeferredLightRendering::RednerImGui()

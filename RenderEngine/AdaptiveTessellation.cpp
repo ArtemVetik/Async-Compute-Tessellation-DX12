@@ -66,9 +66,9 @@ namespace AsyncComputeTessellation
 
 			commandList->Dispatch(10000, 1, 1); // TODO: figure out how many threads group to run
 
-			commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(m_SubdBufferIn->GetD3D12Resource())); // TODO: are these lines necessary?
-			commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(m_SubdBufferOut->GetD3D12Resource()));
-			commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::UAV(subdCulledBuffIdx == 0 ? m_SubdBufferOutCulled0->GetD3D12Resource() : m_SubdBufferOutCulled1->GetD3D12Resource()));
+			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::UAV(m_SubdCounter->GetD3D12Resource()));
+			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::UAV(subdCulledBuffIdx == 1 ? m_SubdBufferOutCulled1->GetD3D12Resource() : m_SubdBufferOutCulled0->GetD3D12Resource()));
+			commandContext.FlushResourceBarriers();
 
 			commandList->SetPipelineState(m_ComputePass->GetCopyDrawPSO());
 			commandList->SetComputeRootSignature(m_ComputePass->GetD3D12RootSignature());

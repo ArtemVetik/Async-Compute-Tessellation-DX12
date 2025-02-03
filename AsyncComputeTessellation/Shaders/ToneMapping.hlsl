@@ -30,7 +30,7 @@ VertexOut VS(VertexIn vIn)
 
 [earlydepthstencil]
 float4 PS(VertexOut pIn) : SV_TARGET
-{
+{   
     float4 hdrColor = gAccumTexture.Sample(gsamPointWrap, pIn.TexC);
     
     float gamma = 2.2;
