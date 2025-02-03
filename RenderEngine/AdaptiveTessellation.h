@@ -4,6 +4,8 @@
 #include "RenderPasses.h"
 #include "TessellationMesh.h"
 #include "TessellationUI.h"
+#include "../Core/Graphics/GBuffer.h"
+#include "../Core/Graphics/SwapChain.h"
 
 namespace AsyncComputeTessellation
 {
@@ -23,10 +25,12 @@ namespace AsyncComputeTessellation
 	class AdaptiveTessellation
 	{
 	public:
-		AdaptiveTessellation(RenderDeviceD3D12* device, const Camera* camera);
+		AdaptiveTessellation(RenderDeviceD3D12* device, SwapChain* swapChain, const Camera* camera);
 
 		void Compute(const Timer& timer);
-		void UpdateParams(UINT screenWidth, UINT screenHeight);
+		void RenderImGui();
+
+		GBuffer* GetGBuffer() const { return m_GBuffer.get(); }
 
 		friend class TessellationUI;
 
@@ -39,12 +43,14 @@ namespace AsyncComputeTessellation
 
 	private:
 		RenderDeviceD3D12* m_Device;
+		SwapChain* m_SwapChain;
 		const Camera* m_Camera;
 		TessellationUI m_UI;
 		TessellationMesh m_Mesh;
 
 		std::unique_ptr<TessellationComputePass> m_ComputePass;
-		std::unique_ptr<TessellationDrawPass> m_DrawPass;
+		std::unique_ptr<TessellationGBufferPass> m_DrawPass;
+		std::unique_ptr<GBuffer> m_GBuffer;
 
 		std::unique_ptr<VertexBufferD3D12> m_LeafMeshVertex;
 		std::unique_ptr<IndexBufferD3D12> m_LeafMeshIndex;

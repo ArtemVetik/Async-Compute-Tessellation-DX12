@@ -11,7 +11,7 @@ namespace AsyncComputeTessellation
 	public:
 		TessellationUI(AdaptiveTessellation* parent);
 
-		void DrawUI(UINT screenWidth, UINT screenHeight);
+		void DrawUI();
 
 	private:
 		AdaptiveTessellation* m_Parent;

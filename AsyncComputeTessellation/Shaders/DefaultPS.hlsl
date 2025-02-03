@@ -4,7 +4,7 @@
 #include "ConstantBuffers.hlsl"
 #include "Noise.hlsl"
 
-float4 main(VertexOut pin) : SV_Target
+ps_output main(VertexOut pin) : SV_Target
 {
     ps_output output;
     
@@ -27,5 +27,5 @@ float4 main(VertexOut pin) : SV_Target
     output.albedo = 1;
     output.normal = float4(pin.NormalW, shadowFactor[0]);
     
-    return float4(pin.TexC, 0, 1);
+    return output;
 }

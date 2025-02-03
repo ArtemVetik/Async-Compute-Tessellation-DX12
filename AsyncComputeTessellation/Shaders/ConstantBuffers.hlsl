@@ -4,6 +4,7 @@
 cbuffer objectData : register(b0)
 {
     matrix gWorld;
+    matrix gTexTransform;
 };
 
 cbuffer tessellationData : register(b1)

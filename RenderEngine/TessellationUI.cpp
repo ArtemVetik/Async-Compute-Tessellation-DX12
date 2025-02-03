@@ -10,7 +10,7 @@ namespace AsyncComputeTessellation
 	{
 	}
 
-	void TessellationUI::DrawUI(UINT screenWidth, UINT screenHeight)
+	void TessellationUI::DrawUI()
 	{
 		bool resetBuffers = false;
 		bool buildPso = false;
@@ -89,7 +89,7 @@ namespace AsyncComputeTessellation
 			ImGui::Checkbox("Freeze", &m_Parent->m_Freeze);
 		}
 
-		auto screenRes = std::max(screenWidth, screenHeight);
+		auto screenRes = std::max(m_Parent->m_SwapChain->GetWidth(), m_Parent->m_SwapChain->GetHeight());
 		if (screenRes != m_Parent->m_Params.CB.ScreenRes)
 		{
 			m_Parent->m_Params.CB.ScreenRes = screenRes;

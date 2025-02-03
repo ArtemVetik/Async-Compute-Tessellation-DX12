@@ -147,7 +147,7 @@
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>assimp-vc143-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>
       </AdditionalLibraryDirectories>
     </Link>
@@ -155,6 +155,7 @@
   <ItemGroup>
     <ClInclude Include="AdaptiveTessellation.h" />
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="DeferredLightRendering.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="GeometryGenerator.h" />
     <ClInclude Include="imgui\imconfig.h" />
@@ -177,6 +178,7 @@
   <ItemGroup>
     <ClCompile Include="AdaptiveTessellation.cpp" />
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="DeferredLightRendering.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="GeometryGenerator.cpp" />
     <ClCompile Include="imgui\imgui.cpp" />

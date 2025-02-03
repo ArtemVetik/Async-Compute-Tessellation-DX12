@@ -14,6 +14,7 @@ SamplerComparisonState gsamShadow : register(s6);
 StructuredBuffer<Vertex> MeshDataVertex : register(t0);
 StructuredBuffer<uint> MeshDataIndex : register(t1);
 StructuredBuffer<uint4> SubdBufferOut : register(t2);
+Texture2D gDiffuseMap : register(t3);
 
 struct VertexIn
 {

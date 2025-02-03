@@ -6,8 +6,9 @@
 
 namespace AsyncComputeTessellation
 {
-	AdaptiveTessellation::AdaptiveTessellation(RenderDeviceD3D12* device, const Camera* camera) :
+	AdaptiveTessellation::AdaptiveTessellation(RenderDeviceD3D12* device, SwapChain* swapChain, const Camera* camera) :
 		m_Device(device),
+		m_SwapChain(swapChain),
 		m_Camera(camera),
 		m_UI(this),
 		m_Mesh(device),
@@ -74,7 +75,20 @@ namespace AsyncComputeTessellation
 			commandList->Dispatch(1, 1, 1);
 		}
 
+
 		subdCulledBuffIdx = 1;
+
+
+		D3D12_CPU_DESCRIPTOR_HANDLE gBuffViews[TessellationGBufferPass::GBufferCount];
+		for (int i = 0; i < TessellationGBufferPass::GBufferCount; i++)
+			gBuffViews[i] = m_GBuffer->GetGBufferRTVView(i);
+
+		commandContext.SetRenderTargets(TessellationGBufferPass::GBufferCount, gBuffViews, false, &(m_SwapChain->DepthStencilView()));
+
+		commandContext.GetCmdList()->ClearDepthStencilView(m_SwapChain->DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+
+		for (int i = 0; i < TessellationGBufferPass::GBufferCount; i++)
+			commandContext.GetCmdList()->ClearRenderTargetView(m_GBuffer->GetGBufferRTVView(i), DirectX::Colors::Black, 0, nullptr);
 
 		commandList->SetPipelineState(m_DrawPass->GetD3D12PipelineState());
 		commandList->SetGraphicsRootSignature(m_DrawPass->GetD3D12RootSignature());
@@ -84,9 +98,9 @@ namespace AsyncComputeTessellation
 		commandList->SetGraphicsRootDescriptorTable(1, m_Mesh.GetIndexSRVGpu());
 		commandList->SetGraphicsRootDescriptorTable(2, subdCulledBuffIdx == 0 ? m_SubdBufferOutCulled1->GetSRVView()->GetGpuHandle() : m_SubdBufferOutCulled0->GetSRVView()->GetGpuHandle());
 
-		commandList->SetGraphicsRootConstantBufferView(3, objBuffer.GetAllocation().GPUAddress);
-		commandList->SetGraphicsRootConstantBufferView(4, m_TessellationData->GetD3D12Resource()->GetGPUVirtualAddress());
-		commandList->SetGraphicsRootConstantBufferView(5, frameBuffer.GetAllocation().GPUAddress);
+		commandList->SetGraphicsRootConstantBufferView(4, objBuffer.GetAllocation().GPUAddress);
+		commandList->SetGraphicsRootConstantBufferView(5, m_TessellationData->GetD3D12Resource()->GetGPUVirtualAddress());
+		commandList->SetGraphicsRootConstantBufferView(6, frameBuffer.GetAllocation().GPUAddress);
 
 		commandList->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(subdCulledBuffIdx == 0 ?
 			m_DrawArgs1->GetD3D12Resource() : m_DrawArgs0->GetD3D12Resource(),
@@ -107,9 +121,9 @@ namespace AsyncComputeTessellation
 		m_PingPongCounter = 1 - m_PingPongCounter;
 	}
 
-	void AdaptiveTessellation::UpdateParams(UINT screenWidth, UINT screenHeight)
+	void AdaptiveTessellation::RenderImGui()
 	{
-		m_UI.DrawUI(screenWidth, screenHeight);
+		m_UI.DrawUI();
 	}
 
 	void AdaptiveTessellation::BuildPSO()
@@ -122,8 +136,11 @@ namespace AsyncComputeTessellation
 			{NULL, NULL}
 		};
 
+		m_GBuffer = std::make_unique<GBuffer>(TessellationGBufferPass::GBufferCount, TessellationGBufferPass::RtvFormats, DeferredLightPass::AccumBuffFormat);
 		m_ComputePass = std::make_unique<TessellationComputePass>(m_Device, QueueID::Direct, macros);
-		m_DrawPass = std::make_unique<TessellationDrawPass>(m_Device, QueueID::Direct, m_Params.WireframeMode, macros);
+		m_DrawPass = std::make_unique<TessellationGBufferPass>(m_Device, QueueID::Direct, m_Params.WireframeMode, macros);
+
+		m_GBuffer->Resize(m_Device, m_SwapChain->GetWidth(), m_SwapChain->GetHeight());
 	}
 
 	void AdaptiveTessellation::InitBuffers()

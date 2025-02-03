@@ -7,6 +7,7 @@
 #include "Timer.h"
 #include "Camera.h"
 #include "AdaptiveTessellation.h"
+#include "DeferredLightRendering.h"
 
 #include "../Core/Graphics/SwapChain.h"
 #include "../Core/EduMath/SimpleMath.h"
@@ -50,6 +51,7 @@ namespace AsyncComputeTessellation
 
 		std::unique_ptr<Camera> m_Camera;
 		std::unique_ptr<AdaptiveTessellation> m_AdaptiveTessellation;
+		std::unique_ptr<DeferredLightRendering> m_DeferredLightRendering;
 
 		DescriptorHeapAllocation m_ImGuiTex;
 

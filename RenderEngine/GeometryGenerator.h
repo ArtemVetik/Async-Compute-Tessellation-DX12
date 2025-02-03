@@ -35,6 +35,18 @@ namespace AsyncComputeTessellation
 				return mIndices16;
 			}
 
+			std::vector<VertexPT>& GetVerticesPT()
+			{
+				if (mVerticesPT.empty())
+				{
+					mVerticesPT.resize(Vertices.size());
+					for (size_t i = 0; i < Vertices.size(); ++i)
+						mVerticesPT[i] = VertexPT(Vertices[i].Position, Vertices[i].TexC);
+				}
+
+				return mVerticesPT;
+			}
+
 			float GetAvgEdgeLength() const { return mAvgEdgeLength; }
 
 			void InitAvgEdgeLength()
@@ -53,6 +65,7 @@ namespace AsyncComputeTessellation
 
 		private:
 			std::vector<uint16> mIndices16;
+			std::vector<VertexPT> mVerticesPT;
 			float mAvgEdgeLength;
 		};
 

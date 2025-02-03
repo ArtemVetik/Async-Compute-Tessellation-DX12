@@ -58,10 +58,9 @@ namespace AsyncComputeTessellation
 		m_Device->GetCommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT).Reset();
 
 		m_ImGuiTex = m_Device->AllocateGPUDescriptor(QueueID::Direct, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
-
 		InitImGui(mainWindow);
-
-		m_AdaptiveTessellation = std::make_unique<AdaptiveTessellation>(m_Device.get(), m_Camera.get());
+		m_AdaptiveTessellation = std::make_unique<AdaptiveTessellation>(m_Device.get(), m_SwapChain.get(), m_Camera.get());
+		m_DeferredLightRendering = std::make_unique<DeferredLightRendering>(m_Device.get(), m_SwapChain.get());
 
 		return true;
 	}
@@ -79,12 +78,12 @@ namespace AsyncComputeTessellation
 		dCommandContext.GetCmdList()->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 		dCommandContext.SetViewports(&m_Viewport, 1);
 		dCommandContext.SetScissorRects(&m_ScissorRect, 1);
-		dCommandContext.SetRenderTargets(1, &(m_SwapChain->CurrentBackBufferView()), true, &(m_SwapChain->DepthStencilView()));
-		const float color[4] = { 0, 0, 0, 1 };
-		dCommandContext.GetCmdList()->ClearDepthStencilView(m_SwapChain->DepthStencilView(), D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
-		dCommandContext.GetCmdList()->ClearRenderTargetView(m_SwapChain->CurrentBackBufferView(), color, 0, nullptr);
 
 		m_AdaptiveTessellation->Compute(m_Timer);
+		m_DeferredLightRendering->RenderLights(m_Camera.get(), m_AdaptiveTessellation->GetGBuffer());
+		m_DeferredLightRendering->RenderToneMapping(m_Camera.get(), m_AdaptiveTessellation->GetGBuffer());
+
+		dCommandContext.SetRenderTargets(1, &(m_SwapChain->CurrentBackBufferView()), true, &(m_SwapChain->DepthStencilView()));
 
 		auto& directCommandQueue = m_Device->GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
 
@@ -157,7 +156,8 @@ namespace AsyncComputeTessellation
 		ImGui::Begin("App parameters | TEST");
 		ImGui::Text("Test application parameters.");
 
-		m_AdaptiveTessellation->UpdateParams(m_SwapChain->GetWidth(), m_SwapChain->GetHeight());
+		m_AdaptiveTessellation->RenderImGui();
+		m_DeferredLightRendering->RednerImGui();
 
 		ImGui::End();
 
@@ -200,6 +200,9 @@ namespace AsyncComputeTessellation
 
 		commandContext.Reset();
 		m_SwapChain->Resize(w, h);
+
+		if (m_AdaptiveTessellation)
+			m_AdaptiveTessellation->GetGBuffer()->Resize(m_Device.get(), w, h);
 
 		commandContext.FlushResourceBarriers();
 		commandQueue.CloseAndExecuteCommandContext(&commandContext);

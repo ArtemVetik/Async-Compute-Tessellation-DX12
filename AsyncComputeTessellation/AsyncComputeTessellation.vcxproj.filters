@@ -261,5 +261,14 @@
     <None Include="Shaders\gpu_noise_lib.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="Shaders\DeferredLightPass.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\LightingUtil.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\ToneMapping.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
