@@ -124,7 +124,7 @@
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
       <EnableUAC>false</EnableUAC>
-      <AdditionalDependencies>assimp-vc143-mtd.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <AdditionalDependencies>assimp-vc143-mt.lib;%(AdditionalDependencies)</AdditionalDependencies>
       <AdditionalLibraryDirectories>
       </AdditionalLibraryDirectories>
     </Link>
@@ -208,6 +208,9 @@
       <Project>{32ac94c6-ef33-4add-92f9-41270d16e447}</Project>
     </ProjectReference>
   </ItemGroup>
+  <Target Name="CopyDll" AfterTargets="Build">
+    <Copy SourceFiles="$(SolutionDir)Libraries\lib\assimp-vc143-mt.dll" DestinationFolder="$(OutDir)" />
+  </Target>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

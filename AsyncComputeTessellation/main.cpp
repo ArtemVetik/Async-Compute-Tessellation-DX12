@@ -1,6 +1,5 @@
 #include <Windows.h>
 #include <crtdbg.h>
-#include "d3dUtil.h"
 //#include "Game.h"
 #include "../RenderEngine/RenderEngine.h"
 #include "../Core/InputSystem/InputManager.h"
