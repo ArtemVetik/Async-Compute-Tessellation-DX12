@@ -219,8 +219,10 @@ namespace AsyncComputeTessellation
 			DirectX::XMFLOAT4 AmbientLight = { 0.25f, 0.25f, 0.35f, 1.0f };
 			DirectX::XMFLOAT4X4 CascadeTransform[4];
 			float CascadeDistance[4] = { FLT_MAX, FLT_MAX, FLT_MAX, FLT_MAX };
+		};
 
-			// TODO: move to other cb (DEFAULT heap)
+		struct MaterialConstants
+		{
 			XMFLOAT4 DiffuseAlbedo = { 1.0f, 1.0f, 1.0f, 1.0f };
 			XMFLOAT3 FresnelR0 = { 0.01f, 0.01f, 0.01f };
 			float Roughness = 0.25f;
@@ -260,6 +262,7 @@ namespace AsyncComputeTessellation
 			m_RootSignature.AddDescriptorParameter(1, &shadowMap); // shadow map
 
 			m_RootSignature.AddConstantBufferView(0); // pass constants
+			m_RootSignature.AddConstantBufferView(1); // material constants
 
 			m_RootSignature.Build(device, QueueID::Direct);
 

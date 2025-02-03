@@ -31,11 +31,14 @@ cbuffer cbPass : register(b0)
     float4 gAmbientLight;
     float4x4 gCascadeTransform[MAX_CASCADES];
     float4 gCascadeDistance;
-    
+};
+
+cbuffer materialPass : register(b1)
+{
     float4 gDiffuseAlbedo;
     float3 gFresnelR0;
     float gRoughness;
-};
+}
 
 struct VertexIn
 {

@@ -10,7 +10,8 @@ namespace AsyncComputeTessellation
 {
 	DeferredLightRendering::DeferredLightRendering(RenderDeviceD3D12* device, const SwapChain* swapChain) :
 		m_Device(device),
-		m_SwapChain(swapChain)
+		m_SwapChain(swapChain),
+		m_MaterialData{}
 	{
 		m_DeferredLightPass = std::make_unique<DeferredLightPass>(m_Device);
 		m_ToneMappingPass = std::make_unique<ToneMappingPass>(m_Device);
@@ -23,13 +24,8 @@ namespace AsyncComputeTessellation
 		m_QuadIndexBuff = std::make_unique<IndexBufferD3D12>(m_Device, quad.GetIndices16().data(),
 			sizeof(uint16_t), (UINT)quad.GetIndices16().size(), DXGI_FORMAT_R16_UINT);
 
-		auto light0 = std::make_shared<Light>();
-		light0->LightType = Light::Type::Directional;
-		light0->Strength = { 1.0f, 1.0f, 1.0f };
-		light0->Position = { 50.0f, 50.0f, 0.0f };
-		light0->FalloffEnd = 50.0f;
-
-		m_Lights.emplace_back(light0);
+		InitMaterialBuffer();
+		AddDefaultLight();
 	}
 
 	void DeferredLightRendering::RenderLights(const Camera* camera, const GBuffer* gBuffer)
@@ -67,8 +63,6 @@ namespace AsyncComputeTessellation
 		lightPassConstants.EyePosW = camera->GetPosition();
 		lightPassConstants.ClearColor = { 0, 0, 0, 1 };
 		lightPassConstants.AmbientLight = { 1, 1, 1, 1 };
-		lightPassConstants.FresnelR0 = { 0.01f, 0.01f, 0.01f };
-		lightPassConstants.Roughness = 0.25f;
 
 		for (size_t i = 0; i < m_Lights.size(); i++)
 		{
@@ -108,6 +102,7 @@ namespace AsyncComputeTessellation
 		}
 
 		commandContext.GetCmdList()->SetGraphicsRootConstantBufferView(5, lightPassUploadBuffer.GetAllocation().GPUAddress);
+		commandContext.GetCmdList()->SetGraphicsRootConstantBufferView(6, m_MaterialBuffer->GetD3D12Resource()->GetGPUVirtualAddress());
 
 		commandContext.GetCmdList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
 	}
@@ -144,29 +139,34 @@ namespace AsyncComputeTessellation
 		commandContext.FlushResourceBarriers(); // TODO: maybe it's not necessary?
 	}
 
-	void DeferredLightRendering::RednerImGui()
+	void DeferredLightRendering::RednerImGui(const Timer& timer)
 	{
-		static bool showLight = false;
+		static bool showLightMenu = false;
+		static float rotateLightsSpeed = 0.0f;
 
 		if (ImGui::CollapsingHeader("Light parameters"))
-			ImGui::Checkbox("Show Settings", &showLight);
+		{
+			ImGui::Checkbox("Show Light Settings", &showLightMenu);
+			ImGui::InputFloat("Rotate Speed", &rotateLightsSpeed);
+			ImGui::Spacing();
+			ImGui::Separator();
+			ImGui::Spacing();
 
-		if (!showLight)
+			if (ImGui::ColorEdit4("Diffuse Albedo", reinterpret_cast<float*>(&m_MaterialData.DiffuseAlbedo)))
+				InitMaterialBuffer();
+			if (ImGui::SliderFloat3("Fresnel R0", reinterpret_cast<float*>(&m_MaterialData.FresnelR0), 0.02f, 0.999f))
+				InitMaterialBuffer();
+			if (ImGui::SliderFloat("Roughness", &m_MaterialData.Roughness, 0.0f, 0.999f))
+				InitMaterialBuffer();
+		}
+
+		if (!showLightMenu)
 			return;
 
 		ImGui::Begin("Lights Settings");
 
 		if (ImGui::Button("Add Light"))
-		{
-			auto light = std::make_shared<Light>();
-			light->LightType = Light::Type::Directional;
-			light->Strength = { 0.8f, 0.8f, 0.8f };
-			light->Position = { 0.0f, 50.0f, 0.0f };
-			light->Direction = { 0.0f, -1.0f, 0.0f };
-			light->FalloffEnd = 50.0f;
-
-			m_Lights.emplace_back(light);
-		}
+			AddDefaultLight();
 
 		for (size_t i = 0; i < m_Lights.size(); i++)
 		{
@@ -180,7 +180,6 @@ namespace AsyncComputeTessellation
 			if (radius > 0.0f)
 			{
 				theta = acosf(y / radius);
-
 				phi = atan2f(z, x);
 			}
 			else
@@ -191,15 +190,21 @@ namespace AsyncComputeTessellation
 
 			bool update = false;
 
+			if (rotateLightsSpeed)
+			{
+				phi += rotateLightsSpeed * timer.GetDeltaTime();
+				update = true;
+			}
+
 			ImGui::Text("Light: %d\n", i);
 			ImGui::Text("Position: (%f %f %f)", x, y, z);
 			ImGui::Text("Direction: (%f %f %f)", m_Lights[i]->Direction.x, m_Lights[i]->Direction.y, m_Lights[i]->Direction.z);
-			
+
 			if (ImGui::SliderFloat((std::string("Radius##") + std::to_string(i)).c_str(), &radius, 0.1f, 300.0f))
 				update = true;
 			if (ImGui::SliderFloat((std::string("Theta##") + std::to_string(i)).c_str(), &theta, 0.0f, XM_PIDIV2))
 				update = true;
-			if (ImGui::SliderFloat((std::string("Phi##") + std::to_string(i)).c_str(), &phi, 0.0f, XM_2PI))
+			if (ImGui::SliderFloat((std::string("Phi##") + std::to_string(i)).c_str(), &phi, -XM_PI, XM_PI))
 				update = true;
 
 			auto lightType = m_Lights[i]->LightType;
@@ -244,5 +249,27 @@ namespace AsyncComputeTessellation
 		}
 
 		ImGui::End();
+	}
+
+	void DeferredLightRendering::AddDefaultLight()
+	{
+		auto light = std::make_shared<Light>();
+		light->LightType = Light::Type::Directional;
+		light->Strength = { 1.0f, 1.0f, 1.0f };
+		light->Position = { 50.0f, 50.0f, 0.0f };
+		light->Direction = { -0.707f, -0.707f, 0.0f };
+		light->FalloffEnd = 50.0f;
+
+		m_Lights.emplace_back(light);
+	}
+
+	void DeferredLightRendering::InitMaterialBuffer()
+	{
+		m_MaterialBuffer = std::make_unique<BufferD3D12>(
+			m_Device,
+			CD3DX12_RESOURCE_DESC::Buffer(sizeof(DeferredLightPass::MaterialConstants)),
+			&m_MaterialData,
+			QueueID::Direct
+		);
 	}
 }

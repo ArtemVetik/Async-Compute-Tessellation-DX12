@@ -157,7 +157,7 @@ namespace AsyncComputeTessellation
 		ImGui::Text("Test application parameters.");
 
 		m_AdaptiveTessellation->RenderImGui();
-		m_DeferredLightRendering->RednerImGui();
+		m_DeferredLightRendering->RednerImGui(m_Timer);
 
 		ImGui::End();
 

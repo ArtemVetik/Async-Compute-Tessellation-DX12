@@ -4,6 +4,7 @@
 
 #include "RenderPasses.h"
 #include "Camera.h"
+#include "Timer.h"
 
 #include "../Core/Graphics/GBuffer.h"
 #include "../Core/Graphics/BufferD3D12.h"
@@ -41,7 +42,11 @@ namespace AsyncComputeTessellation
 		void RenderLights(const Camera* camera, const GBuffer* gBuffer);
 		void RenderToneMapping(const Camera* camera, const GBuffer* gBuffer);
 
-		void RednerImGui();
+		void RednerImGui(const Timer& timer);
+
+	private:
+		void AddDefaultLight();
+		void InitMaterialBuffer();
 
 	private:
 		RenderDeviceD3D12* m_Device;
@@ -52,7 +57,9 @@ namespace AsyncComputeTessellation
 
 		std::unique_ptr<IndexBufferD3D12> m_QuadIndexBuff;
 		std::unique_ptr<VertexBufferD3D12> m_QuadVertexBuff;
+		std::unique_ptr<BufferD3D12> m_MaterialBuffer;
 
 		std::vector<std::shared_ptr<Light>> m_Lights;
+		DeferredLightPass::MaterialConstants m_MaterialData;
 	};
 }
