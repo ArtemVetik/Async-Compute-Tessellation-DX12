@@ -1,36 +1,29 @@
 #pragma once
+
 #include "Camera.h"
 #include "Timer.h"
 #include "RenderPasses.h"
 #include "TessellationMesh.h"
 #include "TessellationUI.h"
+#include "TessellationPSOData.h"
+
 #include "../Core/Graphics/GBuffer.h"
 #include "../Core/Graphics/SwapChain.h"
 
 namespace AsyncComputeTessellation
 {
-	struct TessellationParams
-	{
-		MeshMode MeshMode = MeshMode::TERRAIN;
-		bool WireframeMode = true;
-		bool FlatNormals = false;
-		int CPULodLevel = 0;
-		bool Uniform = false;
-		float TargetLength = 25;
-		bool UseDisplaceMapping = true;
-
-		TessellationComputePass::TessellationData CB;
-	};
-
-	class AdaptiveTessellation
+	class AdaptiveTessellationCompute
 	{
 	public:
-		AdaptiveTessellation(RenderDeviceD3D12* device, SwapChain* swapChain, const Camera* camera);
+		AdaptiveTessellationCompute(RenderDeviceD3D12*   device,
+							 SwapChain*		      swapChain,
+							 const Camera*		  camera,
+							 TessellationPSOData* psoData);
 
 		void Compute(const Timer& timer);
 		void RenderImGui();
 
-		GBuffer* GetGBuffer() const { return m_GBuffer.get(); }
+		void ExecuteIndirect() const;
 
 		friend class TessellationUI;
 
@@ -45,12 +38,11 @@ namespace AsyncComputeTessellation
 		RenderDeviceD3D12* m_Device;
 		SwapChain* m_SwapChain;
 		const Camera* m_Camera;
+
 		TessellationUI m_UI;
 		TessellationMesh m_Mesh;
 
-		std::unique_ptr<TessellationComputePass> m_ComputePass;
-		std::unique_ptr<TessellationGBufferPass> m_DrawPass;
-		std::unique_ptr<GBuffer> m_GBuffer;
+		TessellationPSOData* m_PsoData;
 
 		std::unique_ptr<VertexBufferD3D12> m_LeafMeshVertex;
 		std::unique_ptr<IndexBufferD3D12> m_LeafMeshIndex;
@@ -67,6 +59,5 @@ namespace AsyncComputeTessellation
 		int m_PingPongCounter;
 		
 		TessellationParams m_Params;
-		bool m_Freeze;
 	};
 }

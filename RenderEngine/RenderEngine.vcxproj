@@ -153,8 +153,10 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="AdaptiveTessellation.h" />
+    <ClInclude Include="AdaptiveTessellationCompute.h" />
+    <ClInclude Include="AdaptiveTessellationDraw.h" />
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="CSMRendering.h" />
     <ClInclude Include="DeferredLightRendering.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="GeometryGenerator.h" />
@@ -170,14 +172,17 @@
     <ClInclude Include="RenderEngine.h" />
     <ClInclude Include="RenderPasses.h" />
     <ClInclude Include="TessellationMesh.h" />
+    <ClInclude Include="TessellationPSOData.h" />
     <ClInclude Include="TessellationUI.h" />
     <ClInclude Include="Timer.h" />
     <ClInclude Include="Vertex.h" />
     <ClInclude Include="Window.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="AdaptiveTessellation.cpp" />
+    <ClCompile Include="AdaptiveTessellationCompute.cpp" />
+    <ClCompile Include="AdaptiveTessellationDraw.cpp" />
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="CSMRendering.cpp" />
     <ClCompile Include="DeferredLightRendering.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="GeometryGenerator.cpp" />

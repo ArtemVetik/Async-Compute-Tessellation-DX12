@@ -1,11 +1,11 @@
 #include "TessellationUI.h"
-#include "AdaptiveTessellation.h"
+#include "AdaptiveTessellationCompute.h"
 
 #include "imgui/imgui.h"
 
 namespace AsyncComputeTessellation
 {
-	TessellationUI::TessellationUI(AdaptiveTessellation* parent) :
+	TessellationUI::TessellationUI(AdaptiveTessellationCompute* parent) :
 		m_Parent(parent)
 	{
 	}
@@ -86,7 +86,7 @@ namespace AsyncComputeTessellation
 			}
 
 			ImGui::SeparatorText("Compute Settings");
-			ImGui::Checkbox("Freeze", &m_Parent->m_Freeze);
+			ImGui::Checkbox("Freeze", &m_Parent->m_Params.Freeze);
 		}
 
 		auto screenRes = std::max(m_Parent->m_SwapChain->GetWidth(), m_Parent->m_SwapChain->GetHeight());

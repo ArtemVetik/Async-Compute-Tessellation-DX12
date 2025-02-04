@@ -5,6 +5,7 @@
 #include "RenderPasses.h"
 #include "Camera.h"
 #include "Timer.h"
+#include "CSMRendering.h"
 
 #include "../Core/Graphics/GBuffer.h"
 #include "../Core/Graphics/BufferD3D12.h"
@@ -39,10 +40,13 @@ namespace AsyncComputeTessellation
 	public:
 		DeferredLightRendering(RenderDeviceD3D12* device, const SwapChain* spawChain);
 
-		void RenderLights(const Camera* camera, const GBuffer* gBuffer);
-		void RenderToneMapping(const Camera* camera, const GBuffer* gBuffer);
+		void RenderLights(const Camera* camera, const CSMRendering* csmRendering);
+		void RenderToneMapping(const Camera* camera);
 
 		void RednerImGui(const Timer& timer);
+
+		Light* GetShadowLight() const;
+		GBuffer* GetGBuffer() const { return m_GBuffer.get(); }
 
 	private:
 		void AddDefaultLight();
@@ -52,6 +56,7 @@ namespace AsyncComputeTessellation
 		RenderDeviceD3D12* m_Device;
 		const SwapChain* m_SwapChain;
 
+		std::unique_ptr<GBuffer> m_GBuffer;
 		std::unique_ptr<DeferredLightPass> m_DeferredLightPass;
 		std::unique_ptr<ToneMappingPass> m_ToneMappingPass;
 

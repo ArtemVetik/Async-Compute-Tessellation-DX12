@@ -24,22 +24,25 @@ namespace AsyncComputeTessellation
 		m_QuadIndexBuff = std::make_unique<IndexBufferD3D12>(m_Device, quad.GetIndices16().data(),
 			sizeof(uint16_t), (UINT)quad.GetIndices16().size(), DXGI_FORMAT_R16_UINT);
 
+		m_GBuffer = std::make_unique<GBuffer>(TessellationGBufferPass::GBufferCount, TessellationGBufferPass::RtvFormats, DeferredLightPass::AccumBuffFormat);
+		m_GBuffer->Resize(m_Device, m_SwapChain->GetWidth(), m_SwapChain->GetHeight());
+
 		InitMaterialBuffer();
 		AddDefaultLight();
 	}
 
-	void DeferredLightRendering::RenderLights(const Camera* camera, const GBuffer* gBuffer)
+	void DeferredLightRendering::RenderLights(const Camera* camera, const CSMRendering* csmRendering)
 	{
 		auto& commandContext = m_Device->GetCommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT);
 
 		for (int i = 0; i < TessellationGBufferPass::GBufferCount; i++)
-			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(gBuffer->GetGBuffer(i),
+			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_GBuffer->GetGBuffer(i),
 				D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_SwapChain->GetDepthStencilBuffer(),
 			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
 		commandContext.FlushResourceBarriers();
 
-		commandContext.SetRenderTargets(1, &(gBuffer->GetAccumBuffRTVView()), true, nullptr);
+		commandContext.SetRenderTargets(1, &(m_GBuffer->GetAccumBuffRTVView()), true, nullptr);
 
 		commandContext.GetCmdList()->SetPipelineState(m_DeferredLightPass->GetD3D12PipelineState());
 		commandContext.GetCmdList()->SetGraphicsRootSignature(m_DeferredLightPass->GetD3D12RootSignature());
@@ -48,8 +51,8 @@ namespace AsyncComputeTessellation
 		commandContext.GetCmdList()->IASetIndexBuffer(&(m_QuadIndexBuff->GetView()));
 		commandContext.GetCmdList()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(0, gBuffer->GetGBufferSRVView(0));
-		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(1, gBuffer->GetGBufferSRVView(1));
+		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(0, m_GBuffer->GetGBufferSRVView(0));
+		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(1, m_GBuffer->GetGBufferSRVView(1));
 		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(2, m_SwapChain->DepthStencilSRVView());
 
 		DeferredLightPass::PassConstants lightPassConstants = {};
@@ -73,7 +76,13 @@ namespace AsyncComputeTessellation
 			if (m_Lights[i]->LightType == Light::Type::Spotlight)
 				lightPassConstants.SpotLightsCount++;
 		}
-		lightPassConstants.CascadeCount = 1;
+		lightPassConstants.CascadeCount = csmRendering->GetCascadeCount();
+
+		for (int i = 0; i < csmRendering->GetCascadeCount(); i++)
+		{
+			XMStoreFloat4x4(lightPassConstants.CascadeTransform + i, XMMatrixTranspose(csmRendering->GetCascadeTransform(i)));
+			lightPassConstants.CascadeDistance[i] = csmRendering->GetCascadeDistance(i);
+		}
 
 		DynamicUploadBuffer lightPassUploadBuffer(m_Device, QueueID::Direct);
 		lightPassUploadBuffer.LoadData(lightPassConstants);
@@ -101,13 +110,18 @@ namespace AsyncComputeTessellation
 			commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(3, lightsUploadBuffer.GetSRVDescriptorGPUHandle());
 		}
 
+		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(4, csmRendering->GetGPUHandle());
 		commandContext.GetCmdList()->SetGraphicsRootConstantBufferView(5, lightPassUploadBuffer.GetAllocation().GPUAddress);
 		commandContext.GetCmdList()->SetGraphicsRootConstantBufferView(6, m_MaterialBuffer->GetD3D12Resource()->GetGPUVirtualAddress());
 
 		commandContext.GetCmdList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
+
+		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_GBuffer->GetAccumBuffer(),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+		commandContext.FlushResourceBarriers();
 	}
 
-	void DeferredLightRendering::RenderToneMapping(const Camera* camera, const GBuffer* gBuffer)
+	void DeferredLightRendering::RenderToneMapping(const Camera* camera)
 	{
 		auto& commandContext = m_Device->GetCommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT);
 
@@ -120,18 +134,14 @@ namespace AsyncComputeTessellation
 		commandContext.GetCmdList()->IASetIndexBuffer(&(m_QuadIndexBuff->GetView()));
 		commandContext.GetCmdList()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(gBuffer->GetAccumBuffer(),
-			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
-		commandContext.FlushResourceBarriers();
-
-		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(0, gBuffer->GetAccumBuffSRVView());
+		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(0, m_GBuffer->GetAccumBuffSRVView());
 
 		commandContext.GetCmdList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 		for (int i = 0; i < TessellationGBufferPass::GBufferCount; i++)
-			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(gBuffer->GetGBuffer(i),
+			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_GBuffer->GetGBuffer(i),
 				D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
-		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(gBuffer->GetAccumBuffer(),
+		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_GBuffer->GetAccumBuffer(),
 			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
 		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_SwapChain->GetDepthStencilBuffer(),
 			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
@@ -147,7 +157,6 @@ namespace AsyncComputeTessellation
 		if (ImGui::CollapsingHeader("Light parameters"))
 		{
 			ImGui::Checkbox("Show Light Settings", &showLightMenu);
-			ImGui::InputFloat("Rotate Speed", &rotateLightsSpeed);
 			ImGui::Spacing();
 			ImGui::Separator();
 			ImGui::Spacing();
@@ -164,6 +173,8 @@ namespace AsyncComputeTessellation
 			return;
 
 		ImGui::Begin("Lights Settings");
+
+		ImGui::InputFloat("Rotate Speed", &rotateLightsSpeed);
 
 		if (ImGui::Button("Add Light"))
 			AddDefaultLight();
@@ -249,6 +260,15 @@ namespace AsyncComputeTessellation
 		}
 
 		ImGui::End();
+	}
+
+	Light* DeferredLightRendering::GetShadowLight() const
+	{
+		for (size_t i = 0; i < m_Lights.size(); i++)
+			if (m_Lights[i]->LightType == Light::Directional)
+				return m_Lights[i].get();
+
+		return nullptr;
 	}
 
 	void DeferredLightRendering::AddDefaultLight()

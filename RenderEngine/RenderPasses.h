@@ -128,28 +128,13 @@ namespace AsyncComputeTessellation
 		ID3D12PipelineState* GetCopyDrawPSO() const { return m_CopyDrawPSO.GetD3D12PipelineState(); }
 	};
 
-	class TessellationGBufferPass
+	class TessellationDrawRootSignature
 	{
-	public:
-		static constexpr int GBufferCount = 2;
-		static constexpr DXGI_FORMAT RtvFormats[GBufferCount] =
-		{
-			DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
-			DXGI_FORMAT_R8G8B8A8_SNORM
-		};
-
 	private:
-		ShaderD3D12 m_VertexShader;
-		ShaderD3D12 m_GeometryShader;
-		ShaderD3D12 m_PixelShader;
 		RootSignatureD3D12 m_RootSignature;
-		PipelineStateD3D12 m_PSO;
 
 	public:
-		TessellationGBufferPass(RenderDeviceD3D12* device, QueueID queueId, bool wireframe, D3D_SHADER_MACRO* macros = nullptr) :
-			m_VertexShader(L"Shaders\\DefaultVS.hlsl", EDU_SHADER_TYPE_VERTEX, macros, "main", "vs_5_1"),
-			m_GeometryShader(L"Shaders\\WireframeGS.hlsl", EDU_SHADER_TYPE_GEOMETRY, macros, "main", "gs_5_1"),
-			m_PixelShader(wireframe ? L"Shaders\\WireframePS.hlsl" : L"Shaders\\DefaultPS.hlsl", EDU_SHADER_TYPE_PIXEL, macros, "main", "ps_5_1")
+		TessellationDrawRootSignature(RenderDeviceD3D12* device)
 		{
 			CD3DX12_DESCRIPTOR_RANGE meshDataVertex;
 			meshDataVertex.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
@@ -170,11 +155,79 @@ namespace AsyncComputeTessellation
 			m_RootSignature.AddConstantBufferView(0); // object data
 			m_RootSignature.AddConstantBufferView(1); // tessellation data
 			m_RootSignature.AddConstantBufferView(2); // per frame data
-			m_RootSignature.AddConstantBufferView(3); // material data
+			m_RootSignature.AddConstantBufferView(3); // shadow map frame data
 
-			m_RootSignature.Build(device, queueId);
+			m_RootSignature.Build(device, QueueID::Direct);
 			m_RootSignature.SetName(L"TessellationDrawRootSignature");
+		}
 
+		ID3D12RootSignature* GetD3D12RootSignature() const { return m_RootSignature.GetD3D12RootSignature(); }
+	};
+
+	class TessellationShadowMapPass
+	{
+	public:
+		struct PassConstants
+		{
+			XMFLOAT4X4 ViewProj;
+			XMFLOAT3 CamPosition;
+			float  DeltaTime;
+			float  TotalTime;
+			XMFLOAT3 Padding;
+		};
+
+	private:
+		ShaderD3D12 m_VertexShader;
+		PipelineStateD3D12 m_PSO;
+
+	public:
+		TessellationShadowMapPass(RenderDeviceD3D12* device, TessellationDrawRootSignature* rootSignature, D3D_SHADER_MACRO* macros = nullptr) :
+			m_VertexShader(L"Shaders\\DefaultVS.hlsl", EDU_SHADER_TYPE_VERTEX, macros, "main", "vs_5_1")
+		{
+			std::vector<D3D12_INPUT_ELEMENT_DESC> inputLayout =
+			{
+				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			};
+
+			auto rast = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+			rast.CullMode = D3D12_CULL_MODE_NONE; // TODO: use D3D12_CULL_MODE_FRONT (tessellation algorithm will need to be modified)
+			rast.DepthBias = 30000;
+			rast.DepthBiasClamp = 0.0f;
+			rast.SlopeScaledDepthBias = 1.0f;
+
+			m_PSO.SetInputLayout({ inputLayout.data(), (UINT)inputLayout.size() });
+			m_PSO.SetRootSignature(rootSignature->GetD3D12RootSignature());
+			m_PSO.SetRasterizerState(rast);
+			m_PSO.SetShader(&m_VertexShader);
+			m_PSO.Build(device);
+			m_PSO.SetName(L"ShadowMapPSO");
+		}
+
+		ID3D12PipelineState* GetD3D12PipelineState() const { return m_PSO.GetD3D12PipelineState(); }
+	};
+
+	class TessellationGBufferPass
+	{
+	public:
+		static constexpr int GBufferCount = 2;
+		static constexpr DXGI_FORMAT RtvFormats[GBufferCount] =
+		{
+			DXGI_FORMAT_R8G8B8A8_UNORM_SRGB,
+			DXGI_FORMAT_R8G8B8A8_SNORM
+		};
+
+	private:
+		ShaderD3D12 m_VertexShader;
+		ShaderD3D12 m_GeometryShader;
+		ShaderD3D12 m_PixelShader;
+		PipelineStateD3D12 m_PSO;
+
+	public:
+		TessellationGBufferPass(RenderDeviceD3D12* device, TessellationDrawRootSignature* rootSignature, bool wireframe, D3D_SHADER_MACRO* macros = nullptr) :
+			m_VertexShader(L"Shaders\\DefaultVS.hlsl", EDU_SHADER_TYPE_VERTEX, macros, "main", "vs_5_1"),
+			m_GeometryShader(L"Shaders\\WireframeGS.hlsl", EDU_SHADER_TYPE_GEOMETRY, macros, "main", "gs_5_1"),
+			m_PixelShader(wireframe ? L"Shaders\\WireframePS.hlsl" : L"Shaders\\DefaultPS.hlsl", EDU_SHADER_TYPE_PIXEL, macros, "main", "ps_5_1")
+		{
 			std::vector<D3D12_INPUT_ELEMENT_DESC> inputLayout =
 			{
 				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
@@ -184,7 +237,7 @@ namespace AsyncComputeTessellation
 			rast.CullMode = D3D12_CULL_MODE_NONE; // TODO: use D3D12_CULL_MODE_FRONT (tessellation algorithm will need to be modified)
 
 			m_PSO.SetInputLayout({ inputLayout.data(), (UINT)inputLayout.size() });
-			m_PSO.SetRootSignature(&m_RootSignature);
+			m_PSO.SetRootSignature(rootSignature->GetD3D12RootSignature());
 			m_PSO.SetShader(&m_VertexShader);
 			if (wireframe) m_PSO.SetShader(&m_GeometryShader);
 			m_PSO.SetShader(&m_PixelShader);
@@ -192,12 +245,10 @@ namespace AsyncComputeTessellation
 			m_PSO.SetPrimitiveTopology(D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE);
 			m_PSO.SetRTVFormats(GBufferCount, RtvFormats);
 			m_PSO.SetDepthStencilFormat(DXGI_FORMAT_D24_UNORM_S8_UINT);
-
 			m_PSO.Build(device);
 			m_PSO.SetName(wireframe ? L"TessellationWDrawPSO" : L"TessellationDrawPSO");
 		}
 
-		ID3D12RootSignature* GetD3D12RootSignature() const { return m_RootSignature.GetD3D12RootSignature(); }
 		ID3D12PipelineState* GetD3D12PipelineState() const { return m_PSO.GetD3D12PipelineState(); }
 	};
 

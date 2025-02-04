@@ -1,5 +1,4 @@
 #include "TessellationMesh.h"
-#include "AdaptiveTessellation.h"
 
 namespace AsyncComputeTessellation
 {

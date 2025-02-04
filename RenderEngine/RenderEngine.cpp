@@ -59,7 +59,11 @@ namespace AsyncComputeTessellation
 
 		m_ImGuiTex = m_Device->AllocateGPUDescriptor(QueueID::Direct, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
 		InitImGui(mainWindow);
-		m_AdaptiveTessellation = std::make_unique<AdaptiveTessellation>(m_Device.get(), m_SwapChain.get(), m_Camera.get());
+
+		m_PsoData = std::make_unique<TessellationPSOData>(m_Device.get());
+		m_AdaptiveTessellation = std::make_unique<AdaptiveTessellationCompute>(m_Device.get(), m_SwapChain.get(), m_Camera.get(), m_PsoData.get());
+		m_AdaptiveTessellationDraw = std::make_unique<AdaptiveTessellationDraw>(m_Device.get(), m_SwapChain.get(), m_PsoData.get());
+		m_CSMRendering = std::make_unique<CSMRendering>(m_Device.get(), m_PsoData.get());
 		m_DeferredLightRendering = std::make_unique<DeferredLightRendering>(m_Device.get(), m_SwapChain.get());
 
 		return true;
@@ -70,30 +74,33 @@ namespace AsyncComputeTessellation
 		ID3D12DescriptorHeap* descriptorHeaps[] = { m_Device->GetD3D12DescriptorHeap() };
 
 		auto& dCommandContext = m_Device->GetCommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT);
+		auto& dCommandQueue = m_Device->GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
 		dCommandContext.Reset();
 		dCommandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_SwapChain->CurrentBackBuffer(),
 			D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
-		dCommandContext.FlushResourceBarriers();
-
 		dCommandContext.GetCmdList()->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
-		dCommandContext.SetViewports(&m_Viewport, 1);
-		dCommandContext.SetScissorRects(&m_ScissorRect, 1);
 
 		m_AdaptiveTessellation->Compute(m_Timer);
-		m_DeferredLightRendering->RenderLights(m_Camera.get(), m_AdaptiveTessellation->GetGBuffer());
-		m_DeferredLightRendering->RenderToneMapping(m_Camera.get(), m_AdaptiveTessellation->GetGBuffer());
+
+		if (Light* shadowLight = m_DeferredLightRendering->GetShadowLight())
+			m_CSMRendering->Render(m_Camera.get(), shadowLight, m_Timer, m_AdaptiveTessellation.get());
+
+		dCommandContext.SetViewports(&m_Viewport, 1);
+		dCommandContext.SetScissorRects(&m_ScissorRect, 1);
+		m_AdaptiveTessellationDraw->Draw(m_DeferredLightRendering->GetGBuffer());
+		m_AdaptiveTessellation->ExecuteIndirect();
+
+		m_DeferredLightRendering->RenderLights(m_Camera.get(), m_CSMRendering.get());
+		m_DeferredLightRendering->RenderToneMapping(m_Camera.get());
 
 		dCommandContext.SetRenderTargets(1, &(m_SwapChain->CurrentBackBufferView()), true, &(m_SwapChain->DepthStencilView()));
-
-		auto& directCommandQueue = m_Device->GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
-
 		RecordImGuiCommands();
 
 		dCommandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_SwapChain->CurrentBackBuffer(),
 			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 		dCommandContext.FlushResourceBarriers();
 
-		directCommandQueue.CloseAndExecuteCommandContext(&dCommandContext);
+		dCommandQueue.CloseAndExecuteCommandContext(&dCommandContext);
 		dCommandContext.Reset();
 		m_SwapChain->Present();
 		m_Device->FinishFrame();
@@ -201,8 +208,8 @@ namespace AsyncComputeTessellation
 		commandContext.Reset();
 		m_SwapChain->Resize(w, h);
 
-		if (m_AdaptiveTessellation)
-			m_AdaptiveTessellation->GetGBuffer()->Resize(m_Device.get(), w, h);
+		if (m_DeferredLightRendering)
+			m_DeferredLightRendering->GetGBuffer()->Resize(m_Device.get(), w, h);
 
 		commandContext.FlushResourceBarriers();
 		commandQueue.CloseAndExecuteCommandContext(&commandContext);

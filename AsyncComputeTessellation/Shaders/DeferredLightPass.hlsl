@@ -128,19 +128,19 @@ float4 PS(VertexOut pIn) : SV_TARGET
         dot(comparisons, int4(gCascadeCount > 0, gCascadeCount > 1, gCascadeCount > 2, gCascadeCount > 3))
     );
     
-    //float4 shadowPosH = mul(float4(posW.xyz, 1), gCascadeTransform[cascadeIndex]);
-    //float shadowFactor = CalcShadowFactor(shadowPosH, cascadeIndex);
+    float4 shadowPosH = mul(float4(posW.xyz, 1), gCascadeTransform[cascadeIndex]);
+    float shadowFactor = CalcShadowFactor(shadowPosH, cascadeIndex);
     
     
-    //float depthExceedsMax = step(gCascadeDistance.a, viewDepth);
-    //shadowFactor = lerp(shadowFactor, 1.0f, depthExceedsMax);
+    float depthExceedsMax = step(gCascadeDistance.a, viewDepth);
+    shadowFactor = lerp(shadowFactor, 1.0f, depthExceedsMax);
     
     float3 result = 0.0f;
     
     int i = 0;
     for (; i < gDirectionalLightsCount; i++)
     {
-        result += 1 * ComputeDirectionalLight(gLights[i], mat, normal.rgb, toEyeW);
+        result += shadowFactor * ComputeDirectionalLight(gLights[i], mat, normal.rgb, toEyeW);
     }
     
     for (i = gDirectionalLightsCount; i < gDirectionalLightsCount + gPointLightsCount; i++)

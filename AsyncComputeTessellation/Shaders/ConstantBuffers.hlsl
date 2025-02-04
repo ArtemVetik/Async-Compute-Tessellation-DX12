@@ -29,4 +29,11 @@ cbuffer perFrameData : register(b2)
     float4 gFrustrumPlanes[6];
 }
 
+cbuffer shadowMapData : register(b3)
+{
+    matrix gShadowViewProj;
+    float3 gLightPos;
+    float gPadding;
+}
+
 #endif

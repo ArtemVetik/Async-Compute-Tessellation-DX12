@@ -21,14 +21,23 @@ VertexOut main(VertexIn vIn, uint instanceID : SV_InstanceID)
     float4 posW = mul(float4(vertex.Position, 1.0f), gWorld);
     
 #if USE_DISPLACE
+#if SHADOW_MAP
+    posW = float4(displaceVertex(posW.xyz, gLightPos), 1);
+#else
     posW = float4(displaceVertex(posW.xyz, gCamPosition), 1);
 #endif
+#endif
     
+#if SHADOW_MAP
+    output.TexC = vertex.TexC;
+    output.PosH = mul(posW, gShadowViewProj);
+#else
     output.PosW = posW;
     output.NormalW = mul(float4(vertex.Normal, 1.0f), gWorld);
-    output.PosH = mul(posW, gViewProj);
-    output.TexC = vertex.TexC;
     output.Lvl = ts_findMSB_64(key.xy);
+    output.TexC = vertex.TexC;
+    output.PosH = mul(posW, gViewProj);
+#endif
     
     return output;
 }

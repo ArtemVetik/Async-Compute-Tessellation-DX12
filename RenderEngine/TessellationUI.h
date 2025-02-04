@@ -4,16 +4,16 @@
 
 namespace AsyncComputeTessellation
 {
-	class AdaptiveTessellation;
+	class AdaptiveTessellationCompute;
 
 	class TessellationUI
 	{
 	public:
-		TessellationUI(AdaptiveTessellation* parent);
+		TessellationUI(AdaptiveTessellationCompute* parent);
 
 		void DrawUI();
 
 	private:
-		AdaptiveTessellation* m_Parent;
+		AdaptiveTessellationCompute* m_Parent;
 	};
 }
