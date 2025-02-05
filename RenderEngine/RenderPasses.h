@@ -347,13 +347,10 @@ namespace AsyncComputeTessellation
 	public:
 		struct PassData
 		{
-			XMFLOAT4X4 ViewProj;
+			XMFLOAT4X4 ViewProjInv;
 			XMFLOAT4X4 PreviousViewProj;
-			XMFLOAT4X4 ViewInv;
-			XMFLOAT4X4 ProjInv;
-			float BlureAmount;
-			UINT SampleCount;
-			XMUINT2 padding;
+			float BlurAmount;
+			XMUINT3 padding;
 		};
 
 	private:

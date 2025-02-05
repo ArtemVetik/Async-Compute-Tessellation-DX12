@@ -9,23 +9,25 @@ namespace AsyncComputeTessellation
 		m_SwapChain(swapChain),
 		m_SSQuad(ssQuad)
 	{
-		m_RenderPass = std::make_unique<MotionBlurPass>(m_Device);
+		D3D_SHADER_MACRO macros[] =
+		{
+			{"SAMPLE_COUNT", "20"},
+			{NULL, NULL}
+		};
+
+		m_RenderPass = std::make_unique<MotionBlurPass>(m_Device, macros);
 	}
 
 	void MotionBlurRendering::Render(const Camera* camera, const GBuffer* gBuffer)
 	{
-		auto viewInv = XMMatrixInverse(nullptr, XMLoadFloat4x4(&camera->GetViewMatrix()));
-		auto projInv = XMMatrixInverse(nullptr, XMLoadFloat4x4(&camera->GetProjectionMatrix()));
 		auto viewProj = XMMatrixMultiply(XMLoadFloat4x4(&camera->GetViewMatrix()), XMLoadFloat4x4(&camera->GetProjectionMatrix()));
+		auto viewProjInv = XMMatrixInverse(nullptr, viewProj);
 		auto prevViewProj = XMMatrixMultiply(XMLoadFloat4x4(&camera->GetPrevViewMatrix()), XMLoadFloat4x4(&camera->GetProjectionMatrix()));
 		
 		MotionBlurPass::PassData passData = {};
-		XMStoreFloat4x4(&passData.ViewInv, viewInv);
-		XMStoreFloat4x4(&passData.ProjInv, projInv);
-		XMStoreFloat4x4(&passData.ViewProj, XMMatrixTranspose(viewProj));
+		XMStoreFloat4x4(&passData.ViewProjInv, XMMatrixTranspose(viewProjInv));
 		XMStoreFloat4x4(&passData.PreviousViewProj, XMMatrixTranspose(prevViewProj));
-		passData.BlureAmount = 50.0f;
-		passData.SampleCount = 20;
+		passData.BlurAmount = 5.0f;
 
 		DynamicUploadBuffer passDataBuffer(m_Device, QueueID::Direct);
 		passDataBuffer.LoadData(passData);

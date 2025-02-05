@@ -11,13 +11,10 @@ SamplerComparisonState gsamShadow : register(s6);
 
 cbuffer cbMotionBlurBuffer : register(b0)
 {
-    float4x4 gViewProj;
+    float4x4 gViewProjInv;
     float4x4 gPreviousViewProj;
-    float4x4 gViewInv;
-    float4x4 gProjInv;
-    float gBlureAmount;
-    uint gSampleCount;
-    uint2 padding;
+    float gBlurAmount;
+    uint3 padding;
 };
 
 struct VertexIn
@@ -42,31 +39,32 @@ VertexOut VS(VertexIn vIn)
 
 float4 PS(VertexOut pIn) : SV_TARGET
 {
-    float z = gDepthTexture.Sample(gsamPointWrap, pIn.TexC).r;
-    float4 clipSpacePosition = float4(pIn.TexC * 2 - 1, z, 1);
-    clipSpacePosition.y *= -1.0f;
-    float4 viewSpacePosition = mul(gProjInv, clipSpacePosition);
-    viewSpacePosition /= viewSpacePosition.w;
-    float4 worldSpacePosition = mul(gViewInv, viewSpacePosition);
+    float zOverW = gDepthTexture.Sample(gsamPointWrap, pIn.TexC);
     
-    float4 currentPosition = mul(worldSpacePosition, gViewProj);
-    float4 prevPosition = mul(worldSpacePosition, gPreviousViewProj);
+    if (zOverW >= 1.0f)
+        return gAccumTexture.Sample(gsamLinearClamp, pIn.TexC);
     
-    float2 currentPos = currentPosition.xy / currentPosition.w;
-    float2 previousPos = prevPosition.xy / prevPosition.w;
-    float2 velocity = currentPos - previousPos;
+    float4 H = float4(pIn.TexC.x * 2 - 1, (1 - pIn.TexC.y) * 2 - 1, zOverW, 1);
+    float4 worldPos = mul(H, gViewProjInv);
+    worldPos /= worldPos.w;
     
-    velocity = clamp(velocity, -0.0004f, 0.0004f) * (1 - z / 2.0f);
+    float4 currentPos = H;
+    float4 previousPos = mul(worldPos, gPreviousViewProj);
+    previousPos /= previousPos.w;
     
-    float4 color = float4(0.0, 0.0, 0.0, 0.0);
+    float2 velocity = (currentPos - previousPos) / 2.f;
     
-    for (int i = 0; i < gSampleCount; ++i)
+    float4 color = gAccumTexture.Sample(gsamLinearClamp, pIn.TexC);
+    pIn.TexC += velocity * gBlurAmount;
+    
+#if SAMPLE_COUNT
+    [unroll]
+    for (int i = 1; i < SAMPLE_COUNT; ++i, pIn.TexC += velocity * gBlurAmount)
     {
-        float t = i / (float) (gSampleCount - 1);
-        float2 sampleUv = pIn.TexC + velocity * (t - 0.5) * gBlureAmount;
-        color += gAccumTexture.Sample(gsamLinearClamp, sampleUv);
+        color += gAccumTexture.Sample(gsamLinearClamp, pIn.TexC);
     }
-    color /= gSampleCount;
+    color /= SAMPLE_COUNT;
+#endif
     
     return color;
 }

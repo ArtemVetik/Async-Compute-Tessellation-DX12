@@ -131,7 +131,18 @@ namespace AsyncComputeTessellation
 		XMVECTOR upVector = XMLoadFloat3(&m_Camera->GetUp());
 
 		float moveScale = 35.0f;
-		float rotateScale = 0.01f;
+		static constexpr float rotateScale = 0.01f;
+		static constexpr float rotateLerpSpeed = 20.0f;
+
+		if (InputManager::GetInstance().IsKeyPressed(DIK_1))
+			m_Camera->RotateY(timer.GetDeltaTime() * 0.2f);
+		if (InputManager::GetInstance().IsKeyPressed(DIK_2))
+			m_Camera->RotateY(timer.GetDeltaTime() * 0.4f);
+		if (InputManager::GetInstance().IsKeyPressed(DIK_3))
+			m_Camera->RotateY(timer.GetDeltaTime() * 0.6f);
+
+		if (InputManager::GetInstance().IsKeyPressed(DIK_LSHIFT))
+			moveScale *= 2;
 
 		if (InputManager::GetInstance().IsKeyPressed(DIK_W))
 			m_Camera->Move(direction * moveScale * timer.GetDeltaTime());
@@ -148,14 +159,26 @@ namespace AsyncComputeTessellation
 
 		auto mouseState = InputManager::GetInstance().GetMouseState();
 
+		static XMFLOAT2 currentDelta = { 0, 0 };
+		static XMFLOAT2 targetDelta = { 0, 0 };
+
 		if ((mouseState.rgbButtons[1] & 0x80) != 0)
 		{
-			if (mouseState.lX)
-				m_Camera->RotateY(mouseState.lX * rotateScale);
-
-			if (mouseState.lY)
-				m_Camera->Pitch(mouseState.lY * rotateScale);
+			targetDelta.x += mouseState.lX * rotateScale;
+			targetDelta.y += mouseState.lY * rotateScale;
 		}
+
+		auto Lerp = [](float a, float b, float t) {
+			return a + (b - a) * t;
+		};
+		
+		float prevX = currentDelta.x;
+		currentDelta.x = Lerp(currentDelta.x, targetDelta.x, timer.GetDeltaTime() * rotateLerpSpeed);
+		m_Camera->RotateY(currentDelta.x - prevX);
+
+		float prevY = currentDelta.y;
+		currentDelta.y = Lerp(currentDelta.y, targetDelta.y, timer.GetDeltaTime() * rotateLerpSpeed);
+		m_Camera->Pitch(currentDelta.y - prevY);
 
 		m_Camera->Update();
 	}

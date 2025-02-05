@@ -35,7 +35,7 @@ float4 PS(VertexOut pIn) : SV_TARGET
     float4 hdrColor = gAccumTexture.Sample(gsamPointWrap, pIn.TexC);
     float4 bloomColor = gBloomTexture.Sample(gsamPointWrap, pIn.TexC);
     
-    hdrColor += 1.0f * bloomColor;
+    //hdrColor += 1.0f * bloomColor;
     
     float gamma = 2.2;
   
