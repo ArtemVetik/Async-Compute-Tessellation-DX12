@@ -14,7 +14,7 @@ SamplerComparisonState gsamShadow : register(s6);
 cbuffer cbBloomPass : register(b0)
 {
     float gThreshold;
-    float3 padding;
+    float3 gPadding;
 }
 
 struct VertexIn

@@ -110,7 +110,7 @@ namespace AsyncComputeTessellation
 		commandContext.GetCmdList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
 	}
 
-	void DeferredLightRendering::RenderToneMapping(const Camera* camera)
+	void DeferredLightRendering::RenderToneMapping(const Camera* camera, const BloomRendering* bloom)
 	{
 		auto& commandContext = m_Device->GetCommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT);
 
@@ -130,6 +130,7 @@ namespace AsyncComputeTessellation
 		commandContext.GetCmdList()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(0, m_GBuffer->GetAccumBuffSRVView(1));
+		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(1, bloom->GetBloomSrv());
 
 		commandContext.GetCmdList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
 

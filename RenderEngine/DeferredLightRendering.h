@@ -7,6 +7,7 @@
 #include "Camera.h"
 #include "Timer.h"
 #include "CSMRendering.h"
+#include "BloomRendering.h"
 
 #include "../Core/Graphics/GBuffer.h"
 #include "../Core/Graphics/BufferD3D12.h"
@@ -42,7 +43,7 @@ namespace AsyncComputeTessellation
 		DeferredLightRendering(RenderDeviceD3D12* device, const SwapChain* spawChain, ScreenSpaceQuad* ssQuad);
 
 		void RenderLights(const Camera* camera, const CSMRendering* csmRendering);
-		void RenderToneMapping(const Camera* camera);
+		void RenderToneMapping(const Camera* camera, const BloomRendering* bloom);
 
 		void RednerImGui(const Timer& timer);
 

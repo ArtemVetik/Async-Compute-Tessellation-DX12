@@ -215,11 +215,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <None Include="BloomShader.hlsl">
-      <FileType>Document</FileType>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
     <ProjectReference Include="..\Core\InputSystem\InputSystem.vcxproj">
       <Project>{32ac94c6-ef33-4add-92f9-41270d16e447}</Project>
     </ProjectReference>
@@ -284,6 +279,11 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="Shaders\MotionBlur.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\Bloom.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

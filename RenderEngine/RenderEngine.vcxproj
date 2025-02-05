@@ -155,6 +155,7 @@
   <ItemGroup>
     <ClInclude Include="AdaptiveTessellationCompute.h" />
     <ClInclude Include="AdaptiveTessellationDraw.h" />
+    <ClInclude Include="BloomRendering.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="CSMRendering.h" />
     <ClInclude Include="DeferredLightRendering.h" />
@@ -183,6 +184,7 @@
   <ItemGroup>
     <ClCompile Include="AdaptiveTessellationCompute.cpp" />
     <ClCompile Include="AdaptiveTessellationDraw.cpp" />
+    <ClCompile Include="BloomRendering.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CSMRendering.cpp" />
     <ClCompile Include="DeferredLightRendering.cpp" />

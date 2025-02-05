@@ -67,6 +67,9 @@ namespace AsyncComputeTessellation
 		m_CSMRendering = std::make_unique<CSMRendering>(m_Device.get(), m_PsoData.get());
 		m_DeferredLightRendering = std::make_unique<DeferredLightRendering>(m_Device.get(), m_SwapChain.get(), m_SSQuad.get());
 		m_MotionBlurRendering = std::make_unique<MotionBlurRendering>(m_Device.get(), m_SwapChain.get(), m_SSQuad.get());
+		m_BloomRendering = std::make_unique<BloomRendering>(m_Device.get(), m_SSQuad.get());
+
+		m_BloomRendering->Resize(m_SwapChain->GetWidth(), m_SwapChain->GetHeight());
 
 		return true;
 	}
@@ -93,8 +96,9 @@ namespace AsyncComputeTessellation
 		m_AdaptiveTessellation->ExecuteIndirect();
 
 		m_DeferredLightRendering->RenderLights(m_Camera.get(), m_CSMRendering.get());
+		m_BloomRendering->Render(m_DeferredLightRendering->GetGBuffer());
 		m_MotionBlurRendering->Render(m_Camera.get(), m_DeferredLightRendering->GetGBuffer());
-		m_DeferredLightRendering->RenderToneMapping(m_Camera.get());
+		m_DeferredLightRendering->RenderToneMapping(m_Camera.get(), m_BloomRendering.get());
 
 		dCommandContext.SetRenderTargets(1, &(m_SwapChain->CurrentBackBufferView()), true, &(m_SwapChain->DepthStencilView()));
 		RecordImGuiCommands();
@@ -213,6 +217,8 @@ namespace AsyncComputeTessellation
 
 		if (m_DeferredLightRendering)
 			m_DeferredLightRendering->GetGBuffer()->Resize(m_Device.get(), w, h);
+		if (m_BloomRendering)
+			m_BloomRendering->Resize(w, h);
 
 		commandContext.FlushResourceBarriers();
 		commandQueue.CloseAndExecuteCommandContext(&commandContext);

@@ -213,9 +213,6 @@
     <None Include="RenderQuad.hlsl">
       <Filter>ShadersOld</Filter>
     </None>
-    <None Include="BloomShader.hlsl">
-      <Filter>ShadersOld</Filter>
-    </None>
     <None Include="Shaders\WireframePS.hlsl">
       <Filter>Shaders\Tessellation</Filter>
     </None>
@@ -268,6 +265,9 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="Shaders\MotionBlur.hlsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="Shaders\Bloom.hlsl">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>
