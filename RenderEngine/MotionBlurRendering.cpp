@@ -1,5 +1,6 @@
 #include "MotionBlurRendering.h"
 
+#include "imgui/imgui.h"
 #include "../Core/Graphics/DynamicUploadBuffer.h"
 
 namespace AsyncComputeTessellation
@@ -7,15 +8,11 @@ namespace AsyncComputeTessellation
 	MotionBlurRendering::MotionBlurRendering(RenderDeviceD3D12* device, const SwapChain* swapChain, ScreenSpaceQuad* ssQuad) :
 		m_Device(device),
 		m_SwapChain(swapChain),
-		m_SSQuad(ssQuad)
+		m_SSQuad(ssQuad),
+		m_SampleCount(7),
+		m_BlurAmount(8)
 	{
-		D3D_SHADER_MACRO macros[] =
-		{
-			{"SAMPLE_COUNT", "20"},
-			{NULL, NULL}
-		};
-
-		m_RenderPass = std::make_unique<MotionBlurPass>(m_Device, macros);
+		BuildPSO();
 	}
 
 	void MotionBlurRendering::Render(const Camera* camera, const GBuffer* gBuffer)
@@ -23,11 +20,10 @@ namespace AsyncComputeTessellation
 		auto viewProj = XMMatrixMultiply(XMLoadFloat4x4(&camera->GetViewMatrix()), XMLoadFloat4x4(&camera->GetProjectionMatrix()));
 		auto viewProjInv = XMMatrixInverse(nullptr, viewProj);
 		auto prevViewProj = XMMatrixMultiply(XMLoadFloat4x4(&camera->GetPrevViewMatrix()), XMLoadFloat4x4(&camera->GetProjectionMatrix()));
-		
+
 		MotionBlurPass::PassData passData = {};
 		XMStoreFloat4x4(&passData.ViewProjInv, XMMatrixTranspose(viewProjInv));
 		XMStoreFloat4x4(&passData.PreviousViewProj, XMMatrixTranspose(prevViewProj));
-		passData.BlurAmount = 5.0f;
 
 		DynamicUploadBuffer passDataBuffer(m_Device, QueueID::Direct);
 		passDataBuffer.LoadData(passData);
@@ -47,6 +43,34 @@ namespace AsyncComputeTessellation
 		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(1, m_SwapChain->DepthStencilSRVView());
 		commandContext.GetCmdList()->SetGraphicsRootConstantBufferView(2, passDataBuffer.GetAllocation().GPUAddress);
 
+		float constants[4] = { m_BlurAmount, 0, 0, 0 };
+		commandContext.GetCmdList()->SetGraphicsRoot32BitConstants(3, 4, constants, 0);
+
 		commandContext.GetCmdList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
+	}
+
+	void MotionBlurRendering::RenderImGui()
+	{
+		if (ImGui::CollapsingHeader("Motion Blur"))
+		{
+			ImGui::SliderFloat("Blur Amount", &m_BlurAmount, 0.1f, 20.0f);
+
+			if (ImGui::SliderInt("Sample Count", &m_SampleCount, 1, 50))
+				BuildPSO();
+		}
+	}
+
+	void MotionBlurRendering::BuildPSO()
+	{
+		char sampleCountStr[4];
+		sprintf_s(sampleCountStr, "%d", m_SampleCount);
+
+		D3D_SHADER_MACRO macros[] =
+		{
+			{"SAMPLE_COUNT", sampleCountStr},
+			{NULL, NULL}
+		};
+
+		m_RenderPass = std::make_unique<MotionBlurPass>(m_Device, macros);
 	}
 }

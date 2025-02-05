@@ -349,8 +349,6 @@ namespace AsyncComputeTessellation
 		{
 			XMFLOAT4X4 ViewProjInv;
 			XMFLOAT4X4 PreviousViewProj;
-			float BlurAmount;
-			XMUINT3 padding;
 		};
 
 	private:
@@ -373,6 +371,7 @@ namespace AsyncComputeTessellation
 			m_RootSignature.AddDescriptorParameter(1, &depthTex); // depth buffer
 
 			m_RootSignature.AddConstantBufferView(0); // pass data
+			m_RootSignature.AddConstants(4, 1); // pass constants
 
 			m_RootSignature.Build(device, QueueID::Direct);
 			m_RootSignature.SetName(L"MotionBlurRootSignature");

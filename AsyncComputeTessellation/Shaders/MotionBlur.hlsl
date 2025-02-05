@@ -13,9 +13,13 @@ cbuffer cbMotionBlurBuffer : register(b0)
 {
     float4x4 gViewProjInv;
     float4x4 gPreviousViewProj;
+};
+
+cbuffer cbMotionBlurBuffer : register(b1)
+{
     float gBlurAmount;
     uint3 padding;
-};
+}
 
 struct VertexIn
 {

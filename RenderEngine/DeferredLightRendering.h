@@ -45,7 +45,7 @@ namespace AsyncComputeTessellation
 		void RenderLights(const Camera* camera, const CSMRendering* csmRendering);
 		void RenderToneMapping(const Camera* camera, const BloomRendering* bloom);
 
-		void RednerImGui(const Timer& timer);
+		void RenderImGui(const Timer& timer);
 
 		Light* GetShadowLight() const;
 		GBuffer* GetGBuffer() const { return m_GBuffer.get(); }

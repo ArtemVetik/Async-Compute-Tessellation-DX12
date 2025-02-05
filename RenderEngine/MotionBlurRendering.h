@@ -17,6 +17,10 @@ namespace AsyncComputeTessellation
 		MotionBlurRendering(RenderDeviceD3D12* device, const SwapChain* swapChain, ScreenSpaceQuad* ssQuad);
 
 		void Render(const Camera* camera, const GBuffer* gBuffer);
+		void RenderImGui();
+
+	private:
+		void BuildPSO();
 
 	private:
 		RenderDeviceD3D12* m_Device;
@@ -24,5 +28,8 @@ namespace AsyncComputeTessellation
 		ScreenSpaceQuad* m_SSQuad;
 
 		std::unique_ptr<MotionBlurPass> m_RenderPass;
+
+		int m_SampleCount;
+		float m_BlurAmount;
 	};
 }

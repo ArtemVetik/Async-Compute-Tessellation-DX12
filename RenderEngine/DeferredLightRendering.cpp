@@ -147,7 +147,7 @@ namespace AsyncComputeTessellation
 		commandContext.FlushResourceBarriers(); // TODO: maybe it's not necessary?
 	}
 
-	void DeferredLightRendering::RednerImGui(const Timer& timer)
+	void DeferredLightRendering::RenderImGui(const Timer& timer)
 	{
 		static bool showLightMenu = false;
 		static float rotateLightsSpeed = 0.0f;
