@@ -30,6 +30,7 @@ namespace AsyncComputeTessellation
 		void Update();
 
 		XMFLOAT4X4 GetViewMatrix() const { return m_ViewMatrix; }
+		XMFLOAT4X4 GetPrevViewMatrix() const { return m_PrevViewMatrix; }
 		XMFLOAT4X4 GetProjectionMatrix() const { return m_ProjectionMatrix; }
 		XMFLOAT3 GetPosition() const { return m_Position; }
 		XMFLOAT3 GetLook() const { return m_Look; }
@@ -52,6 +53,7 @@ namespace AsyncComputeTessellation
 		float m_FovY = 55.0f * (3.14f / 180.0f);
 		float m_FovX;
 
+		XMFLOAT4X4 m_PrevViewMatrix;
 		XMFLOAT4X4 m_ViewMatrix;
 		XMFLOAT4X4 m_ProjectionMatrix;
 		float m_NearValue;

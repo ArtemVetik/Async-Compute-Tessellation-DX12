@@ -3,6 +3,7 @@
 #include <memory>
 
 #include "RenderPasses.h"
+#include "ScreenSpaceQuad.h"
 #include "Camera.h"
 #include "Timer.h"
 #include "CSMRendering.h"
@@ -38,7 +39,7 @@ namespace AsyncComputeTessellation
 	class DeferredLightRendering
 	{
 	public:
-		DeferredLightRendering(RenderDeviceD3D12* device, const SwapChain* spawChain);
+		DeferredLightRendering(RenderDeviceD3D12* device, const SwapChain* spawChain, ScreenSpaceQuad* ssQuad);
 
 		void RenderLights(const Camera* camera, const CSMRendering* csmRendering);
 		void RenderToneMapping(const Camera* camera);
@@ -55,13 +56,12 @@ namespace AsyncComputeTessellation
 	private:
 		RenderDeviceD3D12* m_Device;
 		const SwapChain* m_SwapChain;
+		ScreenSpaceQuad* m_SSQuad;
 
 		std::unique_ptr<GBuffer> m_GBuffer;
 		std::unique_ptr<DeferredLightPass> m_DeferredLightPass;
 		std::unique_ptr<ToneMappingPass> m_ToneMappingPass;
 
-		std::unique_ptr<IndexBufferD3D12> m_QuadIndexBuff;
-		std::unique_ptr<VertexBufferD3D12> m_QuadVertexBuff;
 		std::unique_ptr<BufferD3D12> m_MaterialBuffer;
 
 		std::vector<std::shared_ptr<Light>> m_Lights;

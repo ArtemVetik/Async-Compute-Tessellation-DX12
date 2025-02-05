@@ -8,23 +8,16 @@
 
 namespace AsyncComputeTessellation
 {
-	DeferredLightRendering::DeferredLightRendering(RenderDeviceD3D12* device, const SwapChain* swapChain) :
+	DeferredLightRendering::DeferredLightRendering(RenderDeviceD3D12* device, const SwapChain* swapChain, ScreenSpaceQuad* ssQuad) :
 		m_Device(device),
 		m_SwapChain(swapChain),
+		m_SSQuad(ssQuad),
 		m_MaterialData{}
 	{
 		m_DeferredLightPass = std::make_unique<DeferredLightPass>(m_Device);
 		m_ToneMappingPass = std::make_unique<ToneMappingPass>(m_Device);
 
-		GeometryGenerator geoGen;
-		GeometryGenerator::MeshData quad = geoGen.CreateQuad(-1, 1, 2, 2, 0);
-
-		m_QuadVertexBuff = std::make_unique<VertexBufferD3D12>(m_Device, quad.GetVerticesPT().data(),
-			sizeof(VertexPT), (UINT)quad.GetVerticesPT().size());
-		m_QuadIndexBuff = std::make_unique<IndexBufferD3D12>(m_Device, quad.GetIndices16().data(),
-			sizeof(uint16_t), (UINT)quad.GetIndices16().size(), DXGI_FORMAT_R16_UINT);
-
-		m_GBuffer = std::make_unique<GBuffer>(TessellationGBufferPass::GBufferCount, TessellationGBufferPass::RtvFormats, DeferredLightPass::AccumBuffFormat);
+		m_GBuffer = std::make_unique<GBuffer>(TessellationGBufferPass::GBufferCount, TessellationGBufferPass::RtvFormats, 2, DeferredLightPass::AccumBuffFormat);
 		m_GBuffer->Resize(m_Device, m_SwapChain->GetWidth(), m_SwapChain->GetHeight());
 
 		InitMaterialBuffer();
@@ -42,13 +35,13 @@ namespace AsyncComputeTessellation
 			D3D12_RESOURCE_STATE_DEPTH_WRITE, D3D12_RESOURCE_STATE_GENERIC_READ));
 		commandContext.FlushResourceBarriers();
 
-		commandContext.SetRenderTargets(1, &(m_GBuffer->GetAccumBuffRTVView()), true, nullptr);
+		commandContext.SetRenderTargets(1, &(m_GBuffer->GetAccumBuffRTVView(0)), true, nullptr);
 
 		commandContext.GetCmdList()->SetPipelineState(m_DeferredLightPass->GetD3D12PipelineState());
 		commandContext.GetCmdList()->SetGraphicsRootSignature(m_DeferredLightPass->GetD3D12RootSignature());
 
-		commandContext.GetCmdList()->IASetVertexBuffers(0, 1, &(m_QuadVertexBuff->GetView()));
-		commandContext.GetCmdList()->IASetIndexBuffer(&(m_QuadIndexBuff->GetView()));
+		commandContext.GetCmdList()->IASetVertexBuffers(0, 1, &(m_SSQuad->GetVertexView()));
+		commandContext.GetCmdList()->IASetIndexBuffer(&(m_SSQuad->GetIndexView()));
 		commandContext.GetCmdList()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
 		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(0, m_GBuffer->GetGBufferSRVView(0));
@@ -115,33 +108,37 @@ namespace AsyncComputeTessellation
 		commandContext.GetCmdList()->SetGraphicsRootConstantBufferView(6, m_MaterialBuffer->GetD3D12Resource()->GetGPUVirtualAddress());
 
 		commandContext.GetCmdList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
-
-		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_GBuffer->GetAccumBuffer(),
-			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
-		commandContext.FlushResourceBarriers();
 	}
 
 	void DeferredLightRendering::RenderToneMapping(const Camera* camera)
 	{
 		auto& commandContext = m_Device->GetCommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT);
 
+		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_GBuffer->GetAccumBuffer(0),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_GBuffer->GetAccumBuffer(1),
+			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
+		commandContext.FlushResourceBarriers();
+
 		commandContext.SetRenderTargets(1, &(m_SwapChain->CurrentBackBufferView()), true, nullptr);
 
 		commandContext.GetCmdList()->SetPipelineState(m_ToneMappingPass->GetD3D12PipelineState());
 		commandContext.GetCmdList()->SetGraphicsRootSignature(m_ToneMappingPass->GetD3D12RootSignature());
 
-		commandContext.GetCmdList()->IASetVertexBuffers(0, 1, &(m_QuadVertexBuff->GetView()));
-		commandContext.GetCmdList()->IASetIndexBuffer(&(m_QuadIndexBuff->GetView()));
+		commandContext.GetCmdList()->IASetVertexBuffers(0, 1, &(m_SSQuad->GetVertexView()));
+		commandContext.GetCmdList()->IASetIndexBuffer(&(m_SSQuad->GetIndexView()));
 		commandContext.GetCmdList()->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(0, m_GBuffer->GetAccumBuffSRVView());
+		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(0, m_GBuffer->GetAccumBuffSRVView(1));
 
 		commandContext.GetCmdList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 		for (int i = 0; i < TessellationGBufferPass::GBufferCount; i++)
 			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_GBuffer->GetGBuffer(i),
 				D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
-		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_GBuffer->GetAccumBuffer(),
+		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_GBuffer->GetAccumBuffer(0),
+			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
+		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_GBuffer->GetAccumBuffer(1),
 			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_RENDER_TARGET));
 		commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_SwapChain->GetDepthStencilBuffer(),
 			D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));

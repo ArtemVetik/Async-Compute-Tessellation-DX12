@@ -10,6 +10,7 @@
 #include "AdaptiveTessellationDraw.h"
 #include "CSMRendering.h"
 #include "DeferredLightRendering.h"
+#include "MotionBlurRendering.h"
 
 #include "../Core/Graphics/SwapChain.h"
 #include "../Core/EduMath/SimpleMath.h"
@@ -53,10 +54,12 @@ namespace AsyncComputeTessellation
 
 		std::unique_ptr<Camera> m_Camera;
 		std::unique_ptr<TessellationPSOData> m_PsoData;
+		std::unique_ptr<ScreenSpaceQuad> m_SSQuad;
 		std::unique_ptr<AdaptiveTessellationCompute> m_AdaptiveTessellation;
 		std::unique_ptr<AdaptiveTessellationDraw> m_AdaptiveTessellationDraw;
 		std::unique_ptr<CSMRendering> m_CSMRendering;
 		std::unique_ptr<DeferredLightRendering> m_DeferredLightRendering;
+		std::unique_ptr<MotionBlurRendering> m_MotionBlurRendering;
 
 		DescriptorHeapAllocation m_ImGuiTex;
 

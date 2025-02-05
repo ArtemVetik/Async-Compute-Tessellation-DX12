@@ -61,10 +61,12 @@ namespace AsyncComputeTessellation
 		InitImGui(mainWindow);
 
 		m_PsoData = std::make_unique<TessellationPSOData>(m_Device.get());
+		m_SSQuad = std::make_unique<ScreenSpaceQuad>(m_Device.get());
 		m_AdaptiveTessellation = std::make_unique<AdaptiveTessellationCompute>(m_Device.get(), m_SwapChain.get(), m_Camera.get(), m_PsoData.get());
 		m_AdaptiveTessellationDraw = std::make_unique<AdaptiveTessellationDraw>(m_Device.get(), m_SwapChain.get(), m_PsoData.get());
 		m_CSMRendering = std::make_unique<CSMRendering>(m_Device.get(), m_PsoData.get());
-		m_DeferredLightRendering = std::make_unique<DeferredLightRendering>(m_Device.get(), m_SwapChain.get());
+		m_DeferredLightRendering = std::make_unique<DeferredLightRendering>(m_Device.get(), m_SwapChain.get(), m_SSQuad.get());
+		m_MotionBlurRendering = std::make_unique<MotionBlurRendering>(m_Device.get(), m_SwapChain.get(), m_SSQuad.get());
 
 		return true;
 	}
@@ -91,6 +93,7 @@ namespace AsyncComputeTessellation
 		m_AdaptiveTessellation->ExecuteIndirect();
 
 		m_DeferredLightRendering->RenderLights(m_Camera.get(), m_CSMRendering.get());
+		m_MotionBlurRendering->Render(m_Camera.get(), m_DeferredLightRendering->GetGBuffer());
 		m_DeferredLightRendering->RenderToneMapping(m_Camera.get());
 
 		dCommandContext.SetRenderTargets(1, &(m_SwapChain->CurrentBackBufferView()), true, &(m_SwapChain->DepthStencilView()));

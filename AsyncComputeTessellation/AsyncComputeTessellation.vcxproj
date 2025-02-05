@@ -215,11 +215,6 @@
     </None>
   </ItemGroup>
   <ItemGroup>
-    <None Include="MotionBlur.hlsl">
-      <FileType>Document</FileType>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
     <None Include="BloomShader.hlsl">
       <FileType>Document</FileType>
     </None>
@@ -284,6 +279,11 @@
       <FileType>Document</FileType>
     </None>
     <None Include="Shaders\ToneMapping.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\MotionBlur.hlsl">
       <FileType>Document</FileType>
     </None>
   </ItemGroup>

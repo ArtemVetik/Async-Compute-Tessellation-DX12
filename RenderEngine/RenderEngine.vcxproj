@@ -169,8 +169,10 @@
     <ClInclude Include="imgui\imstb_textedit.h" />
     <ClInclude Include="imgui\imstb_truetype.h" />
     <ClInclude Include="MeshUtils.h" />
+    <ClInclude Include="MotionBlurRendering.h" />
     <ClInclude Include="RenderEngine.h" />
     <ClInclude Include="RenderPasses.h" />
+    <ClInclude Include="ScreenSpaceQuad.h" />
     <ClInclude Include="TessellationMesh.h" />
     <ClInclude Include="TessellationPSOData.h" />
     <ClInclude Include="TessellationUI.h" />
@@ -193,6 +195,7 @@
     <ClCompile Include="imgui\imgui_impl_win32.cpp" />
     <ClCompile Include="imgui\imgui_tables.cpp" />
     <ClCompile Include="imgui\imgui_widgets.cpp" />
+    <ClCompile Include="MotionBlurRendering.cpp" />
     <ClCompile Include="RenderEngine.cpp" />
     <ClCompile Include="TessellationMesh.cpp" />
     <ClCompile Include="TessellationUI.cpp" />

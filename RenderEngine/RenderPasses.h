@@ -342,6 +342,67 @@ namespace AsyncComputeTessellation
 		ID3D12PipelineState* GetD3D12PipelineState() const { return m_Pso.GetD3D12PipelineState(); }
 	};
 
+	class MotionBlurPass
+	{
+	public:
+		struct PassData
+		{
+			XMFLOAT4X4 ViewProj;
+			XMFLOAT4X4 PreviousViewProj;
+			XMFLOAT4X4 ViewInv;
+			XMFLOAT4X4 ProjInv;
+			float BlureAmount;
+			UINT SampleCount;
+			XMUINT2 padding;
+		};
+
+	private:
+		ShaderD3D12 m_VertexShader;
+		ShaderD3D12 m_PixelShader;
+		RootSignatureD3D12 m_RootSignature;
+		PipelineStateD3D12 m_Pso;
+
+	public:
+		MotionBlurPass(RenderDeviceD3D12* device, D3D_SHADER_MACRO* macros = nullptr) :
+			m_VertexShader(L"Shaders/MotionBlur.hlsl", EDU_SHADER_TYPE_VERTEX, nullptr, "VS", "vs_5_1"),
+			m_PixelShader(L"Shaders/MotionBlur.hlsl", EDU_SHADER_TYPE_PIXEL, nullptr, "PS", "ps_5_1")
+		{
+			CD3DX12_DESCRIPTOR_RANGE accumTex;
+			accumTex.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+			m_RootSignature.AddDescriptorParameter(1, &accumTex); // accumulation buffer
+
+			CD3DX12_DESCRIPTOR_RANGE depthTex;
+			depthTex.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
+			m_RootSignature.AddDescriptorParameter(1, &depthTex); // depth buffer
+
+			m_RootSignature.AddConstantBufferView(0); // pass data
+
+			m_RootSignature.Build(device, QueueID::Direct);
+			m_RootSignature.SetName(L"MotionBlurRootSignature");
+
+			std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout =
+			{
+				{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0,  D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+				{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT,    0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			};
+
+			auto dss = CD3DX12_DEPTH_STENCIL_DESC(D3D12_DEFAULT);
+			dss.DepthEnable = false;
+
+			m_Pso.SetInputLayout({ mInputLayout.data(), (UINT)mInputLayout.size() });
+			m_Pso.SetRootSignature(&m_RootSignature);
+			m_Pso.SetDepthStencilState(dss);
+			m_Pso.SetShader(&m_VertexShader);
+			m_Pso.SetShader(&m_PixelShader);
+			m_Pso.SetRTVFormat(DeferredLightPass::AccumBuffFormat);
+			m_Pso.Build(device);
+			m_Pso.SetName(L"MotionBlurPSO");
+		}
+
+		ID3D12RootSignature* GetD3D12RootSignature() const { return m_RootSignature.GetD3D12RootSignature(); }
+		ID3D12PipelineState* GetD3D12PipelineState() const { return m_Pso.GetD3D12PipelineState(); }
+	};
+
 	class ToneMappingPass
 	{
 	private:

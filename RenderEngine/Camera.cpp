@@ -17,6 +17,7 @@ namespace AsyncComputeTessellation
 			pos,
 			dir,
 			up);
+		XMStoreFloat4x4(&m_PrevViewMatrix, (V));
 		XMStoreFloat4x4(&m_ViewMatrix, (V));
 
 		SetProjectionMatrix(width, height);
@@ -136,6 +137,8 @@ namespace AsyncComputeTessellation
 
 	void Camera::Update()
 	{
+		m_PrevViewMatrix = m_ViewMatrix;
+
 		if (m_ViewDirty)
 		{
 			XMVECTOR R = XMLoadFloat3(&m_Right);
