@@ -137,64 +137,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Bintree.cpp" />
-    <ClCompile Include="Bloom.cpp" />
-    <ClCompile Include="Camera.cpp" />
-    <ClCompile Include="d3dUtil.cpp" />
-    <ClCompile Include="DDSTextureLoader.cpp" />
-    <ClCompile Include="DXCore.cpp" />
-    <ClCompile Include="FrameResource.cpp" />
-    <ClCompile Include="Game.cpp" />
-    <ClCompile Include="GeometryGenerator.cpp" />
-    <ClCompile Include="imgui\imgui.cpp" />
-    <ClCompile Include="imgui\imgui_demo.cpp" />
-    <ClCompile Include="imgui\imgui_draw.cpp" />
-    <ClCompile Include="imgui\imgui_impl_dx12.cpp" />
-    <ClCompile Include="imgui\imgui_impl_win32.cpp" />
-    <ClCompile Include="imgui\imgui_tables.cpp" />
-    <ClCompile Include="imgui\imgui_widgets.cpp" />
-    <ClCompile Include="InputManager.cpp" />
-    <ClCompile Include="KeyboardEvent.cpp" />
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="MathHelper.cpp" />
-    <ClCompile Include="MeshUtils.cpp" />
-    <ClCompile Include="ShadowMap.cpp" />
-    <ClCompile Include="stdafx.cpp" />
-    <ClCompile Include="Timer.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="Bintree.h" />
-    <ClInclude Include="Bloom.h" />
-    <ClInclude Include="Camera.h" />
-    <ClInclude Include="d3dUtil.h" />
-    <ClInclude Include="d3dx12.h" />
-    <ClInclude Include="DDSTextureLoader.h" />
-    <ClInclude Include="DXCore.h" />
-    <ClInclude Include="FrameResource.h" />
-    <ClInclude Include="Game.h" />
-    <ClInclude Include="GeometryGenerator.h" />
-    <ClInclude Include="HeapIndexes.h" />
-    <ClInclude Include="ImguiParams.h" />
-    <ClInclude Include="imgui\imconfig.h" />
-    <ClInclude Include="imgui\imgui.h" />
-    <ClInclude Include="imgui\imgui_impl_dx12.h" />
-    <ClInclude Include="imgui\imgui_impl_win32.h" />
-    <ClInclude Include="imgui\imgui_internal.h" />
-    <ClInclude Include="imgui\imstb_rectpack.h" />
-    <ClInclude Include="imgui\imstb_textedit.h" />
-    <ClInclude Include="imgui\imstb_truetype.h" />
-    <ClInclude Include="InputManager.h" />
-    <ClInclude Include="KeyboardEvent.h" />
-    <ClInclude Include="MathHelper.h" />
-    <ClInclude Include="MeshUtils.h" />
-    <ClInclude Include="Renderable.h" />
-    <ClInclude Include="Resource.h" />
-    <ClInclude Include="ShadowMap.h" />
-    <ClInclude Include="stdafx.h" />
-    <ClInclude Include="targetver.h" />
-    <ClInclude Include="Timer.h" />
-    <ClInclude Include="UploadBuffer.h" />
-    <ClInclude Include="Vertex.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="small.ico" />
