@@ -39,7 +39,7 @@ VertexOut VS(VertexIn vIn)
 
 float4 PS(VertexOut pIn) : SV_Target
 {
-    float3 lightColor = gAccumTexture.Sample(gsamLinearClamp, pIn.TexC);
+    float3 lightColor = gAccumTexture.Sample(gsamLinearClamp, pIn.TexC).rgb;
 
     float luminance = dot(lightColor, float3(0.2126, 0.7152, 0.0722));
     float3 thresholdColor = step(gThreshold, luminance) * lightColor;

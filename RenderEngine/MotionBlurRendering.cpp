@@ -43,7 +43,7 @@ namespace AsyncComputeTessellation
 		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(1, m_SwapChain->DepthStencilSRVView());
 		commandContext.GetCmdList()->SetGraphicsRootConstantBufferView(2, passDataBuffer.GetAllocation().GPUAddress);
 
-		float constants[4] = { m_BlurAmount, 0, 0, 0 };
+		const float constants[4] = { m_BlurAmount, 0, 0, 0 };
 		commandContext.GetCmdList()->SetGraphicsRoot32BitConstants(3, 4, constants, 0);
 
 		commandContext.GetCmdList()->DrawIndexedInstanced(6, 1, 0, 0, 0);

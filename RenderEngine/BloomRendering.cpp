@@ -1,53 +1,16 @@
 #include "BloomRendering.h"
 
+#include "imgui/imgui.h"
+
 namespace AsyncComputeTessellation
 {
 	BloomRendering::BloomRendering(RenderDeviceD3D12* device, ScreenSpaceQuad* ssQuad) :
 		m_Device(device),
-		m_SSQuad(ssQuad)
+		m_SSQuad(ssQuad),
+		m_Threshold(1.8f),
+		m_KernelSize(7)
 	{
-		D3D_SHADER_MACRO hMacros[] =
-		{
-			{"HORIZONTAL_BLUR", "1"},
-			{"BLOOM_KERNEL_SIZE", "7"},
-			{NULL, NULL}
-		};
-
-		D3D_SHADER_MACRO vMacros[] =
-		{
-			{"HORIZONTAL_BLUR", "0"},
-			{"BLOOM_KERNEL_SIZE", "7"},
-			{NULL, NULL}
-		};
-
-		m_RenderPass = std::make_unique<BloomPass>(m_Device, hMacros, vMacros);
-
-		std::vector<float> weights;
-
-		int kernelSize = 7;
-
-		float sigma = 3.0f;
-		float sum = 0.0f;
-		for (int i = 0; i <= kernelSize; ++i) {
-			float weight = expf(-0.5f * (i * i) / (sigma * sigma));
-			weights.push_back(weight);
-			sum += weight;
-		}
-
-		for (int i = 0; i < weights.size(); ++i)
-			weights[i] /= sum;
-
-		m_WeightsBuffer = std::make_unique<BufferD3D12>(m_Device, CD3DX12_RESOURCE_DESC::Buffer(sizeof(float) * weights.size()), weights.data(), QueueID::Direct);
-		
-		D3D12_SHADER_RESOURCE_VIEW_DESC bloomWeightsSRVDescription = {};
-		bloomWeightsSRVDescription.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-		bloomWeightsSRVDescription.Format = DXGI_FORMAT_UNKNOWN;
-		bloomWeightsSRVDescription.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
-		bloomWeightsSRVDescription.Buffer.FirstElement = 0;
-		bloomWeightsSRVDescription.Buffer.NumElements = kernelSize;
-		bloomWeightsSRVDescription.Buffer.StructureByteStride = sizeof(float);
-
-		m_WeightsBuffer->CreateSRV(&bloomWeightsSRVDescription);
+		BuildPSOAndWeights();
 	}
 
 	void BloomRendering::Resize(UINT w, UINT h)
@@ -121,7 +84,7 @@ namespace AsyncComputeTessellation
 			commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(0, gBuffer->GetAccumBuffSRVView(0));
 			commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(2, m_WeightsBuffer->GetSRVView()->GetGpuHandle());
 
-			const float constants[4] = { 1.0f, 0.0f, 0.0f, 0.0f };
+			const float constants[4] = { m_Threshold, 0.0f, 0.0f, 0.0f };
 			commandContext.GetCmdList()->SetGraphicsRoot32BitConstants(3, 4, constants, 0);
 
 			commandContext.GetCmdList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
@@ -171,5 +134,63 @@ namespace AsyncComputeTessellation
 			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_BloomBuffer[0]->GetD3D12Resource(),
 				D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_GENERIC_READ));
 		}
+	}
+
+	void BloomRendering::RenderImGui()
+	{
+		if (ImGui::CollapsingHeader("Bloom"))
+		{
+			ImGui::SliderFloat("Threshold", &m_Threshold, 0.0f, 3.0f);
+
+			if (ImGui::SliderInt("Kernel Size", &m_KernelSize, 3, 32))
+				BuildPSOAndWeights();
+		}
+	}
+
+	void BloomRendering::BuildPSOAndWeights()
+	{
+		char kernelSizeStr[4];
+		sprintf_s(kernelSizeStr, "%d", m_KernelSize);
+
+		D3D_SHADER_MACRO hMacros[] =
+		{
+			{"HORIZONTAL_BLUR", "1"},
+			{"BLOOM_KERNEL_SIZE", kernelSizeStr},
+			{NULL, NULL}
+		};
+
+		D3D_SHADER_MACRO vMacros[] =
+		{
+			{"HORIZONTAL_BLUR", "0"},
+			{"BLOOM_KERNEL_SIZE", kernelSizeStr},
+			{NULL, NULL}
+		};
+
+		m_RenderPass = std::make_unique<BloomPass>(m_Device, hMacros, vMacros);
+
+		std::vector<float> weights;
+
+		float sigma = 3.0f;
+		float sum = 0.0f;
+		for (int i = 0; i <= m_KernelSize; ++i) {
+			float weight = expf(-0.5f * (i * i) / (sigma * sigma));
+			weights.push_back(weight);
+			sum += weight;
+		}
+
+		for (int i = 0; i < weights.size(); ++i)
+			weights[i] /= sum;
+
+		m_WeightsBuffer = std::make_unique<BufferD3D12>(m_Device, CD3DX12_RESOURCE_DESC::Buffer(sizeof(float) * weights.size()), weights.data(), QueueID::Direct);
+
+		D3D12_SHADER_RESOURCE_VIEW_DESC bloomWeightsSRVDescription = {};
+		bloomWeightsSRVDescription.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+		bloomWeightsSRVDescription.Format = DXGI_FORMAT_UNKNOWN;
+		bloomWeightsSRVDescription.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
+		bloomWeightsSRVDescription.Buffer.FirstElement = 0;
+		bloomWeightsSRVDescription.Buffer.NumElements = m_KernelSize;
+		bloomWeightsSRVDescription.Buffer.StructureByteStride = sizeof(float);
+
+		m_WeightsBuffer->CreateSRV(&bloomWeightsSRVDescription);
 	}
 }

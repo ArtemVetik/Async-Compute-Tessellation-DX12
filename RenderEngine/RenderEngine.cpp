@@ -189,13 +189,13 @@ namespace AsyncComputeTessellation
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 
-		static int counter = 0;
 		ImGui::Begin("App parameters | TEST");
 		ImGui::Text("Test application parameters.");
 
 		m_AdaptiveTessellation->RenderImGui();
 		m_DeferredLightRendering->RenderImGui(m_Timer);
 		m_MotionBlurRendering->RenderImGui();
+		m_BloomRendering->RenderImGui();
 
 		ImGui::End();
 
