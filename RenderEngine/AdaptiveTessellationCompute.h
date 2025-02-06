@@ -18,7 +18,8 @@ namespace AsyncComputeTessellation
 		AdaptiveTessellationCompute(RenderDeviceD3D12*   device,
 							 SwapChain*		      swapChain,
 							 const Camera*		  camera,
-							 TessellationPSOData* psoData);
+							 TessellationPSOData* psoData,
+							 bool				  computeQueue);
 
 		void Compute(const Timer& timer);
 		void RenderImGui();
@@ -57,6 +58,8 @@ namespace AsyncComputeTessellation
 		std::unique_ptr<BufferD3D12> m_TessellationData;
 
 		int m_PingPongCounter;
+		int m_SubdCulledBuffIdx;
+		bool m_ComputeQueue;
 		
 		TessellationParams m_Params;
 	};

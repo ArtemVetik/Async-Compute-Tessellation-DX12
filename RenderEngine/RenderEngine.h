@@ -24,6 +24,14 @@ namespace AsyncComputeTessellation
 {
 	using namespace EduEngine;
 
+	enum class RenderType
+	{
+		Direct,
+		AsyncAll,
+		AsyncShadowMap,
+		AsyncPostProcess,
+	};
+
 	class RENDERENGINE_API RenderEngine
 	{
 	public:
@@ -72,5 +80,7 @@ namespace AsyncComputeTessellation
 
 		static constexpr DirectX::SimpleMath::Rectangle EmptyResize = { -1, -1, -1, -1 };
 		DirectX::SimpleMath::Rectangle m_PendingResize = EmptyResize;
+
+		RenderType m_RenderType;
 	};
 }

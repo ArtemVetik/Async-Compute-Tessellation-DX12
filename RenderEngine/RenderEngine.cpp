@@ -13,7 +13,8 @@ namespace AsyncComputeTessellation
 	RenderEngine::RenderEngine(const Timer& timer) :
 		m_Timer(timer),
 		m_Viewport{},
-		m_ScissorRect{}
+		m_ScissorRect{},
+		m_RenderType(RenderType::Direct)
 	{
 		assert(m_Instance == nullptr);
 		m_Instance = this;
@@ -62,7 +63,7 @@ namespace AsyncComputeTessellation
 
 		m_PsoData = std::make_unique<TessellationPSOData>(m_Device.get());
 		m_SSQuad = std::make_unique<ScreenSpaceQuad>(m_Device.get());
-		m_AdaptiveTessellation = std::make_unique<AdaptiveTessellationCompute>(m_Device.get(), m_SwapChain.get(), m_Camera.get(), m_PsoData.get());
+		m_AdaptiveTessellation = std::make_unique<AdaptiveTessellationCompute>(m_Device.get(), m_SwapChain.get(), m_Camera.get(), m_PsoData.get(), m_RenderType != RenderType::Direct);
 		m_AdaptiveTessellationDraw = std::make_unique<AdaptiveTessellationDraw>(m_Device.get(), m_SwapChain.get(), m_PsoData.get());
 		m_CSMRendering = std::make_unique<CSMRendering>(m_Device.get(), m_PsoData.get());
 		m_DeferredLightRendering = std::make_unique<DeferredLightRendering>(m_Device.get(), m_SwapChain.get(), m_SSQuad.get());
@@ -76,14 +77,25 @@ namespace AsyncComputeTessellation
 
 	void RenderEngine::Render()
 	{
+		RenderType frameRenderType = m_RenderType;
+
 		ID3D12DescriptorHeap* descriptorHeaps[] = { m_Device->GetD3D12DescriptorHeap() };
 
 		auto& dCommandContext = m_Device->GetCommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT);
+		auto& cCommandContext = m_Device->GetCommandContext(D3D12_COMMAND_LIST_TYPE_COMPUTE);
 		auto& dCommandQueue = m_Device->GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT);
+		auto& cCommandQueue = m_Device->GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COMPUTE);
+
 		dCommandContext.Reset();
 		dCommandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_SwapChain->CurrentBackBuffer(),
 			D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET));
 		dCommandContext.GetCmdList()->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+		if (frameRenderType != RenderType::Direct)
+		{
+			cCommandContext.Reset();
+			cCommandContext.GetCmdList()->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+		}
 
 		m_AdaptiveTessellation->Compute(m_Timer);
 
@@ -107,8 +119,19 @@ namespace AsyncComputeTessellation
 			D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT));
 		dCommandContext.FlushResourceBarriers();
 
+		if (frameRenderType == RenderType::AsyncAll)
+			dCommandQueue.Wait(&cCommandQueue, cCommandQueue.GetNextCmdListNum());
+
 		dCommandQueue.CloseAndExecuteCommandContext(&dCommandContext);
 		dCommandContext.Reset();
+
+		if (frameRenderType == RenderType::AsyncAll)
+		{
+			cCommandQueue.CloseAndExecuteCommandContext(&cCommandContext);
+			cCommandContext.Reset();
+			cCommandQueue.Wait(&dCommandQueue, dCommandQueue.GetNextCmdListNum());
+		}
+
 		m_SwapChain->Present();
 		m_Device->FinishFrame();
 
@@ -171,7 +194,7 @@ namespace AsyncComputeTessellation
 		auto Lerp = [](float a, float b, float t) {
 			return a + (b - a) * t;
 		};
-		
+
 		float prevX = currentDelta.x;
 		currentDelta.x = Lerp(currentDelta.x, targetDelta.x, timer.GetDeltaTime() * rotateLerpSpeed);
 		m_Camera->RotateY(currentDelta.x - prevX);
@@ -191,6 +214,9 @@ namespace AsyncComputeTessellation
 
 		ImGui::Begin("App parameters | TEST");
 		ImGui::Text("Test application parameters.");
+
+		if (ImGui::Combo("Render Type", (int*)&m_RenderType, "Direct\0Async All\0\0"))
+			m_AdaptiveTessellation = std::make_unique<AdaptiveTessellationCompute>(m_Device.get(), m_SwapChain.get(), m_Camera.get(), m_PsoData.get(), m_RenderType != RenderType::Direct);
 
 		m_AdaptiveTessellation->RenderImGui();
 		m_DeferredLightRendering->RenderImGui(m_Timer);
