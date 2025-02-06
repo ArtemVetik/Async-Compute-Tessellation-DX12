@@ -15,17 +15,12 @@ namespace AsyncComputeTessellation
 		m_SwapChain(swapChain),
 		m_Camera(camera),
 		m_PsoData(psoData),
-		m_ComputeQueue(computeQueue),
 		m_UI(this),
 		m_Mesh(device),
 		m_PingPongCounter(0),
 		m_SubdCulledBuffIdx(0)
 	{
-		BuildPSO();
-		InitBuffers();
-		ResetBuffers();
-		UpdateLeafMesh();
-		InitTessData();
+		ForceRebuildAll(computeQueue);
 	}
 
 	void AdaptiveTessellationCompute::Compute(const Timer& timer)
@@ -126,6 +121,17 @@ namespace AsyncComputeTessellation
 	void AdaptiveTessellationCompute::RenderImGui()
 	{
 		m_UI.DrawUI();
+	}
+
+	void AdaptiveTessellationCompute::ForceRebuildAll(bool computeQueue)
+	{
+		m_ComputeQueue = computeQueue;
+
+		BuildPSO();
+		InitBuffers();
+		ResetBuffers();
+		UpdateLeafMesh();
+		InitTessData();
 	}
 
 	void AdaptiveTessellationCompute::BuildPSO()

@@ -23,6 +23,7 @@ namespace AsyncComputeTessellation
 
 		void Compute(const Timer& timer);
 		void RenderImGui();
+		void ForceRebuildAll(bool computeQueue);
 
 		void ExecuteIndirect() const;
 

@@ -216,7 +216,7 @@ namespace AsyncComputeTessellation
 		ImGui::Text("Test application parameters.");
 
 		if (ImGui::Combo("Render Type", (int*)&m_RenderType, "Direct\0Async All\0\0"))
-			m_AdaptiveTessellation = std::make_unique<AdaptiveTessellationCompute>(m_Device.get(), m_SwapChain.get(), m_Camera.get(), m_PsoData.get(), m_RenderType != RenderType::Direct);
+			m_AdaptiveTessellation->ForceRebuildAll(m_RenderType != RenderType::Direct);
 
 		m_AdaptiveTessellation->RenderImGui();
 		m_DeferredLightRendering->RenderImGui(m_Timer);
