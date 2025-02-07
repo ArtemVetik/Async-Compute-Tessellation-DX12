@@ -17,7 +17,23 @@ namespace AsyncComputeTessellation
 		bool updateLeafMesh = false;
 		bool initTessData = false;
 
-		if (ImGui::CollapsingHeader("Tessellation parameters"))
+		static bool open = false;
+
+		if (!open) 
+		{
+			if (ImGui::Button("Tessellation"))
+				open = true;
+		}
+		else
+		{
+			if (ImGui::Button("Tessellation [X]"))
+				open = false;
+		}
+
+		if (!open)
+			return;
+
+		if (ImGui::Begin("Tessellation parameters", &open))
 		{
 			ImGui::SeparatorText("View Mode");
 
@@ -88,6 +104,7 @@ namespace AsyncComputeTessellation
 			ImGui::SeparatorText("Compute Settings");
 			ImGui::Checkbox("Freeze", &m_Parent->m_Params.Freeze);
 		}
+		ImGui::End();
 
 		auto screenRes = std::max(m_Parent->m_SwapChain->GetWidth(), m_Parent->m_SwapChain->GetHeight());
 		if (screenRes != m_Parent->m_Params.CB.ScreenRes)

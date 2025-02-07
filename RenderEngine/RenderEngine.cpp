@@ -1,4 +1,5 @@
 #include "RenderEngine.h"
+#include "shellapi.h"
 #include "../Core/InputSystem/InputManager.h"
 
 namespace AsyncComputeTessellation
@@ -240,16 +241,25 @@ namespace AsyncComputeTessellation
 		ImGui_ImplWin32_NewFrame();
 		ImGui::NewFrame();
 
-		ImGui::Begin("App parameters | TEST");
-		ImGui::Text("Test application parameters.");
+		ImGui::Begin("App Parameters");
+		ImGui::Text("Async Compute Tessellation");
 
 		if (ImGui::Combo("Render Type", (int*)&m_RenderType, "Direct\0Async All\0Async Shadow Map\0Async Post Process\0Async Post Process Sync\0\0"))
 			m_AdaptiveTessellation->ForceRebuildAll(m_RenderType != RenderType::Direct);
+
+		ImGui::SeparatorText("Settings");
 
 		m_AdaptiveTessellation->RenderImGui();
 		m_DeferredLightRendering->RenderImGui(m_Timer);
 		m_MotionBlurRendering->RenderImGui();
 		m_BloomRendering->RenderImGui();
+
+		ImGui::SeparatorText("Author");
+
+		if (ImGui::Selectable("https://github.com/ArtemVetik", false, ImGuiSelectableFlags_None))
+		{
+			ShellExecute(0, L"open", L"https://github.com/ArtemVetik", 0, 0, SW_SHOWNORMAL);
+		}
 
 		ImGui::End();
 

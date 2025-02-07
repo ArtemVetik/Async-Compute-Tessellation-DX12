@@ -51,13 +51,30 @@ namespace AsyncComputeTessellation
 
 	void MotionBlurRendering::RenderImGui()
 	{
-		if (ImGui::CollapsingHeader("Motion Blur"))
+		static bool open = false;
+
+		if (!open)
+		{
+			if (ImGui::Button("Motion Blur"))
+				open = true;
+		}
+		else
+		{
+			if (ImGui::Button("Motion Blur [X]"))
+				open = false;
+		}
+
+		if (!open)
+			return;
+
+		if (ImGui::Begin("Motion Blur", &open))
 		{
 			ImGui::SliderFloat("Blur Amount", &m_BlurAmount, 0.1f, 20.0f);
 
 			if (ImGui::SliderInt("Sample Count", &m_SampleCount, 1, 50))
 				BuildPSO();
 		}
+		ImGui::End();
 	}
 
 	void MotionBlurRendering::BuildPSO()

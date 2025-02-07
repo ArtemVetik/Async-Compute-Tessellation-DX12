@@ -149,12 +149,27 @@ namespace AsyncComputeTessellation
 
 	void DeferredLightRendering::RenderImGui(const Timer& timer)
 	{
-		static bool showLightMenu = false;
 		static float rotateLightsSpeed = 0.0f;
+		static bool open = false;
 
-		if (ImGui::CollapsingHeader("Light parameters"))
+		if (!open)
 		{
-			ImGui::Checkbox("Show Light Settings", &showLightMenu);
+			if (ImGui::Button("Lights"))
+				open = true;
+		}
+		else
+		{
+			if (ImGui::Button("Lights [X]"))
+				open = false;
+		}
+
+		if (!open)
+			return;
+
+		if (ImGui::Begin("Lights Settings", &open))
+		{
+			ImGui::SeparatorText("Material");
+
 			ImGui::Spacing();
 			ImGui::Separator();
 			ImGui::Spacing();
@@ -165,98 +180,93 @@ namespace AsyncComputeTessellation
 				InitMaterialBuffer();
 			if (ImGui::SliderFloat("Roughness", &m_MaterialData.Roughness, 0.0f, 0.999f))
 				InitMaterialBuffer();
+
+			ImGui::Spacing();
+
+			ImGui::InputFloat("Rotate Speed", &rotateLightsSpeed);
+
+			if (ImGui::Button("Add Light"))
+				AddDefaultLight();
+
+			for (size_t i = 0; i < m_Lights.size(); i++)
+			{
+				float x = m_Lights[i]->Position.x;
+				float y = m_Lights[i]->Position.y;
+				float z = m_Lights[i]->Position.z;
+
+				float radius = sqrtf(x * x + y * y + z * z);
+				float theta, phi;
+
+				if (radius > 0.0f)
+				{
+					theta = acosf(y / radius);
+					phi = atan2f(z, x);
+				}
+				else
+				{
+					theta = 0.0f;
+					phi = 0.0f;
+				}
+
+				bool update = false;
+
+				if (rotateLightsSpeed)
+				{
+					phi += rotateLightsSpeed * timer.GetDeltaTime();
+					update = true;
+				}
+
+				ImGui::SeparatorText("");
+				ImGui::Text("Light: %d\n", i);
+				ImGui::Text("Position: (%f %f %f)", x, y, z);
+				ImGui::Text("Direction: (%f %f %f)", m_Lights[i]->Direction.x, m_Lights[i]->Direction.y, m_Lights[i]->Direction.z);
+
+				if (ImGui::SliderFloat((std::string("Radius##") + std::to_string(i)).c_str(), &radius, 0.1f, 300.0f))
+					update = true;
+				if (ImGui::SliderFloat((std::string("Theta##") + std::to_string(i)).c_str(), &theta, 0.0f, XM_PIDIV2))
+					update = true;
+				if (ImGui::SliderFloat((std::string("Phi##") + std::to_string(i)).c_str(), &phi, -XM_PI, XM_PI))
+					update = true;
+
+				auto lightType = m_Lights[i]->LightType;
+				if (ImGui::Combo((std::string("Light Type##") + std::to_string(i)).c_str(), (int*)&lightType, "Directional\0Point\0Spotlight\0\0"))
+					m_Lights[i]->LightType = lightType;
+
+				float strength[3] = { m_Lights[i]->Strength.x,m_Lights[i]->Strength.y, m_Lights[i]->Strength.z };
+				if (ImGui::InputFloat3((std::string("Strength##") + std::to_string(i)).c_str(), strength))
+					m_Lights[i]->Strength = { strength[0], strength[1], strength[2] };
+
+				float falloffStart = m_Lights[i]->FalloffStart;
+				if (ImGui::InputFloat((std::string("Falloff Start##") + std::to_string(i)).c_str(), &falloffStart))
+					m_Lights[i]->FalloffStart = falloffStart;
+
+				float falloffEnd = m_Lights[i]->FalloffEnd;
+				if (ImGui::InputFloat((std::string("Falloff End##") + std::to_string(i)).c_str(), &falloffEnd))
+					m_Lights[i]->FalloffEnd = falloffEnd;
+
+				float spotPower = m_Lights[i]->SpotPower;
+				if (ImGui::InputFloat((std::string("Spot Power##") + std::to_string(i)).c_str(), &spotPower))
+					m_Lights[i]->SpotPower = spotPower;
+
+				if (update)
+				{
+					float x = radius * sinf(theta) * cosf(phi);
+					float y = radius * cosf(theta);
+					float z = radius * sinf(theta) * sinf(phi);
+
+					m_Lights[i]->Position = XMFLOAT3(x, y, z);
+				}
+
+				XMVECTOR direction = XMVectorSubtract({ 0, 0, 0 }, XMLoadFloat3(&m_Lights[i]->Position));
+				XMFLOAT3 normDirection;
+				XMStoreFloat3(&normDirection, XMVector3Normalize(direction));
+
+				m_Lights[i]->Direction = normDirection;
+
+				if (ImGui::Button((std::string("Remove Light##") + std::to_string(i)).c_str()))
+					m_Lights.erase(m_Lights.begin() + i);
+			}
 		}
-
-		if (!showLightMenu)
-			return;
-
-		ImGui::Begin("Lights Settings");
-
-		ImGui::InputFloat("Rotate Speed", &rotateLightsSpeed);
-
-		if (ImGui::Button("Add Light"))
-			AddDefaultLight();
-
-		for (size_t i = 0; i < m_Lights.size(); i++)
-		{
-			float x = m_Lights[i]->Position.x;
-			float y = m_Lights[i]->Position.y;
-			float z = m_Lights[i]->Position.z;
-
-			float radius = sqrtf(x * x + y * y + z * z);
-			float theta, phi;
-
-			if (radius > 0.0f)
-			{
-				theta = acosf(y / radius);
-				phi = atan2f(z, x);
-			}
-			else
-			{
-				theta = 0.0f;
-				phi = 0.0f;
-			}
-
-			bool update = false;
-
-			if (rotateLightsSpeed)
-			{
-				phi += rotateLightsSpeed * timer.GetDeltaTime();
-				update = true;
-			}
-
-			ImGui::Text("Light: %d\n", i);
-			ImGui::Text("Position: (%f %f %f)", x, y, z);
-			ImGui::Text("Direction: (%f %f %f)", m_Lights[i]->Direction.x, m_Lights[i]->Direction.y, m_Lights[i]->Direction.z);
-
-			if (ImGui::SliderFloat((std::string("Radius##") + std::to_string(i)).c_str(), &radius, 0.1f, 300.0f))
-				update = true;
-			if (ImGui::SliderFloat((std::string("Theta##") + std::to_string(i)).c_str(), &theta, 0.0f, XM_PIDIV2))
-				update = true;
-			if (ImGui::SliderFloat((std::string("Phi##") + std::to_string(i)).c_str(), &phi, -XM_PI, XM_PI))
-				update = true;
-
-			auto lightType = m_Lights[i]->LightType;
-			if (ImGui::Combo((std::string("Light Type##") + std::to_string(i)).c_str(), (int*)&lightType, "Directional\0Point\0Spotlight\0\0"))
-				m_Lights[i]->LightType = lightType;
-
-			float strength[3] = { m_Lights[i]->Strength.x,m_Lights[i]->Strength.y, m_Lights[i]->Strength.z };
-			if (ImGui::InputFloat3((std::string("Strength##") + std::to_string(i)).c_str(), strength))
-				m_Lights[i]->Strength = { strength[0], strength[1], strength[2] };
-
-			float falloffStart = m_Lights[i]->FalloffStart;
-			if (ImGui::InputFloat((std::string("Falloff Start##") + std::to_string(i)).c_str(), &falloffStart))
-				m_Lights[i]->FalloffStart = falloffStart;
-
-			float falloffEnd = m_Lights[i]->FalloffEnd;
-			if (ImGui::InputFloat((std::string("Falloff End##") + std::to_string(i)).c_str(), &falloffEnd))
-				m_Lights[i]->FalloffEnd = falloffEnd;
-
-			float spotPower = m_Lights[i]->SpotPower;
-			if (ImGui::InputFloat((std::string("Spot Power##") + std::to_string(i)).c_str(), &spotPower))
-				m_Lights[i]->SpotPower = spotPower;
-
-			if (update)
-			{
-				float x = radius * sinf(theta) * cosf(phi);
-				float y = radius * cosf(theta);
-				float z = radius * sinf(theta) * sinf(phi);
-
-				m_Lights[i]->Position = XMFLOAT3(x, y, z);
-			}
-
-			XMVECTOR direction = XMVectorSubtract({ 0, 0, 0 }, XMLoadFloat3(&m_Lights[i]->Position));
-			XMFLOAT3 normDirection;
-			XMStoreFloat3(&normDirection, XMVector3Normalize(direction));
-
-			m_Lights[i]->Direction = normDirection;
-
-			if (ImGui::Button((std::string("Remove Light##") + std::to_string(i)).c_str()))
-				m_Lights.erase(m_Lights.begin() + i);
-
-			ImGui::Separator();
-		}
-
 		ImGui::End();
 	}
 

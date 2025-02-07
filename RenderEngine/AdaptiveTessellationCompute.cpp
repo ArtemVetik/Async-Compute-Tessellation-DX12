@@ -132,6 +132,8 @@ namespace AsyncComputeTessellation
 		m_ObjectCB = DynamicUploadBuffer(m_Device, m_ComputeQueue ? QueueID::Both : QueueID::Direct);
 		m_FrameCB = DynamicUploadBuffer(m_Device, m_ComputeQueue ? QueueID::Both : QueueID::Direct);
 
+		m_Params.CB.ScreenRes = std::max(m_SwapChain->GetWidth(), m_SwapChain->GetHeight());
+
 		BuildPSO();
 		InitBuffers();
 		ResetBuffers();

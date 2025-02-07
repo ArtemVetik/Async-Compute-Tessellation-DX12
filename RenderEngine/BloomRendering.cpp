@@ -54,7 +54,7 @@ namespace AsyncComputeTessellation
 			m_BloomBuffer[i] = std::make_unique<TextureD3D12>(m_Device, resourceDesc, &clearVal, QueueID::Direct);
 			m_BloomBuffer[i]->CreateRTVView(nullptr, true);
 			m_BloomBuffer[i]->CreateSRVView(&descSRV, false);
-			
+
 			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_BloomBuffer[i]->GetD3D12Resource(),
 				D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_GENERIC_READ));
 		}
@@ -138,13 +138,31 @@ namespace AsyncComputeTessellation
 
 	void BloomRendering::RenderImGui()
 	{
-		if (ImGui::CollapsingHeader("Bloom"))
+		static bool open = false;
+
+		if (!open)
+		{
+			if (ImGui::Button("Bloom"))
+				open = true;
+		}
+		else
+		{
+			if (ImGui::Button("Bloom [X]"))
+				open = false;
+		}
+
+		if (!open)
+			return;
+
+		if (ImGui::Begin("Bloom", &open))
 		{
 			ImGui::SliderFloat("Threshold", &m_Threshold, 0.0f, 3.0f);
 
 			if (ImGui::SliderInt("Kernel Size", &m_KernelSize, 3, 32))
 				BuildPSOAndWeights();
+
 		}
+		ImGui::End();
 	}
 
 	void BloomRendering::BuildPSOAndWeights()
