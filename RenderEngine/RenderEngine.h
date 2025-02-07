@@ -52,6 +52,9 @@ namespace AsyncComputeTessellation
 
 		static RenderEngine* GetInstance();
 
+		void AllocImGuiSrv(ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle);
+		void FreeImGuiSrv(ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle);
+	
 	private:
 		void InitImGui(const Window& mainWindow);
 		void Resize(UINT w, UINT h);

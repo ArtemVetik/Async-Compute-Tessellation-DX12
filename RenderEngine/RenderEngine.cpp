@@ -58,7 +58,6 @@ namespace AsyncComputeTessellation
 
 		m_Device->GetCommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT).Reset();
 
-		m_ImGuiTex = m_Device->AllocateGPUDescriptor(QueueID::Direct, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
 		InitImGui(mainWindow);
 
 		m_PsoData = std::make_unique<TessellationPSOData>(m_Device.get());
@@ -193,13 +192,6 @@ namespace AsyncComputeTessellation
 		static constexpr float rotateScale = 0.01f;
 		static constexpr float rotateLerpSpeed = 20.0f;
 
-		if (InputManager::GetInstance().IsKeyPressed(DIK_1))
-			m_Camera->RotateY(timer.GetDeltaTime() * 0.2f);
-		if (InputManager::GetInstance().IsKeyPressed(DIK_2))
-			m_Camera->RotateY(timer.GetDeltaTime() * 0.4f);
-		if (InputManager::GetInstance().IsKeyPressed(DIK_3))
-			m_Camera->RotateY(timer.GetDeltaTime() * 0.6f);
-
 		if (InputManager::GetInstance().IsKeyPressed(DIK_LSHIFT))
 			moveScale *= 2;
 
@@ -229,7 +221,7 @@ namespace AsyncComputeTessellation
 
 		auto Lerp = [](float a, float b, float t) {
 			return a + (b - a) * t;
-		};
+			};
 
 		float prevX = currentDelta.x;
 		currentDelta.x = Lerp(currentDelta.x, targetDelta.x, timer.GetDeltaTime() * rotateLerpSpeed);
@@ -279,18 +271,42 @@ namespace AsyncComputeTessellation
 		IMGUI_CHECKVERSION();
 		ImGui::CreateContext();
 		ImGuiIO& io = ImGui::GetIO();
-		(void)io;
+		io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
+		io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
+
 		ImGui::StyleColorsDark();
 		ImGui_ImplWin32_Init(mainWindow.GetMainWindow());
 
-		ImGui_ImplDX12_Init(
-			m_Device->GetD3D12Device(),
-			3,
-			DXGI_FORMAT_R8G8B8A8_UNORM,
-			m_Device->GetD3D12DescriptorHeap(),
-			m_ImGuiTex.GetCpuHandle(),
-			m_ImGuiTex.GetGpuHandle()
-		);
+		ImGui_ImplDX12_InitInfo init_info;
+		init_info.Device = m_Device->GetD3D12Device();
+		init_info.CommandQueue = m_Device->GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT).GetD3D12CommandQueue();
+		init_info.NumFramesInFlight = 3;
+		init_info.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
+		init_info.SrvDescriptorHeap = m_Device->GetD3D12DescriptorHeap();
+
+		init_info.SrvDescriptorAllocFn = [](ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
+			{
+				return RenderEngine::GetInstance()->AllocImGuiSrv(info, out_cpu_handle, out_gpu_handle);
+			};
+
+		init_info.SrvDescriptorFreeFn = [](ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
+			{
+				return RenderEngine::GetInstance()->FreeImGuiSrv(info, cpu_handle, gpu_handle);
+			};
+
+		ImGui_ImplDX12_Init(&init_info);
+	}
+
+	void RenderEngine::AllocImGuiSrv(ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE* out_cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE* out_gpu_handle)
+	{
+		m_ImGuiTex = m_Device->AllocateGPUDescriptor(QueueID::Direct, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, 1);
+		*out_cpu_handle = m_ImGuiTex.GetCpuHandle();
+		*out_gpu_handle = m_ImGuiTex.GetGpuHandle();
+	}
+
+	void RenderEngine::FreeImGuiSrv(ImGui_ImplDX12_InitInfo*, D3D12_CPU_DESCRIPTOR_HANDLE cpu_handle, D3D12_GPU_DESCRIPTOR_HANDLE gpu_handle)
+	{
+		m_ImGuiTex = {};
 	}
 
 	void RenderEngine::Resize(UINT w, UINT h)
