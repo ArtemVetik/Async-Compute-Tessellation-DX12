@@ -2,7 +2,6 @@
 #include "GeometryGenerator.h"
 
 #include "imgui/imgui.h"
-#include "../Core/Graphics/DynamicUploadBuffer.h"
 
 namespace AsyncComputeTessellation
 {
@@ -18,7 +17,9 @@ namespace AsyncComputeTessellation
 		m_UI(this),
 		m_Mesh(device),
 		m_PingPongCounter(0),
-		m_SubdCulledBuffIdx(0)
+		m_SubdCulledBuffIdx(0),
+		m_ObjectCB(m_Device, m_ComputeQueue ? QueueID::Both : QueueID::Direct),
+		m_FrameCB(m_Device, m_ComputeQueue ? QueueID::Both : QueueID::Direct)
 	{
 		ForceRebuildAll(computeQueue);
 	}
@@ -34,8 +35,7 @@ namespace AsyncComputeTessellation
 		auto commandList = commandContext.GetCmdList();
 
 		TessellationComputePass::ObjectData objConstants = {};
-		DynamicUploadBuffer objectCB(m_Device, m_ComputeQueue ? QueueID::Both : QueueID::Direct);
-		objectCB.LoadData(objConstants);
+		m_ObjectCB.LoadData(objConstants);
 
 		TessellationComputePass::PerFrameData frameData = {};
 		auto viewProj = XMMatrixMultiply(XMLoadFloat4x4(&m_Camera->GetViewMatrix()), XMLoadFloat4x4(&m_Camera->GetProjectionMatrix()));
@@ -48,8 +48,7 @@ namespace AsyncComputeTessellation
 		for (int i = 0; i < 6; i++)
 			frameData.FrustrumPlanes[i] = frustrum.Planes[i];
 
-		DynamicUploadBuffer frameCB(m_Device, m_ComputeQueue ? QueueID::Both : QueueID::Direct);
-		frameCB.LoadData(frameData);
+		m_FrameCB.LoadData(frameData);
 
 		if (!m_Params.Freeze)
 		{
@@ -66,9 +65,9 @@ namespace AsyncComputeTessellation
 			commandList->SetComputeRootDescriptorTable(3, m_Mesh.GetVertexUAVGpu());
 			commandList->SetComputeRootDescriptorTable(4, m_Mesh.GetIndexUAVGpu());
 			commandList->SetComputeRootDescriptorTable(5, m_SubdCounter->GetUAVView()->GetGpuHandle());
-			commandList->SetComputeRootConstantBufferView(6, objectCB.GetAllocation().GPUAddress);
+			commandList->SetComputeRootConstantBufferView(6, m_ObjectCB.GetAllocation().GPUAddress);
 			commandList->SetComputeRootConstantBufferView(7, m_TessellationData->GetD3D12Resource()->GetGPUVirtualAddress());
-			commandList->SetComputeRootConstantBufferView(8, frameCB.GetAllocation().GPUAddress);
+			commandList->SetComputeRootConstantBufferView(8, m_FrameCB.GetAllocation().GPUAddress);
 			commandList->SetComputeRootDescriptorTable(9, m_SubdCulledBuffIdx == 0 ? m_DrawArgs0->GetUAVView()->GetGpuHandle() : m_DrawArgs1->GetUAVView()->GetGpuHandle());
 
 			commandList->Dispatch(10000, 1, 1); // TODO: figure out how many threads group to run
@@ -89,7 +88,10 @@ namespace AsyncComputeTessellation
 
 		if (!m_ComputeQueue)
 			m_SubdCulledBuffIdx = 1;
+	}
 
+	void AdaptiveTessellationCompute::PrepareDraw()
+	{
 		auto& dCommandContext = m_Device->GetCommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT);
 		auto dCommandList = dCommandContext.GetCmdList();
 
@@ -100,9 +102,9 @@ namespace AsyncComputeTessellation
 		dCommandList->SetGraphicsRootDescriptorTable(1, m_Mesh.GetIndexSRVGpu());
 		dCommandList->SetGraphicsRootDescriptorTable(2, m_SubdCulledBuffIdx == 0 ? m_SubdBufferOutCulled1->GetSRVView()->GetGpuHandle() : m_SubdBufferOutCulled0->GetSRVView()->GetGpuHandle());
 
-		dCommandList->SetGraphicsRootConstantBufferView(4, objectCB.GetAllocation().GPUAddress);
+		dCommandList->SetGraphicsRootConstantBufferView(4, m_ObjectCB.GetAllocation().GPUAddress);
 		dCommandList->SetGraphicsRootConstantBufferView(5, m_TessellationData->GetD3D12Resource()->GetGPUVirtualAddress());
-		dCommandList->SetGraphicsRootConstantBufferView(6, frameCB.GetAllocation().GPUAddress);
+		dCommandList->SetGraphicsRootConstantBufferView(6, m_FrameCB.GetAllocation().GPUAddress);
 	}
 
 	void AdaptiveTessellationCompute::ExecuteIndirect() const
@@ -126,6 +128,9 @@ namespace AsyncComputeTessellation
 	void AdaptiveTessellationCompute::ForceRebuildAll(bool computeQueue)
 	{
 		m_ComputeQueue = computeQueue;
+
+		m_ObjectCB = DynamicUploadBuffer(m_Device, m_ComputeQueue ? QueueID::Both : QueueID::Direct);
+		m_FrameCB = DynamicUploadBuffer(m_Device, m_ComputeQueue ? QueueID::Both : QueueID::Direct);
 
 		BuildPSO();
 		InitBuffers();

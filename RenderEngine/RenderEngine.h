@@ -30,6 +30,7 @@ namespace AsyncComputeTessellation
 		AsyncAll,
 		AsyncShadowMap,
 		AsyncPostProcess,
+		AsyncPostProcessSync,
 	};
 
 	class RENDERENGINE_API RenderEngine

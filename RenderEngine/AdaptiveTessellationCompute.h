@@ -9,6 +9,7 @@
 
 #include "../Core/Graphics/GBuffer.h"
 #include "../Core/Graphics/SwapChain.h"
+#include "../Core/Graphics/DynamicUploadBuffer.h"
 
 namespace AsyncComputeTessellation
 {
@@ -22,6 +23,7 @@ namespace AsyncComputeTessellation
 							 bool				  computeQueue);
 
 		void Compute(const Timer& timer);
+		void PrepareDraw();
 		void RenderImGui();
 		void ForceRebuildAll(bool computeQueue);
 
@@ -63,5 +65,8 @@ namespace AsyncComputeTessellation
 		bool m_ComputeQueue;
 		
 		TessellationParams m_Params;
+
+		DynamicUploadBuffer m_ObjectCB;
+		DynamicUploadBuffer m_FrameCB;
 	};
 }

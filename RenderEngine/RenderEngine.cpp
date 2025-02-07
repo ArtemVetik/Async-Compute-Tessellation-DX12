@@ -98,16 +98,49 @@ namespace AsyncComputeTessellation
 		}
 
 		m_AdaptiveTessellation->Compute(m_Timer);
+		m_AdaptiveTessellation->PrepareDraw();
 
 		if (Light* shadowLight = m_DeferredLightRendering->GetShadowLight())
 			m_CSMRendering->Render(m_Camera.get(), shadowLight, m_Timer, m_AdaptiveTessellation.get());
+
+		if (frameRenderType == RenderType::AsyncShadowMap)
+		{
+			dCommandQueue.Signal();
+			dCommandQueue.CloseAndExecuteCommandContext(&dCommandContext);
+			dCommandContext.Reset();
+
+			cCommandQueue.Wait(&dCommandQueue, dCommandQueue.GetNextCmdListNum() - 1);
+			cCommandQueue.CloseAndExecuteCommandContext(&cCommandContext);
+			cCommandContext.Reset();
+
+			dCommandQueue.Wait(&cCommandQueue, cCommandQueue.GetNextCmdListNum());
+
+			dCommandContext.GetCmdList()->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+			cCommandContext.GetCmdList()->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+			m_AdaptiveTessellation->PrepareDraw();
+		}
 
 		dCommandContext.SetViewports(&m_Viewport, 1);
 		dCommandContext.SetScissorRects(&m_ScissorRect, 1);
 		m_AdaptiveTessellationDraw->Draw(m_DeferredLightRendering->GetGBuffer());
 		m_AdaptiveTessellation->ExecuteIndirect();
-
 		m_DeferredLightRendering->RenderLights(m_Camera.get(), m_CSMRendering.get());
+
+		if (frameRenderType == RenderType::AsyncPostProcess || frameRenderType == RenderType::AsyncPostProcessSync)
+		{
+			dCommandQueue.CloseAndExecuteCommandContext(&dCommandContext);
+			dCommandContext.Reset();
+
+			cCommandQueue.Wait(&dCommandQueue, dCommandQueue.GetNextCmdListNum());
+			cCommandQueue.CloseAndExecuteCommandContext(&cCommandContext);
+			cCommandContext.Reset();
+
+			dCommandContext.GetCmdList()->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+			cCommandContext.GetCmdList()->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+			dCommandContext.SetViewports(&m_Viewport, 1);
+			dCommandContext.SetScissorRects(&m_ScissorRect, 1);
+		}
+
 		m_BloomRendering->Render(m_DeferredLightRendering->GetGBuffer());
 		m_MotionBlurRendering->Render(m_Camera.get(), m_DeferredLightRendering->GetGBuffer());
 		m_DeferredLightRendering->RenderToneMapping(m_Camera.get(), m_BloomRendering.get());
@@ -124,6 +157,9 @@ namespace AsyncComputeTessellation
 
 		dCommandQueue.CloseAndExecuteCommandContext(&dCommandContext);
 		dCommandContext.Reset();
+
+		if (frameRenderType == RenderType::AsyncPostProcessSync)
+			dCommandQueue.Wait(&cCommandQueue, cCommandQueue.GetNextCmdListNum());
 
 		if (frameRenderType == RenderType::AsyncAll)
 		{
@@ -215,7 +251,7 @@ namespace AsyncComputeTessellation
 		ImGui::Begin("App parameters | TEST");
 		ImGui::Text("Test application parameters.");
 
-		if (ImGui::Combo("Render Type", (int*)&m_RenderType, "Direct\0Async All\0\0"))
+		if (ImGui::Combo("Render Type", (int*)&m_RenderType, "Direct\0Async All\0Async Shadow Map\0Async Post Process\0Async Post Process Sync\0\0"))
 			m_AdaptiveTessellation->ForceRebuildAll(m_RenderType != RenderType::Direct);
 
 		m_AdaptiveTessellation->RenderImGui();

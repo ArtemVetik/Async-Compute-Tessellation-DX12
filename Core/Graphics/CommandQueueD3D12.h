@@ -19,6 +19,7 @@ namespace EduEngine
 
 		void CloseAndExecuteCommandContext(CommandContext* commandContext);
 		
+		void Signal();
 		void Wait(CommandQueueD3D12* other, UINT64 fenceValue);
 		void SafeReleaseObject(ReleaseResourceWrapper&& staleObject);
 		void ProcessReleaseQueue(bool forceRelease = false);
