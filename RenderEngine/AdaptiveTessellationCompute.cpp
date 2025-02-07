@@ -41,10 +41,11 @@ namespace AsyncComputeTessellation
 		auto viewProj = XMMatrixMultiply(XMLoadFloat4x4(&m_Camera->GetViewMatrix()), XMLoadFloat4x4(&m_Camera->GetProjectionMatrix()));
 		XMStoreFloat4x4(&frameData.ViewProj, XMMatrixTranspose(viewProj));
 		frameData.CamPosition = m_Camera->GetPosition();
-		frameData.PredictedCamPosition = m_Camera->GetPosition();
+		frameData.PredictedCamPosition = m_Camera->GetPredictedPosition();
 		frameData.DeltaTime = timer.GetDeltaTime();
 		frameData.TotalTime = timer.GetTotalTime();
-		auto frustrum = m_Camera->GetFrustrumPlanes(DirectX::SimpleMath::Matrix::Identity);
+
+		auto frustrum = m_Camera->GetPredictedFrustrumPlanes(DirectX::SimpleMath::Matrix::Identity);
 		for (int i = 0; i < 6; i++)
 			frameData.FrustrumPlanes[i] = frustrum.Planes[i];
 

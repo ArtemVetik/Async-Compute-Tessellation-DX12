@@ -232,7 +232,7 @@ namespace AsyncComputeTessellation
 		currentDelta.y = Lerp(currentDelta.y, targetDelta.y, timer.GetDeltaTime() * rotateLerpSpeed);
 		m_Camera->Pitch(currentDelta.y - prevY);
 
-		m_Camera->Update();
+		m_Camera->Update(timer);
 	}
 
 	void RenderEngine::RecordImGuiCommands()
