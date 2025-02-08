@@ -161,6 +161,7 @@
     <ClInclude Include="DeferredLightRendering.h" />
     <ClInclude Include="framework.h" />
     <ClInclude Include="GeometryGenerator.h" />
+    <ClInclude Include="GPUStatsUI.h" />
     <ClInclude Include="imgui\imconfig.h" />
     <ClInclude Include="imgui\imgui.h" />
     <ClInclude Include="imgui\imgui_impl_dx12.h" />
@@ -190,6 +191,7 @@
     <ClCompile Include="DeferredLightRendering.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="GeometryGenerator.cpp" />
+    <ClCompile Include="GPUStatsUI.cpp" />
     <ClCompile Include="imgui\imgui.cpp" />
     <ClCompile Include="imgui\imgui_demo.cpp" />
     <ClCompile Include="imgui\imgui_draw.cpp" />

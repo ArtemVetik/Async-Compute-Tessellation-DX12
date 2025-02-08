@@ -69,6 +69,7 @@ namespace AsyncComputeTessellation
 		m_DeferredLightRendering = std::make_unique<DeferredLightRendering>(m_Device.get(), m_SwapChain.get(), m_SSQuad.get());
 		m_MotionBlurRendering = std::make_unique<MotionBlurRendering>(m_Device.get(), m_SwapChain.get(), m_SSQuad.get());
 		m_BloomRendering = std::make_unique<BloomRendering>(m_Device.get(), m_SSQuad.get());
+		m_RenderStats = std::make_unique<GPUStatsUI>(m_Device.get());
 
 		m_BloomRendering->Resize(m_SwapChain->GetWidth(), m_SwapChain->GetHeight());
 
@@ -97,7 +98,12 @@ namespace AsyncComputeTessellation
 			cCommandContext.GetCmdList()->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 		}
 
+		m_RenderStats->MarkRenderStart();
+		m_RenderStats->MarkComputeStart(m_RenderType != RenderType::Direct);
+
 		m_AdaptiveTessellation->Compute(m_Timer);
+		m_RenderStats->MarkComputeEnd(m_RenderType != RenderType::Direct);
+
 		m_AdaptiveTessellation->PrepareDraw();
 
 		if (Light* shadowLight = m_DeferredLightRendering->GetShadowLight())
@@ -155,6 +161,7 @@ namespace AsyncComputeTessellation
 		if (frameRenderType == RenderType::AsyncAll)
 			dCommandQueue.Wait(&cCommandQueue, cCommandQueue.GetNextCmdListNum());
 
+		m_RenderStats->MarkRenderEnd();
 		dCommandQueue.CloseAndExecuteCommandContext(&dCommandContext);
 		dCommandContext.Reset();
 
@@ -233,6 +240,7 @@ namespace AsyncComputeTessellation
 		m_Camera->Pitch(currentDelta.y - prevY);
 
 		m_Camera->Update(timer);
+		m_RenderStats->Update(m_RenderType != RenderType::Direct);
 	}
 
 	void RenderEngine::RecordImGuiCommands()
@@ -253,6 +261,7 @@ namespace AsyncComputeTessellation
 		m_DeferredLightRendering->RenderImGui(m_Timer);
 		m_MotionBlurRendering->RenderImGui();
 		m_BloomRendering->RenderImGui();
+		m_RenderStats->RenderImGui();
 
 		ImGui::SeparatorText("Author");
 

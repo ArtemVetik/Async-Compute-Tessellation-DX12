@@ -150,6 +150,7 @@
     <ClInclude Include="DynamicUploadBuffer.h" />
     <ClInclude Include="GBuffer.h" />
     <ClInclude Include="PipelineStateD3D12.h" />
+    <ClInclude Include="QueryHeap.h" />
     <ClInclude Include="RenderDeviceD3D12.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="DxException.h" />
@@ -172,6 +173,7 @@
     <ClCompile Include="DynamicUploadBuffer.cpp" />
     <ClCompile Include="GBuffer.cpp" />
     <ClCompile Include="PipelineStateD3D12.cpp" />
+    <ClCompile Include="QueryHeap.cpp" />
     <ClCompile Include="RenderDeviceD3D12.cpp" />
     <ClCompile Include="dllmain.cpp" />
     <ClCompile Include="pch.cpp">

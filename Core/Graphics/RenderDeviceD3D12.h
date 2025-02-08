@@ -7,6 +7,7 @@
 #include "../Graphics.Heaps/ReleaseResourceWrapper.h"
 #include "../Graphics.Heaps/QueueID.h"
 #include "CommandQueueD3D12.h"
+#include "QueryHeap.h"
 
 namespace EduEngine
 {
@@ -28,6 +29,7 @@ namespace EduEngine
 
 		CommandContext& GetCommandContext(D3D12_COMMAND_LIST_TYPE type);
 		CommandQueueD3D12& GetCommandQueue(D3D12_COMMAND_LIST_TYPE type);
+		const QueryHeap& GetQueryHeap() const { return m_QueryHeap; }
 
 		virtual void SafeReleaseObject(QueueID queueId, ReleaseResourceWrapper&& wrapper) override;
 		void FinishFrame(bool forceRelease = false);
@@ -55,5 +57,6 @@ namespace EduEngine
 
 		CommandQueueD3D12 m_CommandQueues[2]; // must be after descriptor heaps (release in destructor)
 		CommandContext m_CommandContexts[2];
+		QueryHeap m_QueryHeap;
 	};
 }

@@ -122,6 +122,26 @@ namespace EduEngine
 		return m_UavView.get();
 	}
 
+	ReadBackBufferD3D12::ReadBackBufferD3D12(RenderDeviceD3D12* pDevice,
+											 UINT64				numElements,
+											 QueueID			queueId) :
+		ResourceD3D12(pDevice, queueId)
+	{
+		D3D12_RESOURCE_DESC resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(numElements * sizeof(UINT64));
+
+		HRESULT hr = pDevice->GetD3D12Device()->CreateCommittedResource(
+			&CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK),
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_COPY_DEST,
+			nullptr,
+			IID_PPV_ARGS(&m_d3d12Resource));
+
+		THROW_IF_FAILED(hr, L"Failed to create resource in readback heap");
+
+		m_d3d12Resource->SetName(L"ReadBackBufferD3D12");
+	}
+
 	UploadBufferD3D12::UploadBufferD3D12(RenderDeviceD3D12*			pDevice,
 										 const D3D12_RESOURCE_DESC& desc,
 										 QueueID					queueId) :

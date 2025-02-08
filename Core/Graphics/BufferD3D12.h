@@ -100,6 +100,27 @@ namespace EduEngine
 		D3D12_INDEX_BUFFER_VIEW m_View;
 	};
 
+	class GRAPHICS_API ReadBackBufferD3D12 : public ResourceD3D12
+	{
+	public:
+		ReadBackBufferD3D12(RenderDeviceD3D12* pDevice,
+							UINT64			   numElements,
+							QueueID			   queueId);
+
+		template <typename T>
+		void ReadData(int elementIndex, T& data)
+		{
+			m_d3d12Resource->Map(0, nullptr, reinterpret_cast<void**>(&m_MappedData));
+
+			data = reinterpret_cast<T*>(m_MappedData + elementIndex * sizeof(T))[0];
+
+			m_d3d12Resource->Unmap(0, nullptr);
+		}
+
+	private:
+		BYTE* m_MappedData = nullptr;
+	};
+
 	class GRAPHICS_API UploadBufferD3D12 : public ResourceD3D12
 	{
 	public:

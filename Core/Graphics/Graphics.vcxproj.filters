@@ -81,6 +81,9 @@
     <ClInclude Include="CommandSignatureD3D12.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="QueryHeap.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -135,6 +138,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="CommandSignatureD3D12.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="QueryHeap.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

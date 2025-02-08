@@ -26,6 +26,7 @@ namespace AsyncComputeTessellation
 
 		commandContext.GetCmdList()->SetPipelineState(m_PsoData->GetGBufferPass()->GetD3D12PipelineState());
 
+		//TODO: add diffuse map
 		//commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(3, diffuseMapSrv);
 	}
 }

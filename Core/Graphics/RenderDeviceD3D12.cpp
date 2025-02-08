@@ -34,7 +34,8 @@ namespace EduEngine
 			{ m_GPUDescriptorHeaps[0], 2048, "CBV_SRV_UAV_DynSuballocationMgr" },
 			{ m_GPUDescriptorHeaps[1], 2048, "SAMPLER_DynSuballocationMgr" }
 		},
-		m_DynUploadHeap{ true, this, 2048 }
+		m_DynUploadHeap{ true, this, 2048 },
+		m_QueryHeap { this, 16, D3D12_QUERY_HEAP_TYPE_TIMESTAMP }
 	{
 	}
 
