@@ -19,6 +19,9 @@ namespace AsyncComputeTessellation
 		void MarkComputeEnd(bool computeQueue);
 
 	private:
+		void ResetStats();
+
+	private:
 		RenderDeviceD3D12* m_Device;
 
 		std::unique_ptr<ReadBackBufferD3D12> m_RenderReadBackBuffer;
@@ -29,8 +32,9 @@ namespace AsyncComputeTessellation
 
 		static constexpr int PlotDataCount = 80;
 
-		bool m_ShowStats = false;
+		int m_RefreshRate = 30;
 		float m_PlotRefreshTime = 0.0f;
+		bool m_ShowStats = false;
 		int m_StatsOffset = 0;
 		float m_ComputeTime[PlotDataCount];
 		float m_TotalTime[PlotDataCount];

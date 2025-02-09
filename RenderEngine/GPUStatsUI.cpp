@@ -15,6 +15,8 @@ namespace AsyncComputeTessellation
 
 		m_Device->GetCommandQueue(D3D12_COMMAND_LIST_TYPE_DIRECT).GetD3D12CommandQueue()->GetTimestampFrequency(&m_DirectFrequency);
 		m_Device->GetCommandQueue(D3D12_COMMAND_LIST_TYPE_COMPUTE).GetD3D12CommandQueue()->GetTimestampFrequency(&m_ComputeFrequency);
+
+		ResetStats();
 	}
 
 	void GPUStatsUI::Update(bool asyncCompute)
@@ -50,6 +52,13 @@ namespace AsyncComputeTessellation
 		{
 			ImGui::Begin("Stats", &m_ShowStats);
 
+			ImGui::SliderInt("Refresh Rate", &m_RefreshRate, 1, 60);
+
+			if (ImGui::Button("Reset"))
+				ResetStats();
+
+			ImGui::SeparatorText("");
+
 			if (m_PlotRefreshTime == 0)
 				m_PlotRefreshTime = ImGui::GetTime();
 
@@ -59,20 +68,22 @@ namespace AsyncComputeTessellation
 				m_TotalTime[m_StatsOffset] = m_CurrentTotalTime;
 
 				m_StatsOffset = (m_StatsOffset + 1) % PlotDataCount;
-				m_PlotRefreshTime += 1.0f / 30.0f;
+				m_PlotRefreshTime += 1.0f / m_RefreshRate;
 			}
+
+			int currOffset = m_StatsOffset > 0 ? m_StatsOffset - 1 : PlotDataCount - 1;
 
 			auto computeMax = *std::max_element(m_ComputeTime, m_ComputeTime + PlotDataCount);
 			ImGui::PlotLines("GPU compute dT", m_ComputeTime,
 				PlotDataCount, m_StatsOffset,
-				std::to_string(m_CurrentComputeTime).c_str(),
+				std::to_string(m_ComputeTime[currOffset]).c_str(),
 				0.0f, computeMax, ImVec2(0, PlotDataCount));
 
 			auto totalMax = *std::max_element(m_TotalTime, m_TotalTime + PlotDataCount);
 			ImGui::PlotLines("GPU render dT", m_TotalTime,
 				PlotDataCount, m_StatsOffset,
-				std::to_string(m_CurrentTotalTime).c_str(),
-				0.0f, computeMax, ImVec2(0, PlotDataCount));
+				std::to_string(m_TotalTime[currOffset]).c_str(),
+				0.0f, totalMax, ImVec2(0, PlotDataCount));
 
 			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 			ImGui::End();
@@ -103,5 +114,15 @@ namespace AsyncComputeTessellation
 		auto& commandConext = m_Device->GetCommandContext(computeQueue ? D3D12_COMMAND_LIST_TYPE_COMPUTE : D3D12_COMMAND_LIST_TYPE_DIRECT);
 		m_Device->GetQueryHeap().EndQuery(commandConext, D3D12_QUERY_TYPE_TIMESTAMP, 1);
 		m_Device->GetQueryHeap().ResolveQueryData(commandConext, D3D12_QUERY_TYPE_TIMESTAMP, 0, 2, m_ComputeReadBackBuffer.get(), 0);
+	}
+
+	void GPUStatsUI::ResetStats()
+	{
+		memset(m_ComputeTime, 0, sizeof(float) * PlotDataCount);
+		memset(m_TotalTime, 0, sizeof(float) * PlotDataCount);
+		m_CurrentComputeTime = 0;
+		m_CurrentTotalTime = 0;
+		m_StatsOffset = 0;
+		m_PlotRefreshTime = 0;
 	}
 }
