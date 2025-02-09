@@ -30,8 +30,8 @@ namespace AsyncComputeTessellation
 		Direct,
 		AsyncAll,
 		AsyncShadowMap,
+		AsyncDraw,
 		AsyncPostProcess,
-		AsyncPostProcessSync,
 	};
 
 	class RENDERENGINE_API RenderEngine
@@ -88,5 +88,6 @@ namespace AsyncComputeTessellation
 		DirectX::SimpleMath::Rectangle m_PendingResize = EmptyResize;
 
 		RenderType m_RenderType;
+		bool m_WaitForCompute;
 	};
 }

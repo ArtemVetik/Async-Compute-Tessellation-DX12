@@ -15,7 +15,8 @@ namespace AsyncComputeTessellation
 		m_Timer(timer),
 		m_Viewport{},
 		m_ScissorRect{},
-		m_RenderType(RenderType::Direct)
+		m_RenderType(RenderType::Direct),
+		m_WaitForCompute(false)
 	{
 		assert(m_Instance == nullptr);
 		m_Instance = this;
@@ -119,7 +120,8 @@ namespace AsyncComputeTessellation
 			cCommandQueue.CloseAndExecuteCommandContext(&cCommandContext);
 			cCommandContext.Reset();
 
-			dCommandQueue.Wait(&cCommandQueue, cCommandQueue.GetNextCmdListNum());
+			if (m_WaitForCompute)
+				dCommandQueue.Wait(&cCommandQueue, cCommandQueue.GetNextCmdListNum());
 
 			dCommandContext.GetCmdList()->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 			cCommandContext.GetCmdList()->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
@@ -130,9 +132,31 @@ namespace AsyncComputeTessellation
 		dCommandContext.SetScissorRects(&m_ScissorRect, 1);
 		m_AdaptiveTessellationDraw->Draw(m_DeferredLightRendering->GetGBuffer());
 		m_AdaptiveTessellation->ExecuteIndirect();
+
+		if (frameRenderType == RenderType::AsyncDraw)
+		{
+			dCommandQueue.Signal();
+			dCommandQueue.CloseAndExecuteCommandContext(&dCommandContext);
+			dCommandContext.Reset();
+
+			cCommandQueue.Wait(&dCommandQueue, dCommandQueue.GetNextCmdListNum() - 1);
+			cCommandQueue.CloseAndExecuteCommandContext(&cCommandContext);
+			cCommandContext.Reset();
+
+			if (m_WaitForCompute)
+				dCommandQueue.Wait(&cCommandQueue, cCommandQueue.GetNextCmdListNum());
+
+			dCommandContext.GetCmdList()->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+			cCommandContext.GetCmdList()->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
+
+			dCommandContext.SetViewports(&m_Viewport, 1);
+			dCommandContext.SetScissorRects(&m_ScissorRect, 1);
+			m_AdaptiveTessellation->PrepareDraw();
+		}
+
 		m_DeferredLightRendering->RenderLights(m_Camera.get(), m_CSMRendering.get());
 
-		if (frameRenderType == RenderType::AsyncPostProcess || frameRenderType == RenderType::AsyncPostProcessSync)
+		if (frameRenderType == RenderType::AsyncPostProcess)
 		{
 			dCommandQueue.CloseAndExecuteCommandContext(&dCommandContext);
 			dCommandContext.Reset();
@@ -165,7 +189,7 @@ namespace AsyncComputeTessellation
 		dCommandQueue.CloseAndExecuteCommandContext(&dCommandContext);
 		dCommandContext.Reset();
 
-		if (frameRenderType == RenderType::AsyncPostProcessSync)
+		if (frameRenderType == RenderType::AsyncPostProcess && m_WaitForCompute)
 			dCommandQueue.Wait(&cCommandQueue, cCommandQueue.GetNextCmdListNum());
 
 		if (frameRenderType == RenderType::AsyncAll)
@@ -252,8 +276,10 @@ namespace AsyncComputeTessellation
 		ImGui::Begin("App Parameters");
 		ImGui::Text("Async Compute Tessellation");
 
-		if (ImGui::Combo("Render Type", (int*)&m_RenderType, "Direct\0Async All\0Async Shadow Map\0Async Post Process\0Async Post Process Sync\0\0"))
+		if (ImGui::Combo("Render Type", (int*)&m_RenderType, "Direct\0Async All\0Async Shadow Map\0Async Draw\0Async Post Process\0\0"))
 			m_AdaptiveTessellation->ForceRebuildAll(m_RenderType != RenderType::Direct);
+
+		ImGui::Checkbox("Wait For Compute", &m_WaitForCompute);
 
 		ImGui::SeparatorText("Settings");
 
