@@ -99,16 +99,18 @@ namespace AsyncComputeTessellation
 			cCommandContext.GetCmdList()->SetDescriptorHeaps(_countof(descriptorHeaps), descriptorHeaps);
 		}
 
-		m_RenderStats->MarkRenderStart();
+		m_RenderStats->MarkRenderStart(GPUStatsUI::RenderStatType::Total);
 		m_RenderStats->MarkComputeStart(m_RenderType != RenderType::Direct);
 
 		m_AdaptiveTessellation->Compute(m_Timer);
 		m_RenderStats->MarkComputeEnd(m_RenderType != RenderType::Direct);
 
+		m_RenderStats->MarkRenderStart(GPUStatsUI::RenderStatType::ShadowMap);
 		m_AdaptiveTessellation->PrepareDraw();
 
 		if (Light* shadowLight = m_DeferredLightRendering->GetShadowLight())
 			m_CSMRendering->Render(m_Camera.get(), shadowLight, m_Timer, m_AdaptiveTessellation.get());
+		m_RenderStats->MarkRenderEnd(GPUStatsUI::RenderStatType::ShadowMap);
 
 		if (frameRenderType == RenderType::AsyncShadowMap)
 		{
@@ -128,10 +130,12 @@ namespace AsyncComputeTessellation
 			m_AdaptiveTessellation->PrepareDraw();
 		}
 
+		m_RenderStats->MarkRenderStart(GPUStatsUI::RenderStatType::Draw);
 		dCommandContext.SetViewports(&m_Viewport, 1);
 		dCommandContext.SetScissorRects(&m_ScissorRect, 1);
 		m_AdaptiveTessellationDraw->Draw(m_DeferredLightRendering->GetGBuffer());
 		m_AdaptiveTessellation->ExecuteIndirect();
+		m_RenderStats->MarkRenderEnd(GPUStatsUI::RenderStatType::Draw);
 
 		if (frameRenderType == RenderType::AsyncDraw)
 		{
@@ -154,7 +158,9 @@ namespace AsyncComputeTessellation
 			m_AdaptiveTessellation->PrepareDraw();
 		}
 
+		m_RenderStats->MarkRenderStart(GPUStatsUI::RenderStatType::Light);
 		m_DeferredLightRendering->RenderLights(m_Camera.get(), m_CSMRendering.get());
+		m_RenderStats->MarkRenderEnd(GPUStatsUI::RenderStatType::Light);
 
 		if (frameRenderType == RenderType::AsyncPostProcess)
 		{
@@ -171,6 +177,7 @@ namespace AsyncComputeTessellation
 			dCommandContext.SetScissorRects(&m_ScissorRect, 1);
 		}
 
+		m_RenderStats->MarkRenderStart(GPUStatsUI::RenderStatType::PostProcess);
 		m_BloomRendering->Render(m_DeferredLightRendering->GetGBuffer());
 		m_MotionBlurRendering->Render(m_Camera.get(), m_DeferredLightRendering->GetGBuffer());
 		m_DeferredLightRendering->RenderToneMapping(m_Camera.get(), m_BloomRendering.get());
@@ -185,7 +192,8 @@ namespace AsyncComputeTessellation
 		if (frameRenderType == RenderType::AsyncAll)
 			dCommandQueue.Wait(&cCommandQueue, cCommandQueue.GetNextCmdListNum());
 
-		m_RenderStats->MarkRenderEnd();
+		m_RenderStats->MarkRenderEnd(GPUStatsUI::RenderStatType::PostProcess);
+		m_RenderStats->MarkRenderEnd(GPUStatsUI::RenderStatType::Total);
 		dCommandQueue.CloseAndExecuteCommandContext(&dCommandContext);
 		dCommandContext.Reset();
 
