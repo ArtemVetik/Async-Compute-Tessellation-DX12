@@ -1,7 +1,5 @@
-Texture2D gAccumTexture : register(t0);
-Texture2D gBloomTexture : register(t1);
-
-StructuredBuffer<float> gWeights : register(t2);
+Texture2D gBloomTexture0 : register(t0);
+Texture2D gBloomTexture1 : register(t1);
 
 SamplerState gsamPointWrap : register(s0);
 SamplerState gsamPointClamp : register(s1);
@@ -14,7 +12,11 @@ SamplerComparisonState gsamShadow : register(s6);
 cbuffer cbBloomPass : register(b0)
 {
     float gThreshold;
-    float3 gPadding;
+    float gIntensity;
+    float gScatter;
+    float gPadding0;
+    float3 gTint;
+    float gPadding1;
 }
 
 struct VertexIn
@@ -37,34 +39,64 @@ VertexOut VS(VertexIn vIn)
     return vOut;
 }
 
-float4 PS(VertexOut pIn) : SV_Target
+float4 PSThreshold(VertexOut pIn) : SV_Target
 {
-    float3 lightColor = gAccumTexture.Sample(gsamLinearClamp, pIn.TexC).rgb;
+    float3 lightColor = gBloomTexture0.Sample(gsamLinearClamp, pIn.TexC).rgb;
 
     float luminance = dot(lightColor, float3(0.2126, 0.7152, 0.0722));
     float3 thresholdColor = step(gThreshold, luminance) * lightColor;
     return float4(thresholdColor, 1.0f);
 }
 
-float4 PSMain(VertexOut pIn) : SV_Target
+float4 PSBlurH(VertexOut pIn) : SV_Target
 {
-    float4 color = gBloomTexture.SampleLevel(gsamPointClamp, pIn.TexC, 0) * gWeights[0];
     float width, height;
-    gBloomTexture.GetDimensions(width, height);
+    gBloomTexture1.GetDimensions(width, height);
     
-#if HORIZONTAL_BLUR
-    float2 texelSize = float2(1.0f/width, 0.0f);
-#else
+    float2 texelSize = float2(1.0f / width, 0.0f);
+    
+    float3 c0 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(texelSize.x * 4.0, 0.0));
+    float3 c1 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(texelSize.x * 3.0, 0.0));
+    float3 c2 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(texelSize.x * 2.0, 0.0));
+    float3 c3 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(texelSize.x * 1.0, 0.0));
+    float3 c4 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC);
+    float3 c5 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(texelSize.x * 1.0, 0.0));
+    float3 c6 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(texelSize.x * 2.0, 0.0));
+    float3 c7 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(texelSize.x * 3.0, 0.0));
+    float3 c8 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(texelSize.x * 4.0, 0.0));
+    
+    float3 color = c0 * 0.01621622 + c1 * 0.05405405 + c2 * 0.12162162 + c3 * 0.19459459
+                 + c4 * 0.22702703
+                 + c5 * 0.19459459 + c6 * 0.12162162 + c7 * 0.05405405 + c8 * 0.01621622;
+    
+    return float4(color, 1.0f);
+}
+
+float4 PSBlurV(VertexOut pIn) : SV_Target
+{
+    float width, height;
+    gBloomTexture1.GetDimensions(width, height);
+    
     float2 texelSize = float2(0.0f, 1.0f / height);
-#endif
+
+    // Optimized bilinear 5-tap gaussian on the same-sized source (9-tap equivalent)
+    float3 c0 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(0, texelSize.y * 3.23076923));
+    float3 c1 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(0, texelSize.y * 1.38461538));
+    float3 c2 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC);
+    float3 c3 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(0, texelSize.y * 1.38461538));
+    float3 c4 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(0, texelSize.y * 3.23076923));
     
-#ifdef BLOOM_KERNEL_SIZE
-    [unroll]
-    for (int i = 1; i <= BLOOM_KERNEL_SIZE; i++)
-    {
-        color += gBloomTexture.SampleLevel(gsamLinearClamp, pIn.TexC + texelSize * i, 0) * gWeights[i];
-        color += gBloomTexture.SampleLevel(gsamLinearClamp, pIn.TexC - texelSize * i, 0) * gWeights[i];
-    }
-#endif
-    return color;
+    float3 color = c0 * 0.07027027 + c1 * 0.31621622
+                 + c2 * 0.22702703
+                 + c3 * 0.31621622 + c4 * 0.07027027;
+    
+    return float4(color, 1.0f);
+}
+
+float4 PSUpscale(VertexOut pIn) : SV_Target
+{
+    float4 highMip = gBloomTexture0.Sample(gsamLinearClamp, pIn.TexC);
+    float4 lowMip = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC);
+    
+    return lerp(highMip, lowMip, gScatter) * gIntensity * float4(gTint, 1.0f);
 }

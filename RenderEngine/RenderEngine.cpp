@@ -179,6 +179,9 @@ namespace AsyncComputeTessellation
 
 		m_RenderStats->MarkRenderStart(GPUStatsUI::RenderStatType::PostProcess);
 		m_BloomRendering->Render(m_DeferredLightRendering->GetGBuffer());
+
+		dCommandContext.SetViewports(&m_Viewport, 1);
+		dCommandContext.SetScissorRects(&m_ScissorRect, 1);
 		m_MotionBlurRendering->Render(m_Camera.get(), m_DeferredLightRendering->GetGBuffer());
 		m_DeferredLightRendering->RenderToneMapping(m_Camera.get(), m_BloomRendering.get());
 

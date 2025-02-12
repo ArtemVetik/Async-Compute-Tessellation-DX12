@@ -403,34 +403,33 @@ namespace AsyncComputeTessellation
 	{
 	private:
 		ShaderD3D12 m_VertexShader;
-		ShaderD3D12 m_HPixelShader;
-		ShaderD3D12 m_VPixelShader;
-		ShaderD3D12 m_ThresholdPixelShader;
+		ShaderD3D12 m_PSThreshold;
+		ShaderD3D12 m_PSBlurH;
+		ShaderD3D12 m_PSBlurV;
+		ShaderD3D12 m_PSUpscale;
 		RootSignatureD3D12 m_RootSignature;
+		PipelineStateD3D12 m_TresholdPso;
 		PipelineStateD3D12 m_HPso;
 		PipelineStateD3D12 m_VPso;
-		PipelineStateD3D12 m_TresholdPso;
+		PipelineStateD3D12 m_UpscalePso;
 
 	public:
-		BloomPass(RenderDeviceD3D12* device, D3D_SHADER_MACRO* hMacros = nullptr, D3D_SHADER_MACRO* vMacros = nullptr) :
-			m_VertexShader(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_VERTEX, nullptr, "VS", "vs_5_1"),
-			m_ThresholdPixelShader(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_PIXEL, vMacros, "PS", "ps_5_1"),
-			m_HPixelShader(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_PIXEL, hMacros, "PSMain", "ps_5_1"),
-			m_VPixelShader(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_PIXEL, vMacros, "PSMain", "ps_5_1")
+		BloomPass(RenderDeviceD3D12* device, D3D_SHADER_MACRO* macros = nullptr) :
+			m_VertexShader(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_VERTEX, macros, "VS", "vs_5_1"),
+			m_PSThreshold(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_PIXEL, macros, "PSThreshold", "ps_5_1"),
+			m_PSBlurH(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_PIXEL, macros, "PSBlurH", "ps_5_1"),
+			m_PSBlurV(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_PIXEL, macros, "PSBlurV", "ps_5_1"),
+			m_PSUpscale(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_PIXEL, macros, "PSUpscale", "ps_5_1")
 		{
-			CD3DX12_DESCRIPTOR_RANGE accumTex;
-			accumTex.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-			m_RootSignature.AddDescriptorParameter(1, &accumTex); // accumulation buffer
+			CD3DX12_DESCRIPTOR_RANGE bloomTex0;
+			bloomTex0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
+			m_RootSignature.AddDescriptorParameter(1, &bloomTex0); // bloom buffer 0
 
-			CD3DX12_DESCRIPTOR_RANGE depthTex;
-			depthTex.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
-			m_RootSignature.AddDescriptorParameter(1, &depthTex); // depth buffer
+			CD3DX12_DESCRIPTOR_RANGE bloomTex1;
+			bloomTex1.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
+			m_RootSignature.AddDescriptorParameter(1, &bloomTex1); // bloom buffer 1
 
-			CD3DX12_DESCRIPTOR_RANGE weights;
-			weights.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2);
-			m_RootSignature.AddDescriptorParameter(1, &weights); // weights
-
-			m_RootSignature.AddConstants(4, 0);
+			m_RootSignature.AddConstants(8, 0);
 
 			m_RootSignature.Build(device, QueueID::Direct);
 			m_RootSignature.SetName(L"BloomRootSignature");
@@ -452,7 +451,7 @@ namespace AsyncComputeTessellation
 			m_TresholdPso.SetDepthStencilState(dss);
 			m_TresholdPso.SetRasterizerState(rast);
 			m_TresholdPso.SetShader(&m_VertexShader);
-			m_TresholdPso.SetShader(&m_ThresholdPixelShader);
+			m_TresholdPso.SetShader(&m_PSThreshold);
 			m_TresholdPso.SetRTVFormat(DeferredLightPass::AccumBuffFormat);
 			m_TresholdPso.Build(device);
 			m_TresholdPso.SetName(L"ThresholdBloomPSO");
@@ -462,26 +461,37 @@ namespace AsyncComputeTessellation
 			m_HPso.SetDepthStencilState(dss);
 			m_HPso.SetRasterizerState(rast);
 			m_HPso.SetShader(&m_VertexShader);
-			m_HPso.SetShader(&m_HPixelShader);
+			m_HPso.SetShader(&m_PSBlurH);
 			m_HPso.SetRTVFormat(DeferredLightPass::AccumBuffFormat);
 			m_HPso.Build(device);
-			m_HPso.SetName(L"HBloomPSO");
+			m_HPso.SetName(L"BloomHPSO");
 
 			m_VPso.SetInputLayout({ mInputLayout.data(), (UINT)mInputLayout.size() });
 			m_VPso.SetRootSignature(&m_RootSignature);
 			m_VPso.SetDepthStencilState(dss);
 			m_VPso.SetRasterizerState(rast);
 			m_VPso.SetShader(&m_VertexShader);
-			m_VPso.SetShader(&m_VPixelShader);
+			m_VPso.SetShader(&m_PSBlurV);
 			m_VPso.SetRTVFormat(DeferredLightPass::AccumBuffFormat);
 			m_VPso.Build(device);
-			m_VPso.SetName(L"VBloomPSO");
+			m_VPso.SetName(L"BloomVPSO");
+
+			m_UpscalePso.SetInputLayout({ mInputLayout.data(), (UINT)mInputLayout.size() });
+			m_UpscalePso.SetRootSignature(&m_RootSignature);
+			m_UpscalePso.SetDepthStencilState(dss);
+			m_UpscalePso.SetRasterizerState(rast);
+			m_UpscalePso.SetShader(&m_VertexShader);
+			m_UpscalePso.SetShader(&m_PSUpscale);
+			m_UpscalePso.SetRTVFormat(DeferredLightPass::AccumBuffFormat);
+			m_UpscalePso.Build(device);
+			m_UpscalePso.SetName(L"BloomUpscalePSO");
 		}
 
 		ID3D12RootSignature* GetD3D12RootSignature() const { return m_RootSignature.GetD3D12RootSignature(); }
 		ID3D12PipelineState* GetD3D12PipelineStateThreshold() const { return m_TresholdPso.GetD3D12PipelineState(); }
 		ID3D12PipelineState* GetD3D12PipelineStateH() const { return m_HPso.GetD3D12PipelineState(); }
 		ID3D12PipelineState* GetD3D12PipelineStateV() const { return m_VPso.GetD3D12PipelineState(); }
+		ID3D12PipelineState* GetD3D12PipelineStateUpscale() const { return m_UpscalePso.GetD3D12PipelineState(); }
 	};
 
 	class ToneMappingPass

@@ -17,21 +17,23 @@ namespace AsyncComputeTessellation
 		void Render(const GBuffer* gBuffer);
 		void RenderImGui();
 
-		D3D12_GPU_DESCRIPTOR_HANDLE GetBloomSrv() const { return m_BloomBuffer[0]->GetView(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)->GetGpuHandle(); };
+		D3D12_GPU_DESCRIPTOR_HANDLE GetBloomSrv() const { return m_BloomMipUp[0]->GetView(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV)->GetGpuHandle(); }
 
 	private:
-		void BuildPSOAndWeights();
+		static constexpr int BloomMipCount = 6;
+		int m_MipNum;
 
-	private:
 		RenderDeviceD3D12* m_Device;
 		ScreenSpaceQuad* m_SSQuad;
 
 		std::unique_ptr<BloomPass> m_RenderPass;
 
-		std::unique_ptr<TextureD3D12> m_BloomBuffer[2];
-		std::unique_ptr<BufferD3D12> m_WeightsBuffer;
+		std::unique_ptr<TextureD3D12> m_BloomMipDown[BloomMipCount];
+		std::unique_ptr<TextureD3D12> m_BloomMipUp[BloomMipCount];
 
 		float m_Threshold;
-		int m_KernelSize;
+		float m_Intensity;
+		float m_Scatter;
+		float m_Tint[3];
 	};
 }
