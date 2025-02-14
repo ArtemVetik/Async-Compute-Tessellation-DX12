@@ -57,32 +57,32 @@ uint2 ts_parent_64(uint2 nodeID)
     return ts_rightShift_64(nodeID, 1u);
 }
 
-float3x2 ts_mul(float3x2 A, float3x2 B)
+FTYPE3x2 ts_mul(FTYPE3x2 A, FTYPE3x2 B)
 {
-    float2x2 tmpA = float2x2(A[0][0], A[0][1], A[1][0], A[1][1]);
-    float2x2 tmpB = float2x2(B[0][0], B[0][1], B[1][0], B[1][1]);
+    FTYPE2x2 tmpA = FTYPE2x2(A[0][0], A[0][1], A[1][0], A[1][1]);
+    FTYPE2x2 tmpB = FTYPE2x2(B[0][0], B[0][1], B[1][0], B[1][1]);
     
-    float2x2 tmp = mul(tmpA, tmpB);
+    FTYPE2x2 tmp = mul(tmpA, tmpB);
     
-    float3x2 r;
-    r[0] = float2(tmp[0][0], tmp[0][1]);
-    r[1] = float2(tmp[1][0], tmp[1][1]);
+    FTYPE3x2 r;
+    r[0] = FTYPE2(tmp[0][0], tmp[0][1]);
+    r[1] = FTYPE2(tmp[1][0], tmp[1][1]);
     
-    float2x3 T = transpose(float3x2(A[0], A[1], A[2]));
+    FTYPE2x3 T = transpose(FTYPE3x2(A[0], A[1], A[2]));
     
-    r[2].x = dot(T[0], float3(B[2][0], B[2][1], 1.0f));
-    r[2].y = dot(T[1], float3(B[2][0], B[2][1], 1.0f));
+    r[2].x = dot(T[0], FTYPE3(B[2][0], B[2][1], 1.0f));
+    r[2].y = dot(T[1], FTYPE3(B[2][0], B[2][1], 1.0f));
 
     return r;
 }
 
-float3x2 jk_bitToMatrix(in uint bit)
+FTYPE3x2 jk_bitToMatrix(in uint bit)
 {
-    float s = float(bit) - 0.5;
-    float2 r1 = float2(-0.5, +s);
-    float2 r2 = float2(-s, -0.5);
-    float2 r3 = float2(+0.5, +0.5);
-    return float3x2(r1, r2, r3);
+    FTYPE s = FTYPE(bit) - 0.5;
+    FTYPE2 r1 = FTYPE2(-0.5, +s);
+    FTYPE2 r2 = FTYPE2(-s, -0.5);
+    FTYPE2 r3 = FTYPE2(+0.5, +0.5);
+    return FTYPE3x2(r1, r2, r3);
 }
 
 void ts_getMeshTriangle(uint meshPolygonID, out Triangle t)
@@ -94,12 +94,12 @@ void ts_getMeshTriangle(uint meshPolygonID, out Triangle t)
     }
 }
 
-void ts_getTriangleXform_64(uint2 nodeID, out float3x2 xform, out float3x2 parent_xform)
+void ts_getTriangleXform_64(uint2 nodeID, out FTYPE3x2 xform, out FTYPE3x2 parent_xform)
 {
-    float2 r1 = float2(1, 0);
-    float2 r2 = float2(0, 1);
-    float2 r3 = float2(0, 0);
-    float3x2 xf = float3x2(r1, r2, r3);
+    FTYPE2 r1 = FTYPE2(1, 0);
+    FTYPE2 r2 = FTYPE2(0, 1);
+    FTYPE2 r3 = FTYPE2(0, 0);
+    FTYPE3x2 xf = FTYPE3x2(r1, r2, r3);
 
     // Handles the root triangle case
     if (nodeID.x == 0u && nodeID.y == 1u)
@@ -120,22 +120,22 @@ void ts_getTriangleXform_64(uint2 nodeID, out float3x2 xform, out float3x2 paren
     xform = ts_mul(parent_xform, jk_bitToMatrix(lsb & 1u));
 }
 
-float2 ts_Leaf_to_Tree_64(float2 p, uint2 nodeID)
+FTYPE2 ts_Leaf_to_Tree_64(FTYPE2 p, uint2 nodeID)
 {
-    float3x2 xform, pxform;
+    FTYPE3x2 xform, pxform;
     ts_getTriangleXform_64(nodeID, xform, pxform);
-    return mul(float3(p, 1), xform).xy;
+    return mul(FTYPE3(p, 1), xform).xy;
 }
 
-float3 ts_mapTo3DTriangle(Triangle t, float2 uv)
+FTYPE3 ts_mapTo3DTriangle(Triangle t, FTYPE2 uv)
 {
-    float3 result = (1.0 - uv.x - uv.y) * t.Vertex[0].Position +
+    FTYPE3 result = (1.0 - uv.x - uv.y) * t.Vertex[0].Position +
             uv.x * t.Vertex[2].Position +
             uv.y * t.Vertex[1].Position;
     return result;
 }
 
-Vertex ts_interpolateVertex(Triangle t, float2 uv)
+Vertex ts_interpolateVertex(Triangle t, FTYPE2 uv)
 {
     Vertex v;
     v.Position = (1.0 - uv.x - uv.y) * t.Vertex[0].Position
@@ -154,31 +154,31 @@ Vertex ts_interpolateVertex(Triangle t, float2 uv)
     return v;
 }
 
-float3 ts_Tree_to_MeshPosition(float2 p, uint meshPolygonID)
+FTYPE3 ts_Tree_to_MeshPosition(FTYPE2 p, uint meshPolygonID)
 {
     Triangle mesh_t;
     ts_getMeshTriangle(meshPolygonID, mesh_t);
     return ts_mapTo3DTriangle(mesh_t, p);
 }
 
-float3 ts_Leaf_to_MeshPosition(float2 p, uint4 key)
+FTYPE3 ts_Leaf_to_MeshPosition(FTYPE2 p, uint4 key)
 {
     uint2 nodeID = key.xy;
     uint meshPolygonID = key.z;
-    float2 p2d = ts_Leaf_to_Tree_64(p, nodeID);
+    FTYPE2 p2d = ts_Leaf_to_Tree_64(p, nodeID);
     return ts_Tree_to_MeshPosition(p2d, meshPolygonID);
 }
 
-void ts_Leaf_n_Parent_to_MeshPosition(float2 p, uint4 key, out float3 p_mesh, out float3 pp_mesh)
+void ts_Leaf_n_Parent_to_MeshPosition(FTYPE2 p, uint4 key, out FTYPE3 p_mesh, out FTYPE3 pp_mesh)
 {
     uint2 nodeID = key.xy;
     uint meshPolygonID = key.z;
-    float3x2 xf, pxf;
-    float2 p2D, pp2D;
+    FTYPE3x2 xf, pxf;
+    FTYPE2 p2D, pp2D;
 
     ts_getTriangleXform_64(nodeID, xf, pxf);
-    p2D = mul(float3(p, 1), xf).xy;
-    pp2D = mul(float3(p, 1), pxf).xy;
+    p2D = mul(FTYPE3(p, 1), xf).xy;
+    pp2D = mul(FTYPE3(p, 1), pxf).xy;
 
     p_mesh = ts_Tree_to_MeshPosition(p2D, meshPolygonID);
     pp_mesh = ts_Tree_to_MeshPosition(pp2D, meshPolygonID);

@@ -15,6 +15,7 @@ namespace AsyncComputeTessellation
 		float TargetLength = 25;
 		bool UseDisplaceMapping = true;
 		bool Freeze = false;
+		bool UseFP16InShader = false;
 
 		TessellationComputePass::TessellationData CB;
 	};
@@ -43,6 +44,7 @@ namespace AsyncComputeTessellation
 				{"USE_DISPLACE", params.UseDisplaceMapping && params.MeshMode == MeshMode::TERRAIN ? "1" : "0"},
 				{"UNIFORM_TESSELLATION", params.Uniform ? "1" : "0"},
 				{"FLAT_NORMALS", params.FlatNormals ? "1" : "0"},
+				{"USE_FP16", params.UseFP16InShader ? "1" : "0"},
 				{NULL, NULL}
 			};
 
@@ -53,6 +55,7 @@ namespace AsyncComputeTessellation
 			{
 				{"SHADOW_MAP", "1"},
 				{"USE_DISPLACE", params.UseDisplaceMapping && params.MeshMode == MeshMode::TERRAIN ? "1" : "0"},
+				{"USE_FP16", params.UseFP16InShader ? "1" : "0"},
 				{NULL, NULL}
 			};
 			m_ShadowPass = std::make_unique<TessellationShadowMapPass>(m_Device, &m_DrawRootSignature, shadowMacros);

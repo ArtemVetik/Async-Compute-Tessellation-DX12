@@ -103,6 +103,9 @@ namespace AsyncComputeTessellation
 
 			ImGui::SeparatorText("Compute Settings");
 			ImGui::Checkbox("Freeze", &m_Parent->m_Params.Freeze);
+			
+			if (ImGui::Checkbox("Use FP16 is shader", &m_Parent->m_Params.UseFP16InShader))
+				buildPso = true;
 		}
 		ImGui::End();
 

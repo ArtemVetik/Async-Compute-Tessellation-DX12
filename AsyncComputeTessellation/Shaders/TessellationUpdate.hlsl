@@ -6,9 +6,9 @@
 static const int O = 0;
 static const int R = 1;
 static const int U = 2;
-static const float2 unit_O = float2(0, 0);
-static const float2 unit_R = float2(1, 0);
-static const float2 unit_U = float2(0, 1);
+static const FTYPE2 unit_O = FTYPE2(0, 0);
+static const FTYPE2 unit_R = FTYPE2(1, 0);
+static const FTYPE2 unit_U = FTYPE2(0, 1);
 
 void cull_writeKey(uint4 key)
 {
@@ -19,9 +19,9 @@ void cull_writeKey(uint4 key)
 
 void cullPass(uint4 key)
 {
-    float3x3 mesh_coord;
-    float3 b_min = 10e6;
-    float3 b_max = -10e6;
+    FTYPE3x3 mesh_coord;
+    FTYPE3 b_min = 10e6;
+    FTYPE3 b_max = -10e6;
 
     mesh_coord[O] = ts_Leaf_to_MeshPosition(unit_O, key);
     mesh_coord[U] = ts_Leaf_to_MeshPosition(unit_U, key);
@@ -41,7 +41,7 @@ void cullPass(uint4 key)
     b_max = max(b_max, mesh_coord[U]);
     b_max = max(b_max, mesh_coord[R]);
     
-    float4x4 mvp = mul(gWorld, gViewProj);
+    FTYPE4x4 mvp = mul(gWorld, gViewProj);
     if (culltest(mvp, b_min.xyz, b_max.xyz))
         cull_writeKey(key);
 }
@@ -78,7 +78,7 @@ void main(uint id : SV_DispatchThreadID, uint groupId : SV_GroupIndex)
     targetLod = gSubdivisionLevel;
     parentLod = gSubdivisionLevel;
 #else 
-    float parentTargetLevel, targetLevel;
+    FTYPE parentTargetLevel, targetLevel;
 #if USE_DISPLACE
     computeTessLvlWithParent(key, cam_height_local, targetLevel, parentTargetLevel);
 #else

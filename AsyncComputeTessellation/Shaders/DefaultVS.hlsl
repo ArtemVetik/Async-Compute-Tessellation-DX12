@@ -8,14 +8,14 @@ VertexOut main(VertexIn vIn, uint instanceID : SV_InstanceID)
 {
     VertexOut output;
     
-    float2 leaf_pos = vIn.PosL.xy;
+    FTYPE2 leaf_pos = vIn.PosL.xy;
     uint4 key = SubdBufferOut[instanceID];
     uint2 nodeID = key.xy;
 
     Triangle t;
     ts_getMeshTriangle(key.z, t);
     
-    float2 tree_pos = ts_Leaf_to_Tree_64(leaf_pos, nodeID);
+    FTYPE2 tree_pos = ts_Leaf_to_Tree_64(leaf_pos, nodeID);
     Vertex vertex = ts_interpolateVertex(t, tree_pos);
     
     float4 posW = mul(float4(vertex.Position, 1.0f), gWorld);
