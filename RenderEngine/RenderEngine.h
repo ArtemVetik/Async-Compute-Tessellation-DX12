@@ -89,5 +89,7 @@ namespace AsyncComputeTessellation
 
 		RenderType m_RenderType;
 		bool m_WaitForCompute;
+
+		DXGI_ADAPTER_DESC1 m_DeviceDesc;
 	};
 }

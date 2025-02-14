@@ -1,5 +1,9 @@
+#include <dxgi1_6.h>
+#include <iostream>
+
 #include "RenderEngine.h"
 #include "shellapi.h"
+
 #include "../Core/InputSystem/InputManager.h"
 
 namespace AsyncComputeTessellation
@@ -40,14 +44,40 @@ namespace AsyncComputeTessellation
 		debugController->EnableDebugLayer();
 #endif
 
+		IDXGIFactory6* pFactory = nullptr;
+		if (FAILED(CreateDXGIFactory1(__uuidof(IDXGIFactory6), (void**)&pFactory)))
+		{
+			std::cerr << "Failed to create DXGI Factory!" << std::endl;
+			return false;
+		}
+
+		IDXGIAdapter1* pAdapter = nullptr;
+
+		if (FAILED(pFactory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE, __uuidof(IDXGIAdapter1), (void**)&pAdapter)))
+		{
+			std::cerr << "Failed to get high-performance GPU!" << std::endl;
+			pFactory->Release();
+			return false;
+		}
+
 		Microsoft::WRL::ComPtr<ID3D12Device> device;
 		HRESULT hardwareResult = D3D12CreateDevice(
-			nullptr,
+			pAdapter,
 			D3D_FEATURE_LEVEL_11_0,
 			IID_PPV_ARGS(device.GetAddressOf()));
 
 		if (FAILED(hardwareResult))
-			throw;
+		{
+			std::cerr << "The selected GPU does not support DirectX 12!" << std::endl;
+			pAdapter->Release();
+			pFactory->Release();
+			return false;
+		}
+
+		pAdapter->GetDesc1(&m_DeviceDesc);
+
+		pAdapter->Release();
+		pFactory->Release();
 
 		m_Device = std::make_unique<RenderDeviceD3D12>(device);
 
@@ -299,6 +329,23 @@ namespace AsyncComputeTessellation
 		m_MotionBlurRendering->RenderImGui();
 		m_BloomRendering->RenderImGui();
 		m_RenderStats->RenderImGui();
+
+		ImGuiIO& io = ImGui::GetIO();
+		ImVec2 windowSize = ImVec2(300, 100);
+		ImVec2 windowPos = ImVec2(io.DisplaySize.x - windowSize.x - 10, io.DisplaySize.y - windowSize.y - 10);
+
+		ImGui::SetNextWindowPos(windowPos, ImGuiCond_Always);
+		ImGui::SetNextWindowSize(windowSize, ImGuiCond_Always);
+
+		ImGui::Begin("GPU Info", nullptr, ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoTitleBar);
+
+		ImGui::TextWrapped("Primary GPU: %ls", m_DeviceDesc.Description);
+		ImGui::Text("\tVideo Memory: %llu", m_DeviceDesc.DedicatedVideoMemory / (1024 * 1024));
+		ImGui::Text("\tSystem Memory: %llu MB", m_DeviceDesc.DedicatedSystemMemory / (1024 * 1024));
+		ImGui::Text("\tShared Memory: %llu MB", m_DeviceDesc.SharedSystemMemory / (1024 * 1024));
+		ImGui::Text("\tVendor ID: %u, Device ID: %u", m_DeviceDesc.VendorId, m_DeviceDesc.DeviceId);
+
+		ImGui::End();
 
 		ImGui::SeparatorText("Author");
 

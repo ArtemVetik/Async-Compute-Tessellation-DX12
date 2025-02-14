@@ -38,7 +38,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE prevInstance,
 	InputManager::GetInstance().Initialize(hInstance, window.GetMainWindow());
 
 	RenderEngine render(timer);
-	render.StartUp(window);
+	if (!render.StartUp(window))
+		return -1;
 
 	MSG msg = { 0 };
 	int fps;
