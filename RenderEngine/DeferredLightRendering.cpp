@@ -27,6 +27,7 @@ namespace AsyncComputeTessellation
 	void DeferredLightRendering::RenderLights(const Camera* camera, const CSMRendering* csmRendering)
 	{
 		auto& commandContext = m_Device->GetCommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT);
+		PIXBeginEvent(commandContext.GetCmdList(), PIX_COLOR(255, 255, 0), L"Deferred Light");
 
 		for (int i = 0; i < TessellationGBufferPass::GBufferCount; i++)
 			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_GBuffer->GetGBuffer(i),
@@ -108,6 +109,8 @@ namespace AsyncComputeTessellation
 		commandContext.GetCmdList()->SetGraphicsRootConstantBufferView(6, m_MaterialBuffer->GetD3D12Resource()->GetGPUVirtualAddress());
 
 		commandContext.GetCmdList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
+
+		PIXEndEvent(commandContext.GetCmdList());
 	}
 
 	void DeferredLightRendering::RenderToneMapping(const Camera* camera, const BloomRendering* bloom)

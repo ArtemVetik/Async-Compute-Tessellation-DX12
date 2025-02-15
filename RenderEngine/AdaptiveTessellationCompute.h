@@ -1,5 +1,6 @@
 #pragma once
 
+#include "framework.h"
 #include "Camera.h"
 #include "Timer.h"
 #include "RenderPasses.h"

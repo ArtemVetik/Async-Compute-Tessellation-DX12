@@ -4,6 +4,7 @@
 #include "RenderEngine.h"
 #include "shellapi.h"
 
+#include "WinPixEventRuntime/pix3.h"
 #include "../Core/InputSystem/InputManager.h"
 
 namespace AsyncComputeTessellation
@@ -161,11 +162,13 @@ namespace AsyncComputeTessellation
 		}
 
 		m_RenderStats->MarkRenderStart(GPUStatsUI::RenderStatType::Draw);
+		PIXBeginEvent(dCommandContext.GetCmdList(), PIX_COLOR(255, 255, 255), L"GBuffer Draw");
 		dCommandContext.SetViewports(&m_Viewport, 1);
 		dCommandContext.SetScissorRects(&m_ScissorRect, 1);
 		m_AdaptiveTessellationDraw->Draw(m_DeferredLightRendering->GetGBuffer());
 		m_AdaptiveTessellation->ExecuteIndirect();
 		m_RenderStats->MarkRenderEnd(GPUStatsUI::RenderStatType::Draw);
+		PIXEndEvent(dCommandContext.GetCmdList());
 
 		if (frameRenderType == RenderType::AsyncDraw)
 		{
@@ -208,6 +211,7 @@ namespace AsyncComputeTessellation
 		}
 
 		m_RenderStats->MarkRenderStart(GPUStatsUI::RenderStatType::PostProcess);
+		PIXBeginEvent(dCommandContext.GetCmdList(), PIX_COLOR(128, 0, 128), L"Post Process");
 		m_BloomRendering->Render(m_DeferredLightRendering->GetGBuffer());
 
 		dCommandContext.SetViewports(&m_Viewport, 1);
@@ -226,6 +230,7 @@ namespace AsyncComputeTessellation
 			dCommandQueue.Wait(&cCommandQueue, cCommandQueue.GetNextCmdListNum());
 
 		m_RenderStats->MarkRenderEnd(GPUStatsUI::RenderStatType::PostProcess);
+		PIXEndEvent(dCommandContext.GetCmdList());
 		m_RenderStats->MarkRenderEnd(GPUStatsUI::RenderStatType::Total);
 		dCommandQueue.CloseAndExecuteCommandContext(&dCommandContext);
 		dCommandContext.Reset();

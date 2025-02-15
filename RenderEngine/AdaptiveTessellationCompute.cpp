@@ -51,6 +51,8 @@ namespace AsyncComputeTessellation
 
 		m_FrameCB.LoadData(frameData);
 
+		PIXBeginEvent(commandList, PIX_COLOR(255, 165, 0), L"ComputeTessellation");
+
 		if (!m_Params.Freeze)
 		{
 			commandContext.GetCmdList()->ResourceBarrier(1, &CD3DX12_RESOURCE_BARRIER::Transition(m_SubdCulledBuffIdx == 0 ?
@@ -84,6 +86,8 @@ namespace AsyncComputeTessellation
 				m_DrawArgs0->GetD3D12Resource() : m_DrawArgs1->GetD3D12Resource(),
 				D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_INDIRECT_ARGUMENT));
 		}
+
+		PIXEndEvent(commandList);
 
 		m_PingPongCounter = 1 - m_PingPongCounter;
 

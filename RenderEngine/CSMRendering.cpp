@@ -73,6 +73,14 @@ namespace AsyncComputeTessellation
 		float cascadeNear = 0.0f;
 
 		auto& commandContext = m_Device->GetCommandContext(D3D12_COMMAND_LIST_TYPE_DIRECT);
+		PIXBeginEvent(commandContext.GetCmdList(), PIX_COLOR(128, 128, 128), L"CSM Rendering");
+		commandContext.GetCmdList()->SetPipelineState(m_PsoData->GetShadowPass()->GetD3D12PipelineState());
+
+		for (int i = 0; i < CascadeCount; i++)
+		{
+			commandContext.GetCmdList()->ClearDepthStencilView(m_ShadowMaps[i]->GetView(D3D12_DESCRIPTOR_HEAP_TYPE_DSV)->GetCpuHandle(),
+				D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
+		}
 
 		for (int i = 0; i < CascadeCount; i++)
 		{
@@ -105,13 +113,8 @@ namespace AsyncComputeTessellation
 			D3D12_VIEWPORT viewport = { 0.0f, 0.0f, shadowTexDesc.Width, shadowTexDesc.Height, 0.0f, 1.0f };
 			D3D12_RECT scissorRect = { 0.0f, 0.0f, shadowTexDesc.Width, shadowTexDesc.Height };
 
-			commandContext.GetCmdList()->SetPipelineState(m_PsoData->GetShadowPass()->GetD3D12PipelineState());
-
 			commandContext.GetCmdList()->RSSetViewports(1, &viewport);
 			commandContext.GetCmdList()->RSSetScissorRects(1, &scissorRect);
-
-			commandContext.GetCmdList()->ClearDepthStencilView(m_ShadowMaps[i]->GetView(D3D12_DESCRIPTOR_HEAP_TYPE_DSV)->GetCpuHandle(),
-				D3D12_CLEAR_FLAG_DEPTH | D3D12_CLEAR_FLAG_STENCIL, 1.0f, 0, 0, nullptr);
 
 			commandContext.SetRenderTargets(0, nullptr, false, &m_ShadowMaps[i]->GetView(D3D12_DESCRIPTOR_HEAP_TYPE_DSV)->GetCpuHandle());
 
@@ -129,6 +132,8 @@ namespace AsyncComputeTessellation
 			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::Transition(m_ShadowMaps[i]->GetD3D12Resource(),
 				D3D12_RESOURCE_STATE_GENERIC_READ, D3D12_RESOURCE_STATE_DEPTH_WRITE));
 		}
+
+		PIXEndEvent(commandContext.GetCmdList());
 	}
 
 	XMMATRIX CSMRendering::CalculateLightView(Light* light)
