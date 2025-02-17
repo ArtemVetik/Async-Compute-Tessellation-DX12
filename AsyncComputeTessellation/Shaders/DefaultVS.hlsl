@@ -32,8 +32,8 @@ VertexOut main(VertexIn vIn, uint instanceID : SV_InstanceID)
     output.TexC = vertex.TexC;
     output.PosH = mul(posW, gShadowViewProj);
 #else
-    output.PosW = posW;
-    output.NormalW = mul(float4(vertex.Normal, 1.0f), gWorld);
+    output.PosW = posW.xyz;
+    output.NormalW = mul(float4(vertex.Normal, 1.0f), gWorld).xyz;
     output.Lvl = ts_findMSB_64(key.xy);
     output.TexC = vertex.TexC;
     output.PosH = mul(posW, gViewProj);

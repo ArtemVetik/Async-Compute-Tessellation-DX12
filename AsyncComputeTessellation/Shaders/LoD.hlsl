@@ -16,8 +16,8 @@ void computeTessLvlWithParent(uint4 key, FTYPE height, out FTYPE lvl, out FTYPE 
 {   
     FTYPE3 p_mesh, pp_mesh;
     ts_Leaf_n_Parent_to_MeshPosition(triangle_centroid, key, p_mesh, pp_mesh);
-    p_mesh = mul(FTYPE4(p_mesh, 1), gWorld);
-    pp_mesh = mul(FTYPE4(pp_mesh, 1), gWorld);
+    p_mesh = mul(FTYPE4(p_mesh, 1), gWorld).xyz;
+    pp_mesh = mul(FTYPE4(pp_mesh, 1), gWorld).xyz;
     p_mesh.y = height;
     pp_mesh.y = height;
 
@@ -30,8 +30,8 @@ void computeTessLvlWithParent(uint4 key, out FTYPE lvl, out FTYPE parent_lvl)
     FTYPE3 p_mesh, pp_mesh;
     
     ts_Leaf_n_Parent_to_MeshPosition(triangle_centroid, key, p_mesh, pp_mesh);
-    p_mesh = mul(FTYPE4(p_mesh, 1), gWorld);
-    pp_mesh = mul(FTYPE4(pp_mesh, 1), gWorld);
+    p_mesh = mul(FTYPE4(p_mesh, 1), gWorld).xyz;
+    pp_mesh = mul(FTYPE4(pp_mesh, 1), gWorld).xyz;
 
     lvl = distanceToLod(p_mesh.xyz);
     parent_lvl = distanceToLod(pp_mesh.xyz);

@@ -55,15 +55,15 @@ float4 PSBlurH(VertexOut pIn) : SV_Target
     
     float2 texelSize = float2(1.0f / width, 0.0f);
     
-    float3 c0 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(texelSize.x * 4.0, 0.0));
-    float3 c1 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(texelSize.x * 3.0, 0.0));
-    float3 c2 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(texelSize.x * 2.0, 0.0));
-    float3 c3 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(texelSize.x * 1.0, 0.0));
-    float3 c4 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC);
-    float3 c5 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(texelSize.x * 1.0, 0.0));
-    float3 c6 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(texelSize.x * 2.0, 0.0));
-    float3 c7 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(texelSize.x * 3.0, 0.0));
-    float3 c8 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(texelSize.x * 4.0, 0.0));
+    float3 c0 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(texelSize.x * 4.0, 0.0)).rgb;
+    float3 c1 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(texelSize.x * 3.0, 0.0)).rgb;
+    float3 c2 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(texelSize.x * 2.0, 0.0)).rgb;
+    float3 c3 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(texelSize.x * 1.0, 0.0)).rgb;
+    float3 c4 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC).rgb;
+    float3 c5 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(texelSize.x * 1.0, 0.0)).rgb;
+    float3 c6 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(texelSize.x * 2.0, 0.0)).rgb;
+    float3 c7 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(texelSize.x * 3.0, 0.0)).rgb;
+    float3 c8 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(texelSize.x * 4.0, 0.0)).rgb;
     
     float3 color = c0 * 0.01621622 + c1 * 0.05405405 + c2 * 0.12162162 + c3 * 0.19459459
                  + c4 * 0.22702703
@@ -80,11 +80,11 @@ float4 PSBlurV(VertexOut pIn) : SV_Target
     float2 texelSize = float2(0.0f, 1.0f / height);
 
     // Optimized bilinear 5-tap gaussian on the same-sized source (9-tap equivalent)
-    float3 c0 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(0, texelSize.y * 3.23076923));
-    float3 c1 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(0, texelSize.y * 1.38461538));
-    float3 c2 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC);
-    float3 c3 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(0, texelSize.y * 1.38461538));
-    float3 c4 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(0, texelSize.y * 3.23076923));
+    float3 c0 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(0, texelSize.y * 3.23076923)).rgb;
+    float3 c1 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC - float2(0, texelSize.y * 1.38461538)).rgb;
+    float3 c2 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC).rgb;
+    float3 c3 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(0, texelSize.y * 1.38461538)).rgb;
+    float3 c4 = gBloomTexture1.Sample(gsamLinearClamp, pIn.TexC + float2(0, texelSize.y * 3.23076923)).rgb;
     
     float3 color = c0 * 0.07027027 + c1 * 0.31621622
                  + c2 * 0.22702703

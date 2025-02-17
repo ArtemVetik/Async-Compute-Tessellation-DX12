@@ -43,7 +43,7 @@ VertexOut VS(VertexIn vIn)
 
 float4 PS(VertexOut pIn) : SV_TARGET
 {
-    float zOverW = gDepthTexture.Sample(gsamPointWrap, pIn.TexC);
+    float zOverW = gDepthTexture.Sample(gsamPointWrap, pIn.TexC).r;
     
     if (zOverW >= 1.0f)
         return gAccumTexture.Sample(gsamLinearClamp, pIn.TexC);
@@ -56,7 +56,7 @@ float4 PS(VertexOut pIn) : SV_TARGET
     float4 previousPos = mul(worldPos, gPreviousViewProj);
     previousPos /= previousPos.w;
     
-    float2 velocity = (currentPos - previousPos) / 2.f;
+    float2 velocity = (currentPos.xy - previousPos.xy) / 2.f;
     
     float4 color = gAccumTexture.Sample(gsamLinearClamp, pIn.TexC);
     pIn.TexC += velocity * gBlurAmount;

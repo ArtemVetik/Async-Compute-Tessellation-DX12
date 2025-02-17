@@ -32,8 +32,8 @@ VertexOut VS(VertexIn vIn)
 [earlydepthstencil]
 float4 PS(VertexOut pIn) : SV_TARGET
 {   
-    float4 hdrColor = gAccumTexture.Sample(gsamPointWrap, pIn.TexC);
-    float4 bloomColor = gBloomTexture.Sample(gsamPointWrap, pIn.TexC);
+    float3 hdrColor = gAccumTexture.Sample(gsamPointWrap, pIn.TexC).rgb;
+    float3 bloomColor = gBloomTexture.Sample(gsamPointWrap, pIn.TexC).rgb;
     
     hdrColor += 1.0f * bloomColor;
     
