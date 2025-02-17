@@ -1,6 +1,5 @@
 #include "pch.h"
 #include "ShaderD3D12.h"
-#include "d3dcompiler.h"
 
 namespace EduEngine
 {
@@ -21,13 +20,20 @@ namespace EduEngine
 		DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&pCompiler));
 
 		pUtils->CreateDefaultIncludeHandler(&pIncludeHandler);
-
+		
 		std::vector<LPCWSTR> pszArgs = {
 			fileName.c_str(),
 			L"-E", entryPoint.c_str(),
 			L"-T", target.c_str(),
+#if defined(DEBUG) | defined(_DEBUG)
 			L"-Zi",
-			L"-Qembed_debug"
+			L"-Qembed_debug",
+#else
+			L"-Fo",
+			L"-O3",
+			L"-Qstrip_debug",
+			L"-Qstrip_reflect",
+#endif
 		};
 
 		std::vector<std::wstring> macroStr;
