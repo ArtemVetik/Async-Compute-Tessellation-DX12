@@ -59,9 +59,9 @@ namespace AsyncComputeTessellation
 		ComputePipelineStateD3D12 m_CopyDrawPSO;
 
 	public:
-		TessellationComputePass(RenderDeviceD3D12* device, QueueID queueId, D3D_SHADER_MACRO* macros = nullptr) :
-			m_UpdateCS(L"Shaders\\TessellationUpdate.hlsl", EDU_SHADER_TYPE_COMPUTE, macros, "main", "cs_5_1"),
-			m_CopyDrawCS(L"Shaders\\TessellationCopyDraw.hlsl", EDU_SHADER_TYPE_COMPUTE, macros, "main", "cs_5_1")
+		TessellationComputePass(RenderDeviceD3D12* device, QueueID queueId, const LPCWSTR* macros = nullptr) :
+			m_UpdateCS(L"Shaders\\TessellationUpdate.hlsl", EDU_SHADER_TYPE_COMPUTE, macros, L"main", L"cs_6_0"),
+			m_CopyDrawCS(L"Shaders\\TessellationCopyDraw.hlsl", EDU_SHADER_TYPE_COMPUTE, macros, L"main", L"cs_6_0")
 		{
 			// TODO: Order from most frequent to least frequent
 
@@ -181,8 +181,8 @@ namespace AsyncComputeTessellation
 		PipelineStateD3D12 m_PSO;
 
 	public:
-		TessellationShadowMapPass(RenderDeviceD3D12* device, TessellationDrawRootSignature* rootSignature, D3D_SHADER_MACRO* macros = nullptr) :
-			m_VertexShader(L"Shaders\\DefaultVS.hlsl", EDU_SHADER_TYPE_VERTEX, macros, "main", "vs_5_1")
+		TessellationShadowMapPass(RenderDeviceD3D12* device, TessellationDrawRootSignature* rootSignature, const LPCWSTR* macros = nullptr) :
+			m_VertexShader(L"Shaders\\DefaultVS.hlsl", EDU_SHADER_TYPE_VERTEX, macros, L"main", L"vs_6_0")
 		{
 			std::vector<D3D12_INPUT_ELEMENT_DESC> inputLayout =
 			{
@@ -223,10 +223,10 @@ namespace AsyncComputeTessellation
 		PipelineStateD3D12 m_PSO;
 
 	public:
-		TessellationGBufferPass(RenderDeviceD3D12* device, TessellationDrawRootSignature* rootSignature, bool wireframe, D3D_SHADER_MACRO* macros = nullptr) :
-			m_VertexShader(L"Shaders\\DefaultVS.hlsl", EDU_SHADER_TYPE_VERTEX, macros, "main", "vs_5_1"),
-			m_GeometryShader(L"Shaders\\WireframeGS.hlsl", EDU_SHADER_TYPE_GEOMETRY, macros, "main", "gs_5_1"),
-			m_PixelShader(wireframe ? L"Shaders\\WireframePS.hlsl" : L"Shaders\\DefaultPS.hlsl", EDU_SHADER_TYPE_PIXEL, macros, "main", "ps_5_1")
+		TessellationGBufferPass(RenderDeviceD3D12* device, TessellationDrawRootSignature* rootSignature, bool wireframe, const LPCWSTR* macros = nullptr) :
+			m_VertexShader(L"Shaders\\DefaultVS.hlsl", EDU_SHADER_TYPE_VERTEX, macros, L"main", L"vs_6_0"),
+			m_GeometryShader(L"Shaders\\WireframeGS.hlsl", EDU_SHADER_TYPE_GEOMETRY, macros, L"main", L"gs_6_0"),
+			m_PixelShader(wireframe ? L"Shaders\\WireframePS.hlsl" : L"Shaders\\DefaultPS.hlsl", EDU_SHADER_TYPE_PIXEL, macros, L"main", L"ps_6_0")
 		{
 			std::vector<D3D12_INPUT_ELEMENT_DESC> inputLayout =
 			{
@@ -289,8 +289,8 @@ namespace AsyncComputeTessellation
 
 	public:
 		DeferredLightPass(RenderDeviceD3D12* device) :
-			m_VertexShader(L"Shaders/DeferredLightPass.hlsl", EDU_SHADER_TYPE_VERTEX, nullptr, "VS", "vs_5_1"),
-			m_PixelShader(L"Shaders/DeferredLightPass.hlsl", EDU_SHADER_TYPE_PIXEL, nullptr, "PS", "ps_5_1")
+			m_VertexShader(L"Shaders/DeferredLightPass.hlsl", EDU_SHADER_TYPE_VERTEX, nullptr, L"VS", L"vs_6_0"),
+			m_PixelShader(L"Shaders/DeferredLightPass.hlsl", EDU_SHADER_TYPE_PIXEL, nullptr, L"PS", L"ps_6_0")
 		{
 			CD3DX12_DESCRIPTOR_RANGE albedoTex;
 			albedoTex.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
@@ -358,9 +358,9 @@ namespace AsyncComputeTessellation
 		PipelineStateD3D12 m_Pso;
 
 	public:
-		MotionBlurPass(RenderDeviceD3D12* device, D3D_SHADER_MACRO* macros = nullptr) :
-			m_VertexShader(L"Shaders/MotionBlur.hlsl", EDU_SHADER_TYPE_VERTEX, macros, "VS", "vs_5_1"),
-			m_PixelShader(L"Shaders/MotionBlur.hlsl", EDU_SHADER_TYPE_PIXEL, macros, "PS", "ps_5_1")
+		MotionBlurPass(RenderDeviceD3D12* device, const LPCWSTR* macros = nullptr) :
+			m_VertexShader(L"Shaders/MotionBlur.hlsl", EDU_SHADER_TYPE_VERTEX, macros, L"VS", L"vs_6_0"),
+			m_PixelShader(L"Shaders/MotionBlur.hlsl", EDU_SHADER_TYPE_PIXEL, macros, L"PS", L"ps_6_0")
 		{
 			CD3DX12_DESCRIPTOR_RANGE accumTex;
 			accumTex.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
@@ -414,12 +414,12 @@ namespace AsyncComputeTessellation
 		PipelineStateD3D12 m_UpscalePso;
 
 	public:
-		BloomPass(RenderDeviceD3D12* device, D3D_SHADER_MACRO* macros = nullptr) :
-			m_VertexShader(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_VERTEX, macros, "VS", "vs_5_1"),
-			m_PSThreshold(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_PIXEL, macros, "PSThreshold", "ps_5_1"),
-			m_PSBlurH(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_PIXEL, macros, "PSBlurH", "ps_5_1"),
-			m_PSBlurV(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_PIXEL, macros, "PSBlurV", "ps_5_1"),
-			m_PSUpscale(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_PIXEL, macros, "PSUpscale", "ps_5_1")
+		BloomPass(RenderDeviceD3D12* device, const LPCWSTR* macros = nullptr) :
+			m_VertexShader(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_VERTEX, macros, L"VS", L"vs_6_0"),
+			m_PSThreshold(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_PIXEL, macros, L"PSThreshold", L"ps_6_0"),
+			m_PSBlurH(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_PIXEL, macros, L"PSBlurH", L"ps_6_0"),
+			m_PSBlurV(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_PIXEL, macros, L"PSBlurV", L"ps_6_0"),
+			m_PSUpscale(L"Shaders/Bloom.hlsl", EDU_SHADER_TYPE_PIXEL, macros, L"PSUpscale", L"ps_6_0")
 		{
 			CD3DX12_DESCRIPTOR_RANGE bloomTex0;
 			bloomTex0.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
@@ -504,8 +504,8 @@ namespace AsyncComputeTessellation
 
 	public:
 		ToneMappingPass(RenderDeviceD3D12* device) :
-			m_VertexShader(L"Shaders/ToneMapping.hlsl", EDU_SHADER_TYPE_VERTEX, nullptr, "VS", "vs_5_1"),
-			m_PixelShader(L"Shaders/ToneMapping.hlsl", EDU_SHADER_TYPE_PIXEL, nullptr, "PS", "ps_5_1")
+			m_VertexShader(L"Shaders/ToneMapping.hlsl", EDU_SHADER_TYPE_VERTEX, nullptr, L"VS", L"vs_6_0"),
+			m_PixelShader(L"Shaders/ToneMapping.hlsl", EDU_SHADER_TYPE_PIXEL, nullptr, L"PS", L"ps_6_0")
 		{
 			CD3DX12_DESCRIPTOR_RANGE accumTex;
 			accumTex.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);

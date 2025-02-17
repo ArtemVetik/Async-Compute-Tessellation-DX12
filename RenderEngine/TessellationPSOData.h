@@ -39,24 +39,24 @@ namespace AsyncComputeTessellation
 
 		void Rebuild(const TessellationParams& params)
 		{
-			D3D_SHADER_MACRO macros[] =
+			const LPCWSTR macros[] =
 			{
-				{"USE_DISPLACE", params.UseDisplaceMapping && params.MeshMode == MeshMode::TERRAIN ? "1" : "0"},
-				{"UNIFORM_TESSELLATION", params.Uniform ? "1" : "0"},
-				{"FLAT_NORMALS", params.FlatNormals ? "1" : "0"},
-				{"USE_FP16", params.UseFP16InShader ? "1" : "0"},
-				{NULL, NULL}
+				L"USE_DISPLACE", params.UseDisplaceMapping && params.MeshMode == MeshMode::TERRAIN ? L"1" : L"0",
+				L"UNIFORM_TESSELLATION", params.Uniform ? L"1" : L"0",
+				L"FLAT_NORMALS", params.FlatNormals ? L"1" : L"0",
+				L"USE_FP16", params.UseFP16InShader ? L"1" : L"0",
+				NULL, NULL,
 			};
 
 			m_ComputePass = std::make_unique<TessellationComputePass>(m_Device, QueueID::Direct, macros);
 			m_DrawPass = std::make_unique<TessellationGBufferPass>(m_Device, &m_DrawRootSignature, params.WireframeMode, macros);
 
-			D3D_SHADER_MACRO shadowMacros[] =
+			const LPCWSTR shadowMacros[] =
 			{
-				{"SHADOW_MAP", "1"},
-				{"USE_DISPLACE", params.UseDisplaceMapping && params.MeshMode == MeshMode::TERRAIN ? "1" : "0"},
-				{"USE_FP16", params.UseFP16InShader ? "1" : "0"},
-				{NULL, NULL}
+				L"SHADOW_MAP", L"1",
+				L"USE_DISPLACE", params.UseDisplaceMapping && params.MeshMode == MeshMode::TERRAIN ? L"1" : L"0",
+				L"USE_FP16", params.UseFP16InShader ? L"1" : L"0",
+				NULL, NULL,
 			};
 			m_ShadowPass = std::make_unique<TessellationShadowMapPass>(m_Device, &m_DrawRootSignature, shadowMacros);
 		}

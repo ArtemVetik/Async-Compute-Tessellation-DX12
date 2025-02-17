@@ -79,13 +79,13 @@ namespace AsyncComputeTessellation
 
 	void MotionBlurRendering::BuildPSO()
 	{
-		char sampleCountStr[4];
-		sprintf_s(sampleCountStr, "%d", m_SampleCount);
+		wchar_t sampleCountStr[4];
+		swprintf_s(sampleCountStr, L"%d", m_SampleCount);
 
-		D3D_SHADER_MACRO macros[] =
+		const LPCWSTR macros[] =
 		{
-			{"SAMPLE_COUNT", sampleCountStr},
-			{NULL, NULL}
+			L"SAMPLE_COUNT", sampleCountStr,
+			NULL, NULL,
 		};
 
 		m_RenderPass = std::make_unique<MotionBlurPass>(m_Device, macros);

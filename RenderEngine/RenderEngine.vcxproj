@@ -223,6 +223,8 @@
   <Target Name="CopyDll" AfterTargets="Build">
     <Copy SourceFiles="$(SolutionDir)Libraries\lib\assimp-vc143-mt.dll" DestinationFolder="$(OutDir)" />
     <Copy SourceFiles="$(SolutionDir)Libraries\lib\WinPixEventRuntime.dll" DestinationFolder="$(OutDir)" />
+    <Copy SourceFiles="$(SolutionDir)Libraries\lib\dxcompiler.dll" DestinationFolder="$(OutDir)" />
+    <Copy SourceFiles="$(SolutionDir)Libraries\lib\dxil.dll" DestinationFolder="$(OutDir)" />
   </Target>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

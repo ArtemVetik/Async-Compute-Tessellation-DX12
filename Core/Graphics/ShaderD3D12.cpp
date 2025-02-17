@@ -4,37 +4,80 @@
 
 namespace EduEngine
 {
-	ShaderD3D12::ShaderD3D12(std::wstring			 fileName,
-							 EDU_SHADER_TYPE		 type,
-							 const D3D_SHADER_MACRO* defines,
-							 std::string			 entryPoint,
-							 std::string			 target) :
+	ShaderD3D12::ShaderD3D12(std::wstring	 fileName,
+							 EDU_SHADER_TYPE type,
+							 const LPCWSTR*  defines,
+							 std::wstring	 entryPoint,
+							 std::wstring	 target) :
 		m_Type(type)
 	{
-		UINT compileFlags = 0;
-#if defined(DEBUG) || defined(_DEBUG)  
-		compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#endif
+		// https://github.com/Microsoft/DirectXShaderCompiler/wiki/Using-dxc.exe-and-dxcompiler.dll
 
-		HRESULT hr = S_OK;
+		Microsoft::WRL::ComPtr<IDxcUtils> pUtils;
+		Microsoft::WRL::ComPtr<IDxcCompiler3> pCompiler;
+		Microsoft::WRL::ComPtr<IDxcIncludeHandler> pIncludeHandler;
 
-		Microsoft::WRL::ComPtr<ID3DBlob> byteCode = nullptr;
-		Microsoft::WRL::ComPtr<ID3DBlob> errors;
-		hr = D3DCompileFromFile(fileName.c_str(), defines, D3D_COMPILE_STANDARD_FILE_INCLUDE,
-			entryPoint.c_str(), target.c_str(), compileFlags, 0, &byteCode, &errors);
+		DxcCreateInstance(CLSID_DxcUtils, IID_PPV_ARGS(&pUtils));
+		DxcCreateInstance(CLSID_DxcCompiler, IID_PPV_ARGS(&pCompiler));
 
-		if (errors != nullptr)
-			OutputDebugStringA((char*)errors->GetBufferPointer());
-		
-		THROW_IF_FAILED(hr, L"Failed to compile shader");
+		pUtils->CreateDefaultIncludeHandler(&pIncludeHandler);
 
-		m_ShaderBlob = byteCode;
+		std::vector<LPCWSTR> pszArgs = {
+			fileName.c_str(),
+			L"-E", entryPoint.c_str(),
+			L"-T", target.c_str(),
+			L"-Zi",
+			L"-Qembed_debug"
+		};
+
+		std::vector<std::wstring> macroStr;
+		if (defines)
+		{
+			for (int i = 0; defines[i] != NULL; i += 2)
+			{
+				macroStr.emplace_back(defines[i]);
+				macroStr.back().append(L"=").append(defines[i + 1]);
+
+				pszArgs.push_back(L"-D");
+				pszArgs.push_back(macroStr.back().c_str());
+			}
+		}
+
+		Microsoft::WRL::ComPtr<IDxcBlobEncoding> pSource = nullptr;
+		Microsoft::WRL::ComPtr<IDxcResult> pResults;
+
+		pUtils->LoadFile(fileName.c_str(), nullptr, &pSource);
+		DxcBuffer Source = {};
+		Source.Ptr = pSource->GetBufferPointer();
+		Source.Size = pSource->GetBufferSize();
+		Source.Encoding = DXC_CP_ACP;
+
+		pCompiler->Compile(
+			&Source,
+			pszArgs.data(),
+			pszArgs.size(),
+			pIncludeHandler.Get(),
+			IID_PPV_ARGS(&pResults)
+		);
+
+		Microsoft::WRL::ComPtr<IDxcBlobUtf8> pErrors = nullptr;
+		pResults->GetOutput(DXC_OUT_ERRORS, IID_PPV_ARGS(&pErrors), nullptr);
+
+		if (pErrors && pErrors->GetStringLength() != 0)
+			OutputDebugStringA(pErrors->GetStringPointer());
+
+		HRESULT hrStatus;
+		pResults->GetStatus(&hrStatus);
+
+		THROW_IF_FAILED(hrStatus, L"Shader Compilation Failed");
+
+		pResults->GetOutput(DXC_OUT_OBJECT, IID_PPV_ARGS(&m_ShaderBlob), nullptr);
 	}
 
 	D3D12_SHADER_BYTECODE ShaderD3D12::GetShaderBytecode() const
 	{
-		return D3D12_SHADER_BYTECODE 
-		{ 
+		return D3D12_SHADER_BYTECODE
+		{
 			reinterpret_cast<BYTE*>(m_ShaderBlob->GetBufferPointer()),
 			m_ShaderBlob->GetBufferSize()
 		};

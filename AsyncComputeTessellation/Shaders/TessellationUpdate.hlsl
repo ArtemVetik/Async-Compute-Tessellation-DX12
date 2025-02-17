@@ -52,7 +52,7 @@ void compute_writeKey(uint2 new_nodeID, uint4 current_key)
     InterlockedAdd(SubdCounter[1], 1, idx);
     SubdBufferOut[idx] = new_key;
 }
-[numthreads(512, 1, 1)]
+[numthreads(64, 1, 1)]
 void main(uint id : SV_DispatchThreadID, uint groupId : SV_GroupIndex)
 {
     uint4 key = SubdBufferIn[id.x];
