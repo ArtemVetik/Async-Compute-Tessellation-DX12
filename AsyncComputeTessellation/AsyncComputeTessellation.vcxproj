@@ -218,8 +218,10 @@
   <Target Name="CopyResources" AfterTargets="Build">
     <ItemGroup>
       <ShaderFiles Include="$(SolutionDir)AsyncComputeTessellation\Shaders\**\*" />
+      <ModelFiles Include="$(SolutionDir)AsyncComputeTessellation\Models\**\*" />
     </ItemGroup>
     <Copy SourceFiles="@(ShaderFiles)" DestinationFolder="$(OutDir)Shaders" />
+    <Copy SourceFiles="@(ModelFiles)" DestinationFolder="$(OutDir)Models" />
     <Copy SourceFiles="$(SolutionDir)AsyncComputeTessellation\imgui.ini" DestinationFolder="$(OutDir)" />
   </Target>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
