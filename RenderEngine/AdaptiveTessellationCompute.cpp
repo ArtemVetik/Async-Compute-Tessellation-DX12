@@ -221,7 +221,7 @@ namespace AsyncComputeTessellation
 		auto leafVertices = m_Mesh.GetLeafVertices(m_Params.CPULodLevel);
 		auto leafIndices = m_Mesh.GetLeafIndices(m_Params.CPULodLevel);
 
-		m_LeafMeshVertex = std::make_unique<VertexBufferD3D12>(m_Device, leafVertices.data(), sizeof(XMFLOAT3), leafVertices.size());
+		m_LeafMeshVertex = std::make_unique<VertexBufferD3D12>(m_Device, leafVertices.data(), sizeof(XMFLOAT2), leafVertices.size());
 		m_LeafMeshIndex = std::make_unique<IndexBufferD3D12>(m_Device, leafIndices.data(), sizeof(uint16_t), leafIndices.size(), DXGI_FORMAT_R16_UINT);
 
 		TessellationComputePass::IndirectCommand command = {};

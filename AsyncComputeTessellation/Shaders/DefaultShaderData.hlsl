@@ -18,7 +18,7 @@ Texture2D gDiffuseMap : register(t3);
 
 struct VertexIn
 {
-    float3 PosL : POSITION;
+    float2 PosL : POSITION;
 };
 
 struct VertexOut

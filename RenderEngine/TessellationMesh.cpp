@@ -51,9 +51,9 @@ namespace AsyncComputeTessellation
 		m_MeshData.InitAvgEdgeLength();
 	}
 
-	std::vector<XMFLOAT3> TessellationMesh::GetLeafVertices(uint32_t level)
+	std::vector<XMFLOAT2> TessellationMesh::GetLeafVertices(uint32_t level)
 	{
-		std::vector<DirectX::XMFLOAT3> vertices;
+		std::vector<DirectX::XMFLOAT2> vertices;
 
 		float num_row = 1 << level;
 		float col = 0.0, row = 0.0;
@@ -63,7 +63,7 @@ namespace AsyncComputeTessellation
 		{
 			while (col <= row)
 			{
-				vertices.push_back(DirectX::XMFLOAT3(col * d, 1.0 - row * d, 0));
+				vertices.push_back(DirectX::XMFLOAT2(col * d, 1.0 - row * d));
 				col++;
 			}
 			row++;

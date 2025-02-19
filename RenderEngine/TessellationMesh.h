@@ -31,7 +31,7 @@ namespace AsyncComputeTessellation
 		D3D12_GPU_DESCRIPTOR_HANDLE GetIndexUAVGpu() const { return m_MeshIndex->GetUAVView()->GetGpuHandle(); }
 		D3D12_GPU_DESCRIPTOR_HANDLE GetIndexSRVGpu() const { return m_MeshIndex->GetSRVView()->GetGpuHandle(); }
 
-		std::vector<XMFLOAT3> GetLeafVertices(uint32_t level);
+		std::vector<XMFLOAT2> GetLeafVertices(uint32_t level);
 		std::vector<uint16_t> GetLeafIndices(uint32_t level);
 
 	private:
