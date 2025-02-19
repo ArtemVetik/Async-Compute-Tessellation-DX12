@@ -18,7 +18,7 @@ VertexOut main(VertexIn vIn, uint instanceID : SV_InstanceID)
     FTYPE2 tree_pos = ts_Leaf_to_Tree_64(leaf_pos, nodeID);
     Vertex vertex = ts_interpolateVertex(t, tree_pos);
     
-    float4 posW = mul(float4(vertex.Position, 1.0f), gWorld);
+    float4 posW = mul(vertex.Position, gWorld);
     
 #if USE_DISPLACE
 #if SHADOW_MAP
@@ -33,7 +33,7 @@ VertexOut main(VertexIn vIn, uint instanceID : SV_InstanceID)
     output.PosH = mul(posW, gShadowViewProj);
 #else
     output.PosW = posW.xyz;
-    output.NormalW = mul(float4(vertex.Normal, 1.0f), gWorld).xyz;
+    output.NormalW = mul(vertex.Normal, gWorld).xyz;
     output.Lvl = ts_findMSB_64(key.xy);
     output.TexC = vertex.TexC;
     output.PosH = mul(posW, gViewProj);

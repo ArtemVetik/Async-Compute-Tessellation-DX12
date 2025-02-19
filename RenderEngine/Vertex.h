@@ -32,6 +32,36 @@ namespace AsyncComputeTessellation
 		DirectX::XMFLOAT2 TexC;
 	};
 
+	struct VertexStride
+	{
+		VertexStride() {}
+		VertexStride(
+			const DirectX::XMFLOAT4& p,
+			const DirectX::XMFLOAT4& n,
+			const DirectX::XMFLOAT4& t,
+			const DirectX::XMFLOAT4& uv) :
+			Position(p),
+			Normal(n),
+			TangentU(t),
+			TexC(uv) {
+		}
+		VertexStride(
+			float px, float py, float pz,
+			float nx, float ny, float nz,
+			float tx, float ty, float tz,
+			float u, float v) :
+			Position(px, py, pz, 1),
+			Normal(nx, ny, nz, 1),
+			TangentU(tx, ty, tz, 1),
+			TexC(u, v, 0, 0) {
+		}
+
+		DirectX::XMFLOAT4 Position;
+		DirectX::XMFLOAT4 Normal;
+		DirectX::XMFLOAT4 TangentU;
+		DirectX::XMFLOAT4 TexC;
+	};
+
 	struct VertexPT
 	{
 		VertexPT() {}

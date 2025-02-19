@@ -16,7 +16,7 @@ namespace AsyncComputeTessellation
 		else
 			m_MeshData = geoGen.LoadMesh("Models/Teapot.fbx");
 
-		m_MeshVertex = std::make_unique<VertexBufferD3D12>(m_Device, m_MeshData.Vertices.data(), sizeof(Vertex), m_MeshData.Vertices.size(), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		m_MeshVertex = std::make_unique<VertexBufferD3D12>(m_Device, m_MeshData.GetVerticesStride().data(), sizeof(VertexStride), m_MeshData.GetVerticesStride().size(), D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 		m_MeshVertex->SetName(L"MeshVertexBuffer");
 		m_MeshIndex = std::make_unique<IndexBufferD3D12>(m_Device, m_MeshData.Indices32.data(), sizeof(UINT), m_MeshData.Indices32.size(), DXGI_FORMAT_R32_UINT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 		m_MeshIndex->SetName(L"MeshIndexBuffer");
@@ -24,7 +24,7 @@ namespace AsyncComputeTessellation
 		D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
 		uavDesc.Format = DXGI_FORMAT_UNKNOWN;
 		uavDesc.Buffer.FirstElement = 0;
-		uavDesc.Buffer.NumElements = m_MeshData.Vertices.size();
+		uavDesc.Buffer.NumElements = m_MeshData.GetVerticesStride().size();
 		uavDesc.Buffer.StructureByteStride = sizeof(Vertex);
 		uavDesc.Buffer.CounterOffsetInBytes = 0;
 		uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
@@ -34,7 +34,7 @@ namespace AsyncComputeTessellation
 		srvDesc.Format = DXGI_FORMAT_UNKNOWN;
 		srvDesc.ViewDimension = D3D12_SRV_DIMENSION_BUFFER;
 		srvDesc.Buffer.FirstElement = 0;
-		srvDesc.Buffer.NumElements = m_MeshData.Vertices.size();
+		srvDesc.Buffer.NumElements = m_MeshData.GetVerticesStride().size();
 		srvDesc.Buffer.StructureByteStride = sizeof(Vertex);
 
 		m_MeshVertex->CreateUAV(&uavDesc);

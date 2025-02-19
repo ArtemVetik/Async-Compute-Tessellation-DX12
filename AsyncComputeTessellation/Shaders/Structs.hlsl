@@ -25,10 +25,10 @@
 
 struct Vertex
 {
-    float3 Position;
-    float3 Normal;
-    float3 TangentU;
-    float2 TexC;
+    float4 Position;
+    float4 Normal;
+    float4 TangentU;
+    float4 TexC;
 };
 
 struct Triangle

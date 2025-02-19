@@ -87,11 +87,13 @@ FTYPE3x2 jk_bitToMatrix(in uint bit)
 
 void ts_getMeshTriangle(uint meshPolygonID, out Triangle t)
 {
-    [unroll]
-    for (int i = 0; i < 3; ++i)
-    {
-        t.Vertex[i] = MeshDataVertex.Load(MeshDataIndex.Load(meshPolygonID + i));
-    }
+    uint i0 = MeshDataIndex.Load(meshPolygonID + 0);
+    uint i1 = MeshDataIndex.Load(meshPolygonID + 1);
+    uint i2 = MeshDataIndex.Load(meshPolygonID + 2);
+    
+    t.Vertex[0] = MeshDataVertex.Load(i0);
+    t.Vertex[1] = MeshDataVertex.Load(i1);
+    t.Vertex[2] = MeshDataVertex.Load(i2);
 }
 
 void ts_getTriangleXform_64(uint2 nodeID, out FTYPE3x2 xform, out FTYPE3x2 parent_xform)
