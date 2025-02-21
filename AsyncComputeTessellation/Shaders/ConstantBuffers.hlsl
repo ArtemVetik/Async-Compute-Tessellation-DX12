@@ -17,6 +17,9 @@ cbuffer tessellationData : register(b1)
     float gDisplacePosScale;
     float gDisplaceH;
     float gLodFactor;
+    uint gIndicesCount;
+    uint gTrianglesCount;
+    uint2 gPadding0;
 };
 
 cbuffer perFrameData : register(b2)
@@ -33,7 +36,7 @@ cbuffer shadowMapData : register(b3)
 {
     matrix gShadowViewProj;
     float3 gLightPos;
-    float gPadding;
+    float gPadding1;
 }
 
 #endif

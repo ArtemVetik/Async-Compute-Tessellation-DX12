@@ -21,14 +21,6 @@ namespace AsyncComputeTessellation
 		m_MeshIndex = std::make_unique<IndexBufferD3D12>(m_Device, m_MeshData.Indices32.data(), sizeof(UINT), m_MeshData.Indices32.size(), DXGI_FORMAT_R32_UINT, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 		m_MeshIndex->SetName(L"MeshIndexBuffer");
 
-		D3D12_UNORDERED_ACCESS_VIEW_DESC uavDesc = {};
-		uavDesc.Format = DXGI_FORMAT_UNKNOWN;
-		uavDesc.Buffer.FirstElement = 0;
-		uavDesc.Buffer.NumElements = m_MeshData.GetVerticesStride().size();
-		uavDesc.Buffer.StructureByteStride = sizeof(Vertex);
-		uavDesc.Buffer.CounterOffsetInBytes = 0;
-		uavDesc.ViewDimension = D3D12_UAV_DIMENSION_BUFFER;
-
 		D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
 		srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
 		srvDesc.Format = DXGI_FORMAT_UNKNOWN;
@@ -37,15 +29,11 @@ namespace AsyncComputeTessellation
 		srvDesc.Buffer.NumElements = m_MeshData.GetVerticesStride().size();
 		srvDesc.Buffer.StructureByteStride = sizeof(Vertex);
 
-		m_MeshVertex->CreateUAV(&uavDesc);
 		m_MeshVertex->CreateSRV(&srvDesc);
 
-		uavDesc.Buffer.NumElements = m_MeshData.Indices32.size();
-		uavDesc.Buffer.StructureByteStride = sizeof(UINT);
 		srvDesc.Buffer.NumElements = m_MeshData.Indices32.size();
 		srvDesc.Buffer.StructureByteStride = sizeof(UINT);
 
-		m_MeshIndex->CreateUAV(&uavDesc);
 		m_MeshIndex->CreateSRV(&srvDesc);
 
 		m_MeshData.InitAvgEdgeLength();
@@ -73,9 +61,9 @@ namespace AsyncComputeTessellation
 		return vertices;
 	}
 
-	std::vector<uint16_t> TessellationMesh::GetLeafIndices(uint32_t level)
+	std::vector<uint32_t> TessellationMesh::GetLeafIndices(uint32_t level)
 	{
-		std::vector<uint16_t> indices;
+		std::vector<uint32_t> indices;
 		uint32_t col = 0, row = 0;
 		uint32_t elem = 0, num_col = 1;
 		uint32_t orientation;

@@ -31,6 +31,9 @@ namespace AsyncComputeTessellation
 			float DisplacePosScale = 0.02;
 			float DisplaceH = 0.96;
 			float LodFactor = 0.00008f;
+			UINT IndicesCount = 3;
+			UINT TrianglesCount = 3;
+			XMFLOAT3 Padding;
 		};
 
 		struct PerFrameData
@@ -52,15 +55,18 @@ namespace AsyncComputeTessellation
 
 	private:
 		ShaderD3D12 m_UpdateCS;
+		ShaderD3D12 m_VSPrepassCS;
 		ShaderD3D12 m_CopyDrawCS;
 		RootSignatureD3D12 m_RootSignature;
 		CommandSignatureD3D12 m_CommandSignature;
 		ComputePipelineStateD3D12 m_UpdatePSO;
+		ComputePipelineStateD3D12 m_VSPrepassPSO;
 		ComputePipelineStateD3D12 m_CopyDrawPSO;
 
 	public:
 		TessellationComputePass(RenderDeviceD3D12* device, QueueID queueId, const LPCWSTR* macros = nullptr) :
 			m_UpdateCS(L"Shaders\\TessellationUpdate.hlsl", EDU_SHADER_TYPE_COMPUTE, macros, L"main", L"cs_6_0"),
+			m_VSPrepassCS(L"Shaders\\TessellationVSPrepass.hlsl", EDU_SHADER_TYPE_COMPUTE, macros, L"main", L"cs_6_0"),
 			m_CopyDrawCS(L"Shaders\\TessellationCopyDraw.hlsl", EDU_SHADER_TYPE_COMPUTE, macros, L"main", L"cs_6_0")
 		{
 			// TODO: Order from most frequent to least frequent
@@ -78,12 +84,20 @@ namespace AsyncComputeTessellation
 			m_RootSignature.AddDescriptorParameter(1, &subdBufferOutCulled); // subd buffer out culled
 
 			CD3DX12_DESCRIPTOR_RANGE meshDataVertex;
-			meshDataVertex.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 3);
+			meshDataVertex.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 			m_RootSignature.AddDescriptorParameter(1, &meshDataVertex); // mesh data vertex
 
 			CD3DX12_DESCRIPTOR_RANGE meshDataIndex;
-			meshDataIndex.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 4);
+			meshDataIndex.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
 			m_RootSignature.AddDescriptorParameter(1, &meshDataIndex); // mesh data index
+
+			CD3DX12_DESCRIPTOR_RANGE prepassOutV;
+			prepassOutV.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 3);
+			m_RootSignature.AddDescriptorParameter(1, &prepassOutV); // prepass out vertex
+
+			CD3DX12_DESCRIPTOR_RANGE prepassOutIdx;
+			prepassOutIdx.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 4);
+			m_RootSignature.AddDescriptorParameter(1, &prepassOutIdx); // prepass out idx
 
 			CD3DX12_DESCRIPTOR_RANGE subdCounter;
 			subdCounter.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 5);
@@ -97,6 +111,14 @@ namespace AsyncComputeTessellation
 			drawArgs.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 6);
 			m_RootSignature.AddDescriptorParameter(1, &drawArgs); // draw args
 
+			CD3DX12_DESCRIPTOR_RANGE leafVertices;
+			leafVertices.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2);
+			m_RootSignature.AddDescriptorParameter(1, &leafVertices); // leaf vertices
+
+			CD3DX12_DESCRIPTOR_RANGE leafIndices;
+			leafIndices.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3);
+			m_RootSignature.AddDescriptorParameter(1, &leafIndices); // leaf indices
+
 			m_RootSignature.Build(device, queueId);
 			m_RootSignature.SetName(L"TessellationComputeRootSignature");
 
@@ -104,6 +126,11 @@ namespace AsyncComputeTessellation
 			m_UpdatePSO.SetShader(&m_UpdateCS);
 			m_UpdatePSO.Build(device, queueId);
 			m_UpdatePSO.SetName(L"TessellationUpdatePSO");
+
+			m_VSPrepassPSO.SetRootSignature(&m_RootSignature);
+			m_VSPrepassPSO.SetShader(&m_VSPrepassCS);
+			m_VSPrepassPSO.Build(device, queueId);
+			m_VSPrepassPSO.SetName(L"TessellationVSPrepassPSO");
 
 			m_CopyDrawPSO.SetRootSignature(&m_RootSignature);
 			m_CopyDrawPSO.SetShader(&m_CopyDrawCS);
@@ -125,6 +152,7 @@ namespace AsyncComputeTessellation
 		ID3D12RootSignature* GetD3D12RootSignature() const { return m_RootSignature.GetD3D12RootSignature(); }
 		ID3D12CommandSignature* GetD3D12CommandSignature() const { return m_CommandSignature.GetD3D12Signature(); }
 		ID3D12PipelineState* GetUpdatePSO() const { return m_UpdatePSO.GetD3D12PipelineState(); }
+		ID3D12PipelineState* GetVSPrepassPSO() const { return m_VSPrepassPSO.GetD3D12PipelineState(); }
 		ID3D12PipelineState* GetCopyDrawPSO() const { return m_CopyDrawPSO.GetD3D12PipelineState(); }
 	};
 
@@ -136,20 +164,8 @@ namespace AsyncComputeTessellation
 	public:
 		TessellationDrawRootSignature(RenderDeviceD3D12* device)
 		{
-			CD3DX12_DESCRIPTOR_RANGE meshDataVertex;
-			meshDataVertex.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
-			m_RootSignature.AddDescriptorParameter(1, &meshDataVertex); // mesh data vertex
-
-			CD3DX12_DESCRIPTOR_RANGE meshDataIndex;
-			meshDataIndex.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
-			m_RootSignature.AddDescriptorParameter(1, &meshDataIndex); // mesh data index
-
-			CD3DX12_DESCRIPTOR_RANGE subdBufferOut;
-			subdBufferOut.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 2);
-			m_RootSignature.AddDescriptorParameter(1, &subdBufferOut); // subd buffer
-
 			CD3DX12_DESCRIPTOR_RANGE diffuseMap;
-			diffuseMap.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 3);
+			diffuseMap.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0);
 			m_RootSignature.AddDescriptorParameter(1, &diffuseMap); // diffuse map
 
 			m_RootSignature.AddConstantBufferView(0); // object data
@@ -186,7 +202,12 @@ namespace AsyncComputeTessellation
 		{
 			std::vector<D3D12_INPUT_ELEMENT_DESC> inputLayout =
 			{
-				{ "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+				{ "POSITION",     0, DXGI_FORMAT_R32G32B32_FLOAT, 0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+				{ "BLENDINDICES", 0, DXGI_FORMAT_R32_UINT,		  0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+				{ "NORMAL",       0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+				{ "COLOR",        0, DXGI_FORMAT_R32_UINT,        0, 28, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+				{ "TEXCOORD",     0, DXGI_FORMAT_R32G32_FLOAT,    0, 32, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+				{ "POSITION",     1, DXGI_FORMAT_R32G32_FLOAT,    0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 			};
 
 			auto rast = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
@@ -230,7 +251,12 @@ namespace AsyncComputeTessellation
 		{
 			std::vector<D3D12_INPUT_ELEMENT_DESC> inputLayout =
 			{
-				{ "POSITION", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+				{ "POSITION",     0, DXGI_FORMAT_R32G32B32_FLOAT, 0,  0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+				{ "BLENDINDICES", 0, DXGI_FORMAT_R32_UINT,		  0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+				{ "NORMAL",       0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 16, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+				{ "COLOR",        0, DXGI_FORMAT_R32_UINT,        0, 28, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+				{ "TEXCOORD",     0, DXGI_FORMAT_R32G32_FLOAT,    0, 32, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+				{ "POSITION",     1, DXGI_FORMAT_R32G32_FLOAT,    0, 40, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 			};
 
 			auto rast = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);

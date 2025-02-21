@@ -88,5 +88,8 @@
     <None Include="Shaders\Bloom.hlsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="Shaders\TessellationVSPrepass.hlsl">
+      <Filter>Shaders\Tessellation</Filter>
+    </None>
   </ItemGroup>
 </Project>

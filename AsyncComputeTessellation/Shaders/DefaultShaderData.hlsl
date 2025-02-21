@@ -11,14 +11,16 @@ SamplerState gsamAnisotropicWrap : register(s4);
 SamplerState gsamAnisotropicClamp : register(s5);
 SamplerComparisonState gsamShadow : register(s6);
 
-StructuredBuffer<Vertex> MeshDataVertex : register(t0);
-StructuredBuffer<uint> MeshDataIndex : register(t1);
-StructuredBuffer<uint4> SubdBufferOut : register(t2);
-Texture2D gDiffuseMap : register(t3);
+Texture2D gDiffuseMap : register(t0);
 
 struct VertexIn
 {
-    float2 PosL : POSITION;
+    float3 PosW : POSITION0;
+    uint Lvl : BLENDINDICES;
+    float3 NormalW : NORMAL;
+    uint Padding0 : COLOR0;
+    float2 TexC : TEXCOORD;
+    float2 LeafPos : POSITION1;
 };
 
 struct VertexOut

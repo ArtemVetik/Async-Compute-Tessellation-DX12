@@ -215,6 +215,11 @@
       <FileType>Document</FileType>
     </None>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="Shaders\TessellationVSPrepass.hlsl">
+      <FileType>Document</FileType>
+    </None>
+  </ItemGroup>
   <Target Name="CopyResources" AfterTargets="Build">
     <ItemGroup>
       <ShaderFiles Include="$(SolutionDir)AsyncComputeTessellation\Shaders\**\*" />

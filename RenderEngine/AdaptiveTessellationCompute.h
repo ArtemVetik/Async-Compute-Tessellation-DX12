@@ -33,6 +33,16 @@ namespace AsyncComputeTessellation
 		friend class TessellationUI;
 
 	private:
+		struct VertexOut
+		{
+			XMFLOAT3 PosW;
+			UINT Lvl;
+			XMFLOAT3 NormalW;
+			UINT Padding0;
+			XMFLOAT2 TexC;
+			XMFLOAT2 LeafPos;
+		};
+
 		void BuildPSO();
 		void InitBuffers();
 		void ResetBuffers();
@@ -56,8 +66,9 @@ namespace AsyncComputeTessellation
 		std::unique_ptr<BufferD3D12> m_DrawArgs1;
 		std::unique_ptr<BufferD3D12> m_SubdBufferIn;
 		std::unique_ptr<BufferD3D12> m_SubdBufferOut;
-		std::unique_ptr<BufferD3D12> m_SubdBufferOutCulled0;
-		std::unique_ptr<BufferD3D12> m_SubdBufferOutCulled1;
+		std::unique_ptr<BufferD3D12> m_SubdBufferOutCulled;
+		std::unique_ptr<BufferD3D12> m_VSPrepassOutV[2];
+		std::unique_ptr<BufferD3D12> m_VSPrepassOutIdx[2];
 		std::unique_ptr<BufferD3D12> m_SubdCounter;
 		std::unique_ptr<BufferD3D12> m_TessellationData;
 

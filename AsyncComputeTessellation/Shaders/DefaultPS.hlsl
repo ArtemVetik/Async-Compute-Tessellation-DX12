@@ -1,7 +1,7 @@
 #define COMPUTE_SHADER 0
 
-#include "Common.hlsl"
 #include "ConstantBuffers.hlsl"
+#include "DefaultShaderData.hlsl"
 #include "Noise.hlsl"
 
 ps_output main(VertexOut pin) : SV_Target

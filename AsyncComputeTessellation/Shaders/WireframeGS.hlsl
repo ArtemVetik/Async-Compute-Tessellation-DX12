@@ -1,6 +1,6 @@
 #define COMPUTE_SHADER 0
 
-#include "Common.hlsl"
+#include "DefaultShaderData.hlsl"
 
 [maxvertexcount(3)]
 void main(triangle VertexOut input[3], inout TriangleStream<VertexOut> outputStream)

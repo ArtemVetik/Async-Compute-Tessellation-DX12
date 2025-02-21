@@ -118,7 +118,7 @@ namespace AsyncComputeTessellation
 
 			commandContext.SetRenderTargets(0, nullptr, false, &m_ShadowMaps[i]->GetView(D3D12_DESCRIPTOR_HEAP_TYPE_DSV)->GetCpuHandle());
 
-			commandContext.GetCmdList()->SetGraphicsRootConstantBufferView(7, passUploadBuffer.GetAllocation().GPUAddress);
+			commandContext.GetCmdList()->SetGraphicsRootConstantBufferView(4, passUploadBuffer.GetAllocation().GPUAddress);
 
 			adaptiveTessellation->ExecuteIndirect();
 

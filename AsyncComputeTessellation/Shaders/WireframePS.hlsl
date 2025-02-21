@@ -1,6 +1,6 @@
 #define COMPUTE_SHADER 0
 
-#include "Common.hlsl"
+#include "DefaultShaderData.hlsl"
 
 float4 levelColor(uint lvl)
 {
