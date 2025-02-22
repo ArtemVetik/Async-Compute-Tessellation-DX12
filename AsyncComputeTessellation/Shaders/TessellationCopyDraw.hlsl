@@ -13,8 +13,13 @@ void main(uint3 id : SV_DispatchThreadID)
     //DrawArgs[5] = 0; // Virtual address of IB (64-bit)
     //DrawArgs[6] = 0; // IB size
     //DrawArgs[7] = 0; // IB format
+#ifdef USE_STANDART_TESSELLATION
+    //DrawArgs[8] = 0; // IndexCountPerInstance
+    DrawArgs[9] = SubdCounter[2]; // InstanceCount
+#else
     DrawArgs[8] = SubdCounter[2] * gIndicesCount; // IndexCountPerInstance
-    //DrawArgs[9] = 1; // InstanceCount
+    //DrawArgs[9] = 1; // InstanceCount    
+#endif
     //DrawArgs[10] = 0; // StartIndexLocation
     //DrawArgs[11] = 0; // BaseVertexLocation
     //DrawArgs[12] = 0; // StartInstanceLocation

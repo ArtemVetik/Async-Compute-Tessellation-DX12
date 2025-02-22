@@ -62,28 +62,47 @@ namespace AsyncComputeTessellation
 			commandList->SetPipelineState(m_PsoData->GetComputePass()->GetUpdatePSO());
 			commandList->SetComputeRootSignature(m_PsoData->GetComputePass()->GetD3D12RootSignature());
 
-			commandList->SetComputeRootDescriptorTable(0 + m_PingPongCounter, m_SubdBufferIn->GetUAVView()->GetGpuHandle());
-			commandList->SetComputeRootDescriptorTable(1 - m_PingPongCounter, m_SubdBufferOut->GetUAVView()->GetGpuHandle());
-			commandList->SetComputeRootDescriptorTable(2, m_SubdBufferOutCulled->GetUAVView()->GetGpuHandle());
-			commandList->SetComputeRootDescriptorTable(3, m_Mesh.GetVertexSRVGpu());
-			commandList->SetComputeRootDescriptorTable(4, m_Mesh.GetIndexSRVGpu());
-			commandList->SetComputeRootDescriptorTable(5, (m_SubdCulledBuffIdx == 0 ? m_VSPrepassOutV[0] : m_VSPrepassOutV[1])->GetUAVView()->GetGpuHandle());
-			commandList->SetComputeRootDescriptorTable(6, (m_SubdCulledBuffIdx == 0 ? m_VSPrepassOutIdx[0] : m_VSPrepassOutIdx[1])->GetUAVView()->GetGpuHandle());
-			commandList->SetComputeRootDescriptorTable(7, m_SubdCounter->GetUAVView()->GetGpuHandle());
-			commandList->SetComputeRootConstantBufferView(8, m_ObjectCB.GetAllocation().GPUAddress);
-			commandList->SetComputeRootConstantBufferView(9, m_TessellationData->GetD3D12Resource()->GetGPUVirtualAddress());
-			commandList->SetComputeRootConstantBufferView(10, m_FrameCB.GetAllocation().GPUAddress);
-			commandList->SetComputeRootDescriptorTable(11, m_SubdCulledBuffIdx == 0 ? m_DrawArgs0->GetUAVView()->GetGpuHandle() : m_DrawArgs1->GetUAVView()->GetGpuHandle());
-			commandList->SetComputeRootDescriptorTable(12, m_LeafMeshVertex->GetSRVView()->GetGpuHandle());
-			commandList->SetComputeRootDescriptorTable(13, m_LeafMeshIndex->GetSRVView()->GetGpuHandle());
+			UINT id = 0;
+
+			commandList->SetComputeRootDescriptorTable(id++ + m_PingPongCounter, m_SubdBufferIn->GetUAVView()->GetGpuHandle());
+			commandList->SetComputeRootDescriptorTable(id++ - m_PingPongCounter, m_SubdBufferOut->GetUAVView()->GetGpuHandle());
+#ifdef USE_STANDART_TESSELLATION
+			commandList->SetComputeRootDescriptorTable(id++, m_SubdCulledBuffIdx == 0 ? m_SubdBufferOutCulled0->GetUAVView()->GetGpuHandle() : m_SubdBufferOutCulled1->GetUAVView()->GetGpuHandle());
+#else
+			commandList->SetComputeRootDescriptorTable(id++, m_SubdBufferOutCulled->GetUAVView()->GetGpuHandle());
+#endif
+			commandList->SetComputeRootDescriptorTable(id++, m_Mesh.GetVertexSRVGpu());
+			commandList->SetComputeRootDescriptorTable(id++, m_Mesh.GetIndexSRVGpu());
+#ifdef USE_STANDART_TESSELLATION
+			commandList->SetComputeRootDescriptorTable(id++, m_SubdCounter->GetUAVView()->GetGpuHandle());
+#else
+			commandList->SetComputeRootDescriptorTable(id++, (m_SubdCulledBuffIdx == 0 ? m_VSPrepassOutV[0] : m_VSPrepassOutV[1])->GetUAVView()->GetGpuHandle());
+			commandList->SetComputeRootDescriptorTable(id++, (m_SubdCulledBuffIdx == 0 ? m_VSPrepassOutIdx[0] : m_VSPrepassOutIdx[1])->GetUAVView()->GetGpuHandle());
+			commandList->SetComputeRootDescriptorTable(id++, m_SubdCounter->GetUAVView()->GetGpuHandle());
+#endif
+			
+			commandList->SetComputeRootConstantBufferView(id++, m_ObjectCB.GetAllocation().GPUAddress);
+			commandList->SetComputeRootConstantBufferView(id++, m_TessellationData->GetD3D12Resource()->GetGPUVirtualAddress());
+			commandList->SetComputeRootConstantBufferView(id++, m_FrameCB.GetAllocation().GPUAddress);
+			commandList->SetComputeRootDescriptorTable(id++, m_SubdCulledBuffIdx == 0 ? m_DrawArgs0->GetUAVView()->GetGpuHandle() : m_DrawArgs1->GetUAVView()->GetGpuHandle());
+			
+#ifndef USE_STANDART_TESSELLATION
+			commandList->SetComputeRootDescriptorTable(id++, m_LeafMeshVertex->GetSRVView()->GetGpuHandle());
+			commandList->SetComputeRootDescriptorTable(id++, m_LeafMeshIndex->GetSRVView()->GetGpuHandle());
+#endif
 
 			commandList->Dispatch(10000, 1, 1); // TODO: figure out how many threads group to run
 
 			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::UAV(m_SubdCounter->GetD3D12Resource()));
+#ifdef USE_STANDART_TESSELLATION
+			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::UAV(m_SubdCulledBuffIdx == 0 ? m_SubdBufferOutCulled0->GetD3D12Resource() : m_SubdBufferOutCulled1->GetD3D12Resource()));
+#endif
 			commandContext.FlushResourceBarriers();
 
+#ifndef USE_STANDART_TESSELLATION
 			commandList->SetPipelineState(m_PsoData->GetComputePass()->GetVSPrepassPSO());
-			commandList->Dispatch(10000, 1, 1);
+			commandList->Dispatch(20000, 1, 1);
+#endif
 
 			commandList->SetPipelineState(m_PsoData->GetComputePass()->GetCopyDrawPSO());
 			commandList->Dispatch(1, 1, 1);
@@ -109,9 +128,17 @@ namespace AsyncComputeTessellation
 		dCommandList->SetGraphicsRootSignature(m_PsoData->GetDrawRootSignature()->GetD3D12RootSignature());
 		dCommandList->IASetPrimitiveTopology(D3D11_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
-		dCommandList->SetGraphicsRootConstantBufferView(1, m_ObjectCB.GetAllocation().GPUAddress);
-		dCommandList->SetGraphicsRootConstantBufferView(2, m_TessellationData->GetD3D12Resource()->GetGPUVirtualAddress());
-		dCommandList->SetGraphicsRootConstantBufferView(3, m_FrameCB.GetAllocation().GPUAddress);
+		UINT id = 0;
+
+#ifdef USE_STANDART_TESSELLATION
+		dCommandList->SetGraphicsRootDescriptorTable(id++, m_Mesh.GetVertexSRVGpu());
+		dCommandList->SetGraphicsRootDescriptorTable(id++, m_Mesh.GetIndexSRVGpu());
+		dCommandList->SetGraphicsRootDescriptorTable(id++, m_SubdCulledBuffIdx == 0 ? m_SubdBufferOutCulled1->GetSRVView()->GetGpuHandle() : m_SubdBufferOutCulled0->GetSRVView()->GetGpuHandle());
+#endif
+		id++;
+		dCommandList->SetGraphicsRootConstantBufferView(id++, m_ObjectCB.GetAllocation().GPUAddress);
+		dCommandList->SetGraphicsRootConstantBufferView(id++, m_TessellationData->GetD3D12Resource()->GetGPUVirtualAddress());
+		dCommandList->SetGraphicsRootConstantBufferView(id++, m_FrameCB.GetAllocation().GPUAddress);
 	}
 
 	void AdaptiveTessellationCompute::ExecuteIndirect() const
@@ -185,11 +212,17 @@ namespace AsyncComputeTessellation
 
 		CREATE_UAV_BUFFER(m_SubdBufferIn, sizeof(XMUINT4), subdSize, L"SubdBufferIn", false);
 		CREATE_UAV_BUFFER(m_SubdBufferOut, sizeof(XMUINT4), subdSize, L"SubdBufferOut", false);
+#ifdef USE_STANDART_TESSELLATION
+		CREATE_UAV_BUFFER(m_SubdBufferOutCulled0, sizeof(XMUINT4), subdSize, L"SubdBufferOutCulled0", true);
+		CREATE_UAV_BUFFER(m_SubdBufferOutCulled1, sizeof(XMUINT4), subdSize, L"SubdBufferOutCulled1", true);
+#else
 		CREATE_UAV_BUFFER(m_SubdBufferOutCulled, sizeof(XMUINT4), subdSize, L"SubdBufferOutCulled", false);
+		subdSize *= 2;
 		CREATE_UAV_BUFFER(m_VSPrepassOutV[0], sizeof(VertexOut), subdSize, L"VSPrepassOutV0", false);
 		CREATE_UAV_BUFFER(m_VSPrepassOutV[1], sizeof(VertexOut), subdSize, L"VSPrepassOutV1", false);
 		CREATE_UAV_BUFFER(m_VSPrepassOutIdx[0], sizeof(UINT), subdSize, L"VSPrepassOutIdx0", false);
 		CREATE_UAV_BUFFER(m_VSPrepassOutIdx[1], sizeof(UINT), subdSize, L"VSPrepassOutIdx1", false);
+#endif
 		CREATE_UAV_BUFFER(m_SubdCounter, sizeof(UINT), 3, L"SubdCounter", false);
 
 #undef CREATE_UAV_BUFFER
@@ -226,6 +259,9 @@ namespace AsyncComputeTessellation
 		auto leafIndices = m_Mesh.GetLeafIndices(m_Params.CPULodLevel);
 
 		m_LeafMeshVertex = std::make_unique<VertexBufferD3D12>(m_Device, leafVertices.data(), sizeof(XMFLOAT2), leafVertices.size());
+#ifdef USE_STANDART_TESSELLATION
+		m_LeafMeshIndex = std::make_unique<IndexBufferD3D12>(m_Device, leafIndices.data(), sizeof(uint16_t), leafIndices.size(), DXGI_FORMAT_R16_UINT);
+#else
 		// TODO: use DXGI_FORMAT_R16_UINT
 		m_LeafMeshIndex = std::make_unique<IndexBufferD3D12>(m_Device, leafIndices.data(), sizeof(uint32_t), leafIndices.size(), DXGI_FORMAT_R32_UINT);
 
@@ -246,19 +282,30 @@ namespace AsyncComputeTessellation
 		m_Params.CB.IndicesCount = leafIndices.size();
 		m_Params.CB.TrianglesCount = leafVertices.size();
 		InitTessData();
+#endif
 
+#ifdef USE_STANDART_TESSELLATION
+		TessellationComputePass::IndirectCommand command = {};
+		command.VertexBufferView = m_LeafMeshVertex->GetView();
+		command.IndexBufferView = m_LeafMeshIndex->GetView();
+		command.DrawArguments.IndexCountPerInstance = leafIndices.size();
+		command.DrawArguments.InstanceCount = 0;
+		command.DrawArguments.StartIndexLocation = 0;
+		command.DrawArguments.BaseVertexLocation = 0;
+		command.DrawArguments.StartInstanceLocation = 0;
+#else
 		TessellationComputePass::IndirectCommand command = {};
 		command.VertexBufferView.BufferLocation = m_VSPrepassOutV[0]->GetD3D12Resource()->GetGPUVirtualAddress();
-		command.VertexBufferView.SizeInBytes = sizeof(VertexOut) * 1000000;
+		command.VertexBufferView.SizeInBytes = sizeof(VertexOut) * 2000000;
 		command.VertexBufferView.StrideInBytes = sizeof(VertexOut);
 		command.IndexBufferView.BufferLocation = m_VSPrepassOutIdx[0]->GetD3D12Resource()->GetGPUVirtualAddress();
-		command.IndexBufferView.SizeInBytes = sizeof(UINT) * 1000000;
+		command.IndexBufferView.SizeInBytes = sizeof(UINT) * 2000000;
 		command.IndexBufferView.Format = DXGI_FORMAT_R32_UINT;
-
 		command.DrawArguments.InstanceCount = 1;
 		command.DrawArguments.StartIndexLocation = 0;
 		command.DrawArguments.BaseVertexLocation = 0;
 		command.DrawArguments.StartInstanceLocation = 0;
+#endif
 
 		int drawArgsCount = sizeof(TessellationComputePass::IndirectCommand) / sizeof(UINT);
 
@@ -278,8 +325,10 @@ namespace AsyncComputeTessellation
 		m_DrawArgs0->SetName(L"DrawArgs0");
 		m_DrawArgs0->CreateUAV(&uavDesc);
 
+#ifndef USE_STANDART_TESSELLATION
 		command.VertexBufferView.BufferLocation = m_VSPrepassOutV[1]->GetD3D12Resource()->GetGPUVirtualAddress();
 		command.IndexBufferView.BufferLocation = m_VSPrepassOutIdx[1]->GetD3D12Resource()->GetGPUVirtualAddress();
+#endif
 
 		m_DrawArgs1 = std::make_unique<BufferD3D12>(m_Device,
 			CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT) * drawArgsCount, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS),

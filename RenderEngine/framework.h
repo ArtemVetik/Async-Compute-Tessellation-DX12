@@ -7,6 +7,8 @@
 #include <d3d12.h>
 #include "WinPixEventRuntime/pix3.h"
 
+//#define USE_STANDART_TESSELLATION
+
 #ifdef RENDERENGINE_EXPORTS
 #define RENDERENGINE_API __declspec(dllexport)
 #else

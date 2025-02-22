@@ -11,16 +11,27 @@ SamplerState gsamAnisotropicWrap : register(s4);
 SamplerState gsamAnisotropicClamp : register(s5);
 SamplerComparisonState gsamShadow : register(s6);
 
+#ifdef USE_STANDART_TESSELLATION
+StructuredBuffer<Vertex> MeshDataVertex : register(t0);
+StructuredBuffer<uint> MeshDataIndex : register(t1);
+StructuredBuffer<uint4> SubdBufferOut : register(t2);
+Texture2D gDiffuseMap : register(t3);
+#else
 Texture2D gDiffuseMap : register(t0);
+#endif
 
 struct VertexIn
 {
+#ifdef USE_STANDART_TESSELLATION
+    float2 PosL : POSITION;
+#else
     float3 PosW : POSITION0;
     uint Lvl : BLENDINDICES;
     float3 NormalW : NORMAL;
     uint Padding0 : COLOR0;
     float2 TexC : TEXCOORD;
     float2 LeafPos : POSITION1;
+#endif
 };
 
 struct VertexOut

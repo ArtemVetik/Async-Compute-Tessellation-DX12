@@ -41,6 +41,9 @@ namespace AsyncComputeTessellation
 		{
 			const LPCWSTR macros[] =
 			{
+#ifdef USE_STANDART_TESSELLATION
+				L"USE_STANDART_TESSELLATION", L"1",
+#endif
 				L"USE_DISPLACE", params.UseDisplaceMapping && params.MeshMode == MeshMode::TERRAIN ? L"1" : L"0",
 				L"UNIFORM_TESSELLATION", params.Uniform ? L"1" : L"0",
 				L"FLAT_NORMALS", params.FlatNormals ? L"1" : L"0",
@@ -53,6 +56,9 @@ namespace AsyncComputeTessellation
 
 			const LPCWSTR shadowMacros[] =
 			{
+#ifdef USE_STANDART_TESSELLATION
+				L"USE_STANDART_TESSELLATION", L"1",
+#endif
 				L"SHADOW_MAP", L"1",
 				L"USE_DISPLACE", params.UseDisplaceMapping && params.MeshMode == MeshMode::TERRAIN ? L"1" : L"0",
 				L"USE_FP16", params.UseFP16InShader ? L"1" : L"0",

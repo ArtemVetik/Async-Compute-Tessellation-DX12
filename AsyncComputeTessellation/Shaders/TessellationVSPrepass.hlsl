@@ -5,7 +5,7 @@
 #include "Common.hlsl"
 #include "Noise.hlsl"
 
-[numthreads(64, 1, 1)]
+[numthreads(128, 1, 1)]
 void main(uint id : SV_DispatchThreadID)
 {
     if (id >= SubdCounter[2] * gIndicesCount)
