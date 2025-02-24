@@ -10,12 +10,12 @@ namespace AsyncComputeTessellation
 		m_SwapChain(swapChain),
 		m_SSQuad(ssQuad),
 		m_SampleCount(7),
-		m_BlurAmount(8)
+		m_BlurAmount(5)
 	{
 		BuildPSO();
 	}
 
-	void MotionBlurRendering::Render(const Camera* camera, const GBuffer* gBuffer)
+	void MotionBlurRendering::Render(const Camera* camera, const GBuffer* gBuffer, const Timer* timer)
 	{
 		auto viewProj = XMMatrixMultiply(XMLoadFloat4x4(&camera->GetViewMatrix()), XMLoadFloat4x4(&camera->GetProjectionMatrix()));
 		auto viewProjInv = XMMatrixInverse(nullptr, viewProj);
@@ -43,7 +43,7 @@ namespace AsyncComputeTessellation
 		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(1, m_SwapChain->DepthStencilSRVView());
 		commandContext.GetCmdList()->SetGraphicsRootConstantBufferView(2, passDataBuffer.GetAllocation().GPUAddress);
 
-		const float constants[4] = { m_BlurAmount, 0, 0, 0 };
+		const float constants[4] = { m_BlurAmount * 0.001f / timer->GetDeltaTime(), 0, 0, 0 };
 		commandContext.GetCmdList()->SetGraphicsRoot32BitConstants(3, 4, constants, 0);
 
 		commandContext.GetCmdList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
@@ -69,7 +69,7 @@ namespace AsyncComputeTessellation
 
 		if (ImGui::Begin("Motion Blur", &open))
 		{
-			ImGui::SliderFloat("Blur Amount", &m_BlurAmount, 0.1f, 20.0f);
+			ImGui::SliderFloat("Blur Amount", &m_BlurAmount, 0.1f, 10.0f);
 
 			if (ImGui::SliderInt("Sample Count", &m_SampleCount, 1, 50))
 				BuildPSO();

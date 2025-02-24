@@ -16,7 +16,7 @@ namespace AsyncComputeTessellation
 	public:
 		MotionBlurRendering(RenderDeviceD3D12* device, const SwapChain* swapChain, ScreenSpaceQuad* ssQuad);
 
-		void Render(const Camera* camera, const GBuffer* gBuffer);
+		void Render(const Camera* camera, const GBuffer* gBuffer, const Timer* timer);
 		void RenderImGui();
 
 	private:

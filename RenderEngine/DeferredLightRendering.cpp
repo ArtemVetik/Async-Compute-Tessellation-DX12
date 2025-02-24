@@ -12,6 +12,7 @@ namespace AsyncComputeTessellation
 		m_Device(device),
 		m_SwapChain(swapChain),
 		m_SSQuad(ssQuad),
+		m_ChromaParam(0.5f),
 		m_MaterialData{}
 	{
 		m_DeferredLightPass = std::make_unique<DeferredLightPass>(m_Device);

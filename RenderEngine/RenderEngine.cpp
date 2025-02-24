@@ -216,7 +216,7 @@ namespace AsyncComputeTessellation
 
 		dCommandContext.SetViewports(&m_Viewport, 1);
 		dCommandContext.SetScissorRects(&m_ScissorRect, 1);
-		m_MotionBlurRendering->Render(m_Camera.get(), m_DeferredLightRendering->GetGBuffer());
+		m_MotionBlurRendering->Render(m_Camera.get(), m_DeferredLightRendering->GetGBuffer(), &m_Timer);
 		m_DeferredLightRendering->RenderToneMapping(m_Camera.get(), m_BloomRendering.get());
 
 		dCommandContext.SetRenderTargets(1, &(m_SwapChain->CurrentBackBufferView()), true, &(m_SwapChain->DepthStencilView()));
