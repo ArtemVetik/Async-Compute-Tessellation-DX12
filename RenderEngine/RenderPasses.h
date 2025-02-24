@@ -587,6 +587,8 @@ namespace AsyncComputeTessellation
 			bloomTex.Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1);
 			m_RootSignature.AddDescriptorParameter(1, &bloomTex); // bloom buffer
 
+			m_RootSignature.AddConstants(4, 0); // aberration params
+
 			m_RootSignature.Build(device, QueueID::Direct);
 
 			std::vector<D3D12_INPUT_ELEMENT_DESC> mInputLayout =

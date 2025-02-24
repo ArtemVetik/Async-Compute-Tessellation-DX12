@@ -135,6 +135,9 @@ namespace AsyncComputeTessellation
 		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(0, m_GBuffer->GetAccumBuffSRVView(1));
 		commandContext.GetCmdList()->SetGraphicsRootDescriptorTable(1, bloom->GetBloomSrv());
 
+		const float constants[4] = { 0.5f, 0.5f, 0.05f * m_ChromaParam, 0.0f };
+		commandContext.GetCmdList()->SetGraphicsRoot32BitConstants(2, 4, constants, 0);
+
 		commandContext.GetCmdList()->DrawIndexedInstanced(6, 1, 0, 0, 0);
 
 		for (int i = 0; i < TessellationGBufferPass::GBufferCount; i++)
@@ -151,6 +154,21 @@ namespace AsyncComputeTessellation
 	}
 
 	void DeferredLightRendering::RenderImGui(const Timer& timer)
+	{
+		RenderLightsImGui(timer);
+		RenderChromaticAberrationImGui(timer);
+	}
+
+	Light* DeferredLightRendering::GetShadowLight() const
+	{
+		for (size_t i = 0; i < m_Lights.size(); i++)
+			if (m_Lights[i]->LightType == Light::Directional)
+				return m_Lights[i].get();
+
+		return nullptr;
+	}
+
+	void DeferredLightRendering::RenderLightsImGui(const Timer& timer)
 	{
 		static float rotateLightsSpeed = 0.0f;
 		static bool open = false;
@@ -273,13 +291,29 @@ namespace AsyncComputeTessellation
 		ImGui::End();
 	}
 
-	Light* DeferredLightRendering::GetShadowLight() const
+	void DeferredLightRendering::RenderChromaticAberrationImGui(const Timer& timer)
 	{
-		for (size_t i = 0; i < m_Lights.size(); i++)
-			if (m_Lights[i]->LightType == Light::Directional)
-				return m_Lights[i].get();
+		static bool open = false;
 
-		return nullptr;
+		if (!open)
+		{
+			if (ImGui::Button("Chromatic Aberration"))
+				open = true;
+		}
+		else
+		{
+			if (ImGui::Button("Chromatic Aberration [X]"))
+				open = false;
+		}
+
+		if (!open)
+			return;
+
+		if (ImGui::Begin("ChromaticAberration", &open))
+		{
+			ImGui::SliderFloat("Intensity", &m_ChromaParam, 0.0f, 1.0f);
+		}
+		ImGui::End();
 	}
 
 	void DeferredLightRendering::AddDefaultLight()

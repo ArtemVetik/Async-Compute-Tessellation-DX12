@@ -70,9 +70,6 @@
     <None Include="Shaders\Structs.hlsl">
       <Filter>Shaders\Tessellation</Filter>
     </None>
-    <None Include="Shaders\gpu_noise_lib.hlsl">
-      <Filter>Shaders</Filter>
-    </None>
     <None Include="Shaders\DeferredLightPass.hlsl">
       <Filter>Shaders</Filter>
     </None>
@@ -89,6 +86,9 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="Shaders\TessellationVSPrepass.hlsl">
+      <Filter>Shaders\Tessellation</Filter>
+    </None>
+    <None Include="Shaders\gpu_noise_lib.hlsl">
       <Filter>Shaders\Tessellation</Filter>
     </None>
   </ItemGroup>

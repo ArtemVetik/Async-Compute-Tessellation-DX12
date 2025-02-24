@@ -51,6 +51,9 @@ namespace AsyncComputeTessellation
 		GBuffer* GetGBuffer() const { return m_GBuffer.get(); }
 
 	private:
+		void RenderLightsImGui(const Timer& timer);
+		void RenderChromaticAberrationImGui(const Timer& timer);
+
 		void AddDefaultLight();
 		void InitMaterialBuffer();
 
@@ -67,5 +70,7 @@ namespace AsyncComputeTessellation
 
 		std::vector<std::shared_ptr<Light>> m_Lights;
 		DeferredLightPass::MaterialConstants m_MaterialData;
+
+		float m_ChromaParam;
 	};
 }
