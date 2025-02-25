@@ -10,7 +10,7 @@ namespace AsyncComputeTessellation
 		m_SwapChain(swapChain),
 		m_SSQuad(ssQuad),
 		m_SampleCount(7),
-		m_BlurAmount(5)
+		m_BlurAmount(2.5)
 	{
 		BuildPSO();
 	}
