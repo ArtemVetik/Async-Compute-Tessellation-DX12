@@ -1,5 +1,6 @@
 #pragma once
 
+#include "framework.h"
 #include "Camera.h"
 #include "Timer.h"
 #include "RenderPasses.h"
@@ -21,6 +22,8 @@ namespace AsyncComputeTessellation
 	private:
 		RenderDeviceD3D12* m_Device;
 		SwapChain* m_SwapChain;
+
+		std::unique_ptr<TextureD3D12> m_DiffuseMap;
 
 		TessellationPSOData* m_PsoData;
 	};

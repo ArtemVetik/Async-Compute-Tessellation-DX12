@@ -24,7 +24,7 @@ ps_output main(VertexOut pin) : SV_Target
     float3 shadowFactor = float3(1.0f, 1.0f, 1.0f);
     shadowFactor[0] = 1;
     
-    output.albedo = 1;
+    output.albedo = gDiffuseMap.Sample(gsamLinearWrap, pin.TexC * 8.0f);
     output.normal = float4(pin.NormalW, shadowFactor[0]);
     
     return output;
