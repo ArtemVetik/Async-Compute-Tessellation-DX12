@@ -76,7 +76,7 @@ namespace AsyncComputeTessellation
 			}
 
 			float expo = log2(m_Parent->m_Params.TargetLength);
-			if (ImGui::SliderFloat("Edge Length (2^x)", &expo, 2, 10))
+			if (ImGui::SliderFloat("Edge Length (2^x)", &expo, 1.2f, 10))
 			{
 				m_Parent->m_Params.TargetLength = std::pow(2, expo);
 				initTessData = true;
@@ -104,7 +104,7 @@ namespace AsyncComputeTessellation
 			ImGui::SeparatorText("Compute Settings");
 			ImGui::Checkbox("Freeze", &m_Parent->m_Params.Freeze);
 			
-			if (ImGui::Checkbox("Use FP16 is shader", &m_Parent->m_Params.UseFP16InShader))
+			if (ImGui::Checkbox("Use FP16 in shader", &m_Parent->m_Params.UseFP16InShader))
 				buildPso = true;
 		}
 		ImGui::End();

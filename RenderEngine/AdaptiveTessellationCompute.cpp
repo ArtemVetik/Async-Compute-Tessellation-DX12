@@ -101,7 +101,7 @@ namespace AsyncComputeTessellation
 
 #ifndef USE_STANDART_TESSELLATION
 			commandList->SetPipelineState(m_PsoData->GetComputePass()->GetVSPrepassPSO());
-			commandList->Dispatch(20000, 1, 1);
+			commandList->Dispatch(90000, 1, 1);
 #endif
 
 			commandList->SetPipelineState(m_PsoData->GetComputePass()->GetCopyDrawPSO());
@@ -135,6 +135,7 @@ namespace AsyncComputeTessellation
 		dCommandList->SetGraphicsRootDescriptorTable(id++, m_Mesh.GetIndexSRVGpu());
 		dCommandList->SetGraphicsRootDescriptorTable(id++, m_SubdCulledBuffIdx == 0 ? m_SubdBufferOutCulled1->GetSRVView()->GetGpuHandle() : m_SubdBufferOutCulled0->GetSRVView()->GetGpuHandle());
 #endif
+
 		id++;
 		dCommandList->SetGraphicsRootConstantBufferView(id++, m_ObjectCB.GetAllocation().GPUAddress);
 		dCommandList->SetGraphicsRootConstantBufferView(id++, m_TessellationData->GetD3D12Resource()->GetGPUVirtualAddress());
@@ -208,7 +209,7 @@ namespace AsyncComputeTessellation
 		buffer->CreateUAV(&uavDesc);																				\
 		if (createSrv) buffer->CreateSRV(&srvDesc);																	\
 
-		int subdSize = 1000000; // TODO: find out what size is needed here
+		int subdSize = 10000000; // TODO: find out what size is needed here
 
 		CREATE_UAV_BUFFER(m_SubdBufferIn, sizeof(XMUINT4), subdSize, L"SubdBufferIn", false);
 		CREATE_UAV_BUFFER(m_SubdBufferOut, sizeof(XMUINT4), subdSize, L"SubdBufferOut", false);
@@ -296,10 +297,10 @@ namespace AsyncComputeTessellation
 #else
 		TessellationComputePass::IndirectCommand command = {};
 		command.VertexBufferView.BufferLocation = m_VSPrepassOutV[0]->GetD3D12Resource()->GetGPUVirtualAddress();
-		command.VertexBufferView.SizeInBytes = sizeof(VertexOut) * 2000000;
+		command.VertexBufferView.SizeInBytes = sizeof(VertexOut) * 20000000;
 		command.VertexBufferView.StrideInBytes = sizeof(VertexOut);
 		command.IndexBufferView.BufferLocation = m_VSPrepassOutIdx[0]->GetD3D12Resource()->GetGPUVirtualAddress();
-		command.IndexBufferView.SizeInBytes = sizeof(UINT) * 2000000;
+		command.IndexBufferView.SizeInBytes = sizeof(UINT) * 20000000;
 		command.IndexBufferView.Format = DXGI_FORMAT_R32_UINT;
 		command.DrawArguments.InstanceCount = 1;
 		command.DrawArguments.StartIndexLocation = 0;
