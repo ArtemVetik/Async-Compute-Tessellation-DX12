@@ -44,6 +44,9 @@ namespace AsyncComputeTessellation
 				initTessData = true;
 			}
 
+			ImGui::DragInt("Dispatch 1 Count", (int*)& m_Parent->m_Params.Dispatch1Count, 10.0f);
+			ImGui::DragInt("Dispatch 2 Count", (int*)& m_Parent->m_Params.Dispatch2Count, 100.0f);
+
 			if (ImGui::Checkbox("Wireframe Mode", &m_Parent->m_Params.WireframeMode))
 				buildPso = true;
 

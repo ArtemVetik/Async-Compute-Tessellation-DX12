@@ -91,7 +91,7 @@ namespace AsyncComputeTessellation
 			commandList->SetComputeRootDescriptorTable(id++, m_LeafMeshIndex->GetSRVView()->GetGpuHandle());
 #endif
 
-			commandList->Dispatch(10000, 1, 1); // TODO: figure out how many threads group to run
+			commandList->Dispatch(m_Params.Dispatch1Count, 1, 1); // TODO: figure out how many threads group to run
 
 			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::UAV(m_SubdCounter->GetD3D12Resource()));
 #ifdef USE_STANDART_TESSELLATION
@@ -101,7 +101,7 @@ namespace AsyncComputeTessellation
 
 #ifndef USE_STANDART_TESSELLATION
 			commandList->SetPipelineState(m_PsoData->GetComputePass()->GetVSPrepassPSO());
-			commandList->Dispatch(90000, 1, 1);
+			commandList->Dispatch(m_Params.Dispatch2Count, 1, 1);
 #endif
 
 			commandList->SetPipelineState(m_PsoData->GetComputePass()->GetCopyDrawPSO());

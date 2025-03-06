@@ -8,6 +8,8 @@ namespace AsyncComputeTessellation
 	struct TessellationParams
 	{
 		MeshMode MeshMode = MeshMode::TERRAIN;
+		UINT Dispatch1Count = 10000;
+		UINT Dispatch2Count = 90000;
 		bool WireframeMode = true;
 		bool FlatNormals = false;
 		int CPULodLevel = 0;
