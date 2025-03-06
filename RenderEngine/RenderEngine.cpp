@@ -253,7 +253,6 @@ namespace AsyncComputeTessellation
 		// that resources are removed before the end of rendering
 		if (m_PendingResize != EmptyResize)
 		{
-			Window::GetInstance()->SetPosition(m_PendingResize.x, m_PendingResize.y, m_PendingResize.width, m_PendingResize.height);
 			Resize(m_PendingResize.width, m_PendingResize.height);
 			m_PendingResize = EmptyResize;
 			dCommandContext.Reset();
