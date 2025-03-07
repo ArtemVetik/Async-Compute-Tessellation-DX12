@@ -30,6 +30,7 @@ namespace AsyncComputeTessellation
 	private:
 		void ResetStats();
 		const char* ToName(RenderStatType type);
+		void ExportDataToFile(const std::string& fileName);
 
 	private:
 		static constexpr int RenderStatsCount = 5;
@@ -51,5 +52,9 @@ namespace AsyncComputeTessellation
 		float m_RenderTime[RenderStatsCount][PlotDataCount];
 		float m_CurrentComputeTime = 0.0f;
 		float m_CurrentRenderTime[RenderStatsCount];
+
+		bool m_Record;
+		std::vector<float> m_ComputeTimeExport;
+		std::vector<float> m_GpuTimeExport[RenderStatsCount];
 	};
 }

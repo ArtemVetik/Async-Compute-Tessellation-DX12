@@ -56,7 +56,42 @@ namespace AsyncComputeTessellation
 
 		if (m_ShowStats)
 		{
+			static int prevOffset = -1;
+
 			ImGui::Begin("Stats", &m_ShowStats);
+
+			ImGui::SeparatorText("Record");
+
+			ImGui::BeginDisabled(m_Record);
+
+			if (ImGui::Button("Start Record"))
+			{
+				prevOffset = -1;
+				m_ComputeTimeExport.clear();
+				for (size_t i = 0; i < RenderStatsCount; i++)
+					m_GpuTimeExport[i].clear();
+				m_Record = true;
+			}
+
+			ImGui::EndDisabled();
+
+			ImGui::SameLine();
+
+			ImGui::BeginDisabled(!m_Record);
+
+			if (ImGui::Button("Stop Record"))
+			{
+				m_Record = false;
+				ExportDataToFile("gpu_time.txt");
+			}
+
+			ImGui::EndDisabled();
+
+			ImGui::SameLine();
+
+			ImGui::Text("Num frames: %d", m_ComputeTimeExport.size());
+
+			ImGui::SeparatorText("");
 
 			ImGui::SliderInt("Refresh Rate", &m_RefreshRate, 1, 60);
 
@@ -86,6 +121,10 @@ namespace AsyncComputeTessellation
 				std::to_string(m_ComputeTime[currOffset]).c_str(),
 				0.0f, computeMax, ImVec2(0, PlotDataCount));
 
+			if (m_Record && prevOffset != currOffset) {
+				m_ComputeTimeExport.push_back(m_ComputeTime[currOffset]);
+			}
+
 			for (size_t i = 0; i < RenderStatsCount; i++)
 			{
 				auto totalMax = *std::max_element(m_RenderTime[i], m_RenderTime[i] + PlotDataCount);
@@ -93,10 +132,16 @@ namespace AsyncComputeTessellation
 					PlotDataCount, m_StatsOffset,
 					std::to_string(m_RenderTime[i][currOffset]).c_str(),
 					0.0f, totalMax, ImVec2(0, PlotDataCount));
+
+				if (m_Record && prevOffset != currOffset) {
+					m_GpuTimeExport[i].push_back(m_RenderTime[i][currOffset]);
+				}
 			}
 
 			ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 			ImGui::End();
+
+			prevOffset = currOffset;
 		}
 	}
 
@@ -140,13 +185,42 @@ namespace AsyncComputeTessellation
 	{
 		switch (type)
 		{
-			case GPUStatsUI::RenderStatType::Total: return "GPU Total dT";
-			case GPUStatsUI::RenderStatType::ShadowMap: return "GPU Shadow Map Pass dT";
-			case GPUStatsUI::RenderStatType::Draw: return "GPU Draw Pass dT";
-			case GPUStatsUI::RenderStatType::Light: return "GPU Light Pass dT";
-			case GPUStatsUI::RenderStatType::PostProcess: return "GPU Post Process Pass dT";
+		case GPUStatsUI::RenderStatType::Total: return "GPU Total dT";
+		case GPUStatsUI::RenderStatType::ShadowMap: return "GPU Shadow Map Pass dT";
+		case GPUStatsUI::RenderStatType::Draw: return "GPU Draw Pass dT";
+		case GPUStatsUI::RenderStatType::Light: return "GPU Light Pass dT";
+		case GPUStatsUI::RenderStatType::PostProcess: return "GPU Post Process Pass dT";
 		}
 
 		return "Error";
+	}
+
+	void GPUStatsUI::ExportDataToFile(const std::string& fileName)
+	{
+		std::ofstream file(fileName);
+		
+		if (!file.is_open())
+		{
+			OutputDebugStringW(L"Can't open file");
+			return;
+		}
+
+		file << "Compute\t";
+		for (auto &value : m_ComputeTimeExport)
+			file << value << "\t";
+
+		file << "\n";
+
+		for (size_t i = 0; i < RenderStatsCount; i++)
+		{
+			file << ToName((RenderStatType)(2 + i * 2)) << "\t";
+
+			for (auto &value : m_GpuTimeExport[i])
+				file << value << "\t";
+
+			file << "\n";
+		}
+
+		file.close();
 	}
 }
