@@ -18,10 +18,10 @@ namespace AsyncComputeTessellation
 	{
 	public:
 		AdaptiveTessellationCompute(RenderDeviceD3D12*   device,
-							 SwapChain*		      swapChain,
-							 const Camera*		  camera,
-							 TessellationPSOData* psoData,
-							 bool				  computeQueue);
+									SwapChain*		     swapChain,
+									const Camera*		 camera,
+									TessellationPSOData* psoData,
+									bool				 computeQueue);
 
 		void Compute(const Timer& timer);
 		void PrepareDraw();
@@ -29,6 +29,9 @@ namespace AsyncComputeTessellation
 		void ForceRebuildAll(bool computeQueue);
 
 		void ExecuteIndirect() const;
+
+		void SetParams(TessellationParams params);
+		TessellationParams GetParams() const { return m_Params; }
 
 		friend class TessellationUI;
 

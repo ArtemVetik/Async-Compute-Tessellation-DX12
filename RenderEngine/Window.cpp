@@ -63,6 +63,19 @@ namespace AsyncComputeTessellation
 		ShowWindow(m_MainWindowHandle, SW_SHOWNORMAL);
 		UpdateWindow(m_MainWindowHandle);
 
+		HMONITOR hMonitor = MonitorFromWindow(m_MainWindowHandle, MONITOR_DEFAULTTOPRIMARY);
+		MONITORINFO mi = {};
+		mi.cbSize = sizeof(mi);
+		GetMonitorInfo(hMonitor, &mi);
+
+		SetWindowLongPtr(m_MainWindowHandle, GWL_STYLE, WS_POPUP | WS_VISIBLE);
+
+		SetWindowPos(m_MainWindowHandle, HWND_TOP,
+			mi.rcMonitor.left, mi.rcMonitor.top,
+			mi.rcMonitor.right - mi.rcMonitor.left,
+			mi.rcMonitor.bottom - mi.rcMonitor.top,
+			SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
+
 		return true;
 	}
 

@@ -50,6 +50,11 @@ namespace AsyncComputeTessellation
 		Light* GetShadowLight() const;
 		GBuffer* GetGBuffer() const { return m_GBuffer.get(); }
 
+		void SetLights(const std::vector<Light>& lights);
+		void SetChroma(float chroma);
+		const std::vector<std::shared_ptr<Light>>& GetLights() const { return m_Lights; }
+		float GetChroma() const { return m_ChromaParam; }
+
 	private:
 		void RenderLightsImGui(const Timer& timer);
 		void RenderChromaticAberrationImGui(const Timer& timer);

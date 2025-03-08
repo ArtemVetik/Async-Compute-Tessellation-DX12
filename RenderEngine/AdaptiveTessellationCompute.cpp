@@ -155,6 +155,12 @@ namespace AsyncComputeTessellation
 			0);
 	}
 
+	void AdaptiveTessellationCompute::SetParams(TessellationParams params)
+	{
+		m_Params = params;
+		ForceRebuildAll(m_ComputeQueue);
+	}
+
 	void AdaptiveTessellationCompute::RenderImGui()
 	{
 		m_UI.DrawUI();

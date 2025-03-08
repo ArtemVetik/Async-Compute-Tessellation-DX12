@@ -14,7 +14,7 @@ namespace AsyncComputeTessellation
 
 	enum class MeshMode
 	{
-		TERRAIN, MESH
+		TERRAIN = 0, MESH = 1
 	};
 
 	class TessellationMesh

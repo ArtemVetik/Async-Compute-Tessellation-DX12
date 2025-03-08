@@ -13,6 +13,7 @@
 #include "MotionBlurRendering.h"
 #include "BloomRendering.h"
 #include "GPUStatsUI.h"
+#include "RenderSettings.h"
 
 #include "../Core/Graphics/SwapChain.h"
 #include "../Core/EduMath/SimpleMath.h"
@@ -75,6 +76,7 @@ namespace AsyncComputeTessellation
 		std::unique_ptr<MotionBlurRendering> m_MotionBlurRendering;
 		std::unique_ptr<BloomRendering> m_BloomRendering;
 		std::unique_ptr<GPUStatsUI> m_RenderStats;
+		std::unique_ptr<RenderSettings> m_RenderSettings;
 
 		DescriptorHeapAllocation m_ImGuiTex;
 

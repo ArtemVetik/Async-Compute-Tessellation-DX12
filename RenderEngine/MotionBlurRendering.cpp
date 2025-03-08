@@ -77,6 +77,17 @@ namespace AsyncComputeTessellation
 		ImGui::End();
 	}
 
+	void MotionBlurRendering::SetSampleCount(int value)
+	{
+		m_SampleCount = value;
+		BuildPSO();
+	}
+
+	void MotionBlurRendering::SetBlurAmount(float value)
+	{
+		m_BlurAmount = value;
+	}
+
 	void MotionBlurRendering::BuildPSO()
 	{
 		wchar_t sampleCountStr[4];

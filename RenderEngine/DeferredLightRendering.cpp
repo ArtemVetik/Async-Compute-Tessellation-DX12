@@ -169,6 +169,19 @@ namespace AsyncComputeTessellation
 		return nullptr;
 	}
 
+	void DeferredLightRendering::SetLights(const std::vector<Light>& lights)
+	{
+		m_Lights.clear();
+
+		for (size_t i = 0; i < lights.size(); i++)
+			m_Lights.emplace_back(std::make_shared<Light>(lights[i]));
+	}
+
+	void DeferredLightRendering::SetChroma(float chroma)
+	{
+		m_ChromaParam = chroma;
+	}
+
 	void DeferredLightRendering::RenderLightsImGui(const Timer& timer)
 	{
 		static float rotateLightsSpeed = 0.0f;

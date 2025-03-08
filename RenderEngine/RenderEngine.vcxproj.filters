@@ -102,6 +102,9 @@
     <ClInclude Include="GPUStatsUI.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="RenderSettings.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="dllmain.cpp">
@@ -168,6 +171,9 @@
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="GPUStatsUI.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="RenderSettings.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

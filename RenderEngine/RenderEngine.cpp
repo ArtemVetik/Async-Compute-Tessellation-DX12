@@ -102,6 +102,7 @@ namespace AsyncComputeTessellation
 		m_MotionBlurRendering = std::make_unique<MotionBlurRendering>(m_Device.get(), m_SwapChain.get(), m_SSQuad.get());
 		m_BloomRendering = std::make_unique<BloomRendering>(m_Device.get(), m_SSQuad.get());
 		m_RenderStats = std::make_unique<GPUStatsUI>(m_Device.get());
+		m_RenderSettings = std::make_unique<RenderSettings>(m_AdaptiveTessellation.get(), m_DeferredLightRendering.get(), m_MotionBlurRendering.get(), m_BloomRendering.get());
 
 		m_BloomRendering->Resize(m_SwapChain->GetWidth(), m_SwapChain->GetHeight());
 
@@ -350,6 +351,16 @@ namespace AsyncComputeTessellation
 		ImGui::Text("\tVendor ID: %u, Device ID: %u", m_DeviceDesc.VendorId, m_DeviceDesc.DeviceId);
 
 		ImGui::End();
+
+		ImGui::SeparatorText("Import/Export");
+
+		if (ImGui::Button("Export Settings"))
+			m_RenderSettings->Export();
+
+		ImGui::SameLine();
+
+		if (ImGui::Button("Import Settings"))
+			m_RenderSettings->Import();
 
 		ImGui::SeparatorText("Author");
 

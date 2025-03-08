@@ -19,6 +19,12 @@ namespace AsyncComputeTessellation
 		void Render(const Camera* camera, const GBuffer* gBuffer, const Timer* timer);
 		void RenderImGui();
 
+		void SetSampleCount(int value);
+		void SetBlurAmount(float value);
+
+		int GetSampleCount() const { return m_SampleCount; }
+		float GetBlurAmount() const { return m_BlurAmount; }
+
 	private:
 		void BuildPSO();
 
