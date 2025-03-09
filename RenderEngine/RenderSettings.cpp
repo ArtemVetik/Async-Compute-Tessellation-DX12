@@ -15,9 +15,9 @@ namespace AsyncComputeTessellation
 
 	}
 
-	void RenderSettings::Export()
+	void RenderSettings::Export(std::wstring configFile)
 	{
-		std::ofstream outFile("RenderSettings.ini");
+		std::ofstream outFile(configFile);
 
 		if (!outFile)
 		{
@@ -99,9 +99,9 @@ namespace AsyncComputeTessellation
 		outFile.close();
 	}
 
-	void RenderSettings::Import()
+	void RenderSettings::Import(std::wstring configFile)
 	{
-		std::ifstream inFile("RenderSettings.ini");
+		std::ifstream inFile(configFile);
 
 		if (!inFile)
 		{

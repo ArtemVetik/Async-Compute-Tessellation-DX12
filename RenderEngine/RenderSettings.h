@@ -15,8 +15,8 @@ namespace AsyncComputeTessellation
 					   MotionBlurRendering*			motionBlurRendering,
 					   BloomRendering*				bloomRendering);
 
-		void Export();
-		void Import();
+		void Export(std::wstring configFile);
+		void Import(std::wstring configFile);
 
 	private:
 		AdaptiveTessellationCompute* m_Tessellation;

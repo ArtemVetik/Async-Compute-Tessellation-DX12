@@ -157,6 +157,7 @@
     <ClInclude Include="AdaptiveTessellationDraw.h" />
     <ClInclude Include="BloomRendering.h" />
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="Common.h" />
     <ClInclude Include="CSMRendering.h" />
     <ClInclude Include="DeferredLightRendering.h" />
     <ClInclude Include="framework.h" />
@@ -188,6 +189,7 @@
     <ClCompile Include="AdaptiveTessellationDraw.cpp" />
     <ClCompile Include="BloomRendering.cpp" />
     <ClCompile Include="Camera.cpp" />
+    <ClCompile Include="Common.cpp" />
     <ClCompile Include="CSMRendering.cpp" />
     <ClCompile Include="DeferredLightRendering.cpp" />
     <ClCompile Include="dllmain.cpp" />

@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "RenderEngine.h"
+#include "Common.h"
 #include "shellapi.h"
 
 #include "WinPixEventRuntime/pix3.h"
@@ -355,12 +356,18 @@ namespace AsyncComputeTessellation
 		ImGui::SeparatorText("Import/Export");
 
 		if (ImGui::Button("Export Settings"))
-			m_RenderSettings->Export();
+		{
+			auto configFile = Common::OpenFolderDialog(false, L"Select the file to write the config to");
+			m_RenderSettings->Export(configFile);
+		}
 
 		ImGui::SameLine();
 
 		if (ImGui::Button("Import Settings"))
-			m_RenderSettings->Import();
+		{
+			auto configFile = Common::OpenFolderDialog(false, L"Select the config file");
+			m_RenderSettings->Import(configFile);
+		}
 
 		ImGui::SeparatorText("Author");
 
