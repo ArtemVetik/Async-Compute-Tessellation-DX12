@@ -43,7 +43,7 @@ namespace AsyncComputeTessellation
 			0,
 			L"MainWindow",
 			L"Async Compute Tessellation",
-			WS_OVERLAPPEDWINDOW,
+			WS_OVERLAPPEDWINDOW | WS_MAXIMIZE,
 			CW_USEDEFAULT,
 			CW_USEDEFAULT,
 			GetClientWidth(),
@@ -60,21 +60,8 @@ namespace AsyncComputeTessellation
 			return false;
 		}
 
-		ShowWindow(m_MainWindowHandle, SW_SHOWNORMAL);
+		ShowWindow(m_MainWindowHandle, SW_MAXIMIZE);
 		UpdateWindow(m_MainWindowHandle);
-
-		HMONITOR hMonitor = MonitorFromWindow(m_MainWindowHandle, MONITOR_DEFAULTTOPRIMARY);
-		MONITORINFO mi = {};
-		mi.cbSize = sizeof(mi);
-		GetMonitorInfo(hMonitor, &mi);
-
-		SetWindowLongPtr(m_MainWindowHandle, GWL_STYLE, WS_POPUP | WS_VISIBLE);
-
-		SetWindowPos(m_MainWindowHandle, HWND_TOP,
-			mi.rcMonitor.left, mi.rcMonitor.top,
-			mi.rcMonitor.right - mi.rcMonitor.left,
-			mi.rcMonitor.bottom - mi.rcMonitor.top,
-			SWP_FRAMECHANGED | SWP_NOOWNERZORDER);
 
 		return true;
 	}
