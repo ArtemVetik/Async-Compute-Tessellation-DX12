@@ -106,6 +106,7 @@ namespace AsyncComputeTessellation
 		m_RenderSettings = std::make_unique<RenderSettings>(m_AdaptiveTessellation.get(), m_DeferredLightRendering.get(), m_MotionBlurRendering.get(), m_BloomRendering.get(), m_Camera.get());
 
 		m_BloomRendering->Resize(m_SwapChain->GetWidth(), m_SwapChain->GetHeight());
+		m_RenderStats->SetExportFilePrefix(RenderTypeName::Get(m_RenderType));
 
 		return true;
 	}
@@ -324,7 +325,10 @@ namespace AsyncComputeTessellation
 		ImGui::Text("Async Compute Tessellation");
 
 		if (ImGui::Combo("Render Type", (int*)&m_RenderType, "Direct\0Async All\0Async Shadow Map\0Async Draw\0Async Post Process\0\0"))
+		{
 			m_AdaptiveTessellation->ForceRebuildAll(m_RenderType != RenderType::Direct);
+			m_RenderStats->SetExportFilePrefix(RenderTypeName::Get(m_RenderType));
+		}
 
 		ImGui::Checkbox("Wait For Compute", &m_WaitForCompute);
 

@@ -34,6 +34,23 @@ namespace AsyncComputeTessellation
 		AsyncPostProcess,
 	};
 
+	class RenderTypeName
+	{
+	public:
+		static const char* Get(RenderType type)
+		{
+			switch (type)
+			{
+			case RenderType::Direct: return "Direct";
+			case RenderType::AsyncAll: return "AsyncAll";
+			case RenderType::AsyncShadowMap: return "AsyncShadowMap";
+			case RenderType::AsyncDraw: return "AsyncDraw";
+			case RenderType::AsyncPostProcess: return "AsyncPostProcess";
+			default: return "";
+			}
+		}
+	};
+
 	class RENDERENGINE_API RenderEngine
 	{
 	public:

@@ -30,10 +30,12 @@ namespace AsyncComputeTessellation
 		void MarkComputeStart(bool computeQueue);
 		void MarkComputeEnd(bool computeQueue);
 
+		void SetExportFilePrefix(const char* prefix);
+
 	private:
 		void ResetStats();
 		const char* ToName(RenderStatType type);
-		void ExportDataToFile(const std::string& fileName);
+		void ExportDataToFile();
 
 	private:
 		static constexpr int RenderStatsCount = 5;
@@ -47,6 +49,8 @@ namespace AsyncComputeTessellation
 		UINT64 m_ComputeFrequency;
 
 		static constexpr int PlotDataCount = 80;
+
+		std::string m_ExportFileName;
 
 		int m_RefreshRate = 30;
 		float m_PlotRefreshTime = 0.0f;

@@ -9,7 +9,8 @@ namespace AsyncComputeTessellation
 {
 	GPUStatsUI::GPUStatsUI(RenderDeviceD3D12* device, Camera* camera) :
 		m_Device(device),
-		m_Camera(camera)
+		m_Camera(camera),
+		m_ExportFileName("gpu_time.txt")
 	{
 		for (size_t i = 0; i < RenderStatsCount; i++)
 			m_RenderReadBackBuffers[i] = std::make_unique<ReadBackBufferD3D12>(m_Device, 2, QueueID::Direct);
@@ -91,7 +92,7 @@ namespace AsyncComputeTessellation
 			{
 				m_Camera->SetRotateAroundMode(false);
 				m_Record = false;
-				ExportDataToFile("gpu_time.txt");
+				ExportDataToFile();
 
 				m_ComputeTimeExport.clear();
 				for (size_t i = 0; i < RenderStatsCount; i++)
@@ -184,6 +185,11 @@ namespace AsyncComputeTessellation
 		m_Device->GetQueryHeap().ResolveQueryData(commandConext, D3D12_QUERY_TYPE_TIMESTAMP, 0, 2, m_ComputeReadBackBuffer.get(), 0);
 	}
 
+	void GPUStatsUI::SetExportFilePrefix(const char* prefix)
+	{
+		m_ExportFileName = std::string(prefix) + "_gpu_time.txt";
+	}
+
 	void GPUStatsUI::ResetStats()
 	{
 		memset(m_ComputeTime, 0, sizeof(float) * PlotDataCount);
@@ -208,9 +214,9 @@ namespace AsyncComputeTessellation
 		return "Error";
 	}
 
-	void GPUStatsUI::ExportDataToFile(const std::string& fileName)
+	void GPUStatsUI::ExportDataToFile()
 	{
-		std::ofstream file(fileName);
+		std::ofstream file(m_ExportFileName);
 		
 		if (!file.is_open())
 		{
