@@ -35,6 +35,8 @@ namespace AsyncComputeTessellation
 
 		m_PredictedPos = m_Position;
 		m_CurrentPredictionIndex = 0;
+
+		m_RotateAround = false;
 	}
 
 	XMMATRIX Camera::GetViewProjMatrix() const
@@ -96,6 +98,9 @@ namespace AsyncComputeTessellation
 
 	void Camera::Pitch(float angle)
 	{
+		if (angle == 0)
+			return;
+
 		XMMATRIX R = XMMatrixRotationAxis(XMLoadFloat3(&m_Right), angle);
 
 		XMStoreFloat3(&m_Up, XMVector3TransformNormal(XMLoadFloat3(&m_Up), R));
@@ -106,6 +111,9 @@ namespace AsyncComputeTessellation
 
 	void Camera::RotateY(float angle)
 	{
+		if (angle == 0)
+			return;
+
 		XMMATRIX R = XMMatrixRotationY(angle);
 
 		XMStoreFloat3(&m_Right, XMVector3TransformNormal(XMLoadFloat3(&m_Right), R));
@@ -120,12 +128,43 @@ namespace AsyncComputeTessellation
 		XMVECTOR pos = XMLoadFloat3(&m_Position);
 		pos += deltaPos;
 		XMStoreFloat3(&m_Position, pos);
+
 		m_ViewDirty = true;
 	}
 
 	void Camera::Update(const Timer& timer)
 	{
 		m_PrevViewMatrix = m_ViewMatrix;
+
+		if (m_RotateAround)
+		{
+			XMFLOAT3 target = { 0, 0, 0 };
+			float radius = sqrtf(m_Position.x * m_Position.x + m_Position.y * m_Position.y + m_Position.z * m_Position.z);
+
+			float theta = atan2f(m_Position.x, m_Position.z) + timer.GetDeltaTime();
+			float phi = asinf(m_Position.y / radius);
+
+			float x = target.x + radius * cosf(phi) * sinf(theta);
+			float y = target.y + radius * sinf(phi);
+			float z = target.z + radius * cosf(phi) * cosf(theta);
+
+			m_Position = XMFLOAT3(x, y, z);
+
+			XMVECTOR posVec = XMLoadFloat3(&m_Position);
+			XMVECTOR targetVec = XMLoadFloat3(&target);
+			XMVECTOR lookVec = XMVector3Normalize(XMVectorSubtract(targetVec, posVec));
+
+			XMStoreFloat3(&m_Look, lookVec);
+
+			XMVECTOR worldUp = XMVectorSet(0.0f, 1.0f, 0.0f, 0.0f);
+			XMVECTOR rightVec = XMVector3Normalize(XMVector3Cross(worldUp, lookVec));
+			XMStoreFloat3(&m_Right, rightVec);
+
+			XMVECTOR upVec = XMVector3Normalize(XMVector3Cross(lookVec, rightVec));
+			XMStoreFloat3(&m_Up, upVec);
+
+			m_ViewDirty = true;
+		}
 
 		if (m_ViewDirty)
 		{
@@ -154,6 +193,11 @@ namespace AsyncComputeTessellation
 		m_Right = right;
 		m_Up = up;
 		m_ViewDirty = true;
+	}
+
+	void Camera::SetRotateAroundMode(bool enable)
+	{
+		m_RotateAround = enable;
 	}
 
 	void Camera::ConstructViewMatrix(XMFLOAT4X4& view, XMFLOAT3& right, XMFLOAT3& up, XMFLOAT3& look, XMFLOAT3& pos) const

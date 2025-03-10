@@ -1,4 +1,7 @@
 #pragma once
+
+#include "Camera.h"
+
 #include "../Core/Graphics/BufferD3D12.h"
 
 namespace AsyncComputeTessellation
@@ -17,7 +20,7 @@ namespace AsyncComputeTessellation
 			PostProcess = 10
 		};
 
-		GPUStatsUI(RenderDeviceD3D12* device);
+		GPUStatsUI(RenderDeviceD3D12* device, Camera* camera);
 
 		void Update(bool asyncCompute);
 		void RenderImGui();
@@ -35,6 +38,7 @@ namespace AsyncComputeTessellation
 	private:
 		static constexpr int RenderStatsCount = 5;
 		RenderDeviceD3D12* m_Device;
+		Camera* m_Camera;
 
 		std::unique_ptr<ReadBackBufferD3D12> m_RenderReadBackBuffers[RenderStatsCount];
 		std::unique_ptr<ReadBackBufferD3D12> m_ComputeReadBackBuffer;

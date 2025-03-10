@@ -30,6 +30,7 @@ namespace AsyncComputeTessellation
 		void Move(XMVECTOR deltaPos);
 		void Update(const Timer& timer);
 		void Setup(XMFLOAT3 pos, XMFLOAT3 look, XMFLOAT3 right, XMFLOAT3 up);
+		void SetRotateAroundMode(bool enable);
 
 		XMFLOAT4X4 GetViewMatrix() const { return m_ViewMatrix; }
 		XMFLOAT4X4 GetPrevViewMatrix() const { return m_PrevViewMatrix; }
@@ -74,6 +75,7 @@ namespace AsyncComputeTessellation
 		XMFLOAT3 m_Up = { 0.0f, 1.0f, 0.0f };
 		XMFLOAT3 m_Look = { 0.0f, 0.0f, 1.0f };
 		bool m_ViewDirty;
+		bool m_RotateAround;
 
 		static const int PredictionBufferSize = 4;
 		DirectX::XMFLOAT3 m_Positions[PredictionBufferSize];

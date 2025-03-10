@@ -7,8 +7,9 @@
 
 namespace AsyncComputeTessellation
 {
-	GPUStatsUI::GPUStatsUI(RenderDeviceD3D12* device) :
-		m_Device(device)
+	GPUStatsUI::GPUStatsUI(RenderDeviceD3D12* device, Camera* camera) :
+		m_Device(device),
+		m_Camera(camera)
 	{
 		for (size_t i = 0; i < RenderStatsCount; i++)
 			m_RenderReadBackBuffers[i] = std::make_unique<ReadBackBufferD3D12>(m_Device, 2, QueueID::Direct);
@@ -57,10 +58,15 @@ namespace AsyncComputeTessellation
 		if (m_ShowStats)
 		{
 			static int prevOffset = -1;
+			static bool rotateCamera = false;
+			static int maxRecords = 200;
 
 			ImGui::Begin("Stats", &m_ShowStats);
 
 			ImGui::SeparatorText("Record");
+
+			ImGui::Checkbox("Rotate Camera", &rotateCamera);
+			ImGui::InputInt("Max Records", &maxRecords);
 
 			ImGui::BeginDisabled(m_Record);
 
@@ -70,6 +76,8 @@ namespace AsyncComputeTessellation
 				m_ComputeTimeExport.clear();
 				for (size_t i = 0; i < RenderStatsCount; i++)
 					m_GpuTimeExport[i].clear();
+
+				m_Camera->SetRotateAroundMode(rotateCamera);
 				m_Record = true;
 			}
 
@@ -79,10 +87,15 @@ namespace AsyncComputeTessellation
 
 			ImGui::BeginDisabled(!m_Record);
 
-			if (ImGui::Button("Stop Record"))
+			if (ImGui::Button("Stop Record") || m_ComputeTimeExport.size() >= maxRecords)
 			{
+				m_Camera->SetRotateAroundMode(false);
 				m_Record = false;
 				ExportDataToFile("gpu_time.txt");
+
+				m_ComputeTimeExport.clear();
+				for (size_t i = 0; i < RenderStatsCount; i++)
+					m_GpuTimeExport[i].clear();
 			}
 
 			ImGui::EndDisabled();
