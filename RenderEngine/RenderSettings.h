@@ -13,7 +13,8 @@ namespace AsyncComputeTessellation
 		RenderSettings(AdaptiveTessellationCompute* tessellation,
 					   DeferredLightRendering*		defferedRendering,
 					   MotionBlurRendering*			motionBlurRendering,
-					   BloomRendering*				bloomRendering);
+					   BloomRendering*				bloomRendering,
+					   Camera*						camera);
 
 		void Export(std::wstring configFile);
 		void Import(std::wstring configFile);
@@ -23,5 +24,6 @@ namespace AsyncComputeTessellation
 		DeferredLightRendering* m_DefferedRendering;
 		MotionBlurRendering* m_MotionBlurRendering;
 		BloomRendering* m_BloomRendering;
+		Camera* m_Camera;
 	};
 }

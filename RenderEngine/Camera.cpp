@@ -147,6 +147,15 @@ namespace AsyncComputeTessellation
 			0.5f * acceleration.z * timer.GetDeltaTime() * timer.GetDeltaTime();
 	}
 
+	void Camera::Setup(XMFLOAT3 pos, XMFLOAT3 look, XMFLOAT3 right, XMFLOAT3 up)
+	{
+		m_Position = pos;
+		m_Look = look;
+		m_Right = right;
+		m_Up = up;
+		m_ViewDirty = true;
+	}
+
 	void Camera::ConstructViewMatrix(XMFLOAT4X4& view, XMFLOAT3& right, XMFLOAT3& up, XMFLOAT3& look, XMFLOAT3& pos) const
 	{
 		XMVECTOR R = XMLoadFloat3(&right);

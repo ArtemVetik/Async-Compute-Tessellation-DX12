@@ -4,13 +4,15 @@
 namespace AsyncComputeTessellation
 {
 	RenderSettings::RenderSettings(AdaptiveTessellationCompute* tessellation,
-		DeferredLightRendering* defferedRendering,
-		MotionBlurRendering* motionBlurRendering,
-		BloomRendering* bloomRendering) :
+								   DeferredLightRendering*		defferedRendering,
+								   MotionBlurRendering*			motionBlurRendering,
+								   BloomRendering*				bloomRendering,
+								   Camera*						camera) :
 		m_Tessellation(tessellation),
 		m_DefferedRendering(defferedRendering),
 		m_MotionBlurRendering(motionBlurRendering),
-		m_BloomRendering(bloomRendering)
+		m_BloomRendering(bloomRendering),
+		m_Camera(camera)
 	{
 
 	}
@@ -86,6 +88,14 @@ namespace AsyncComputeTessellation
 			{"Tint", { m_BloomRendering->GetTint()[0], m_BloomRendering->GetTint()[1], m_BloomRendering->GetTint()[2] } },
 		};
 
+		nlohmann::json cameraJson =
+		{
+			{"Position", { m_Camera->GetPosition().x, m_Camera->GetPosition().y, m_Camera->GetPosition().z } },
+			{"Look", { m_Camera->GetLook().x, m_Camera->GetLook().y, m_Camera->GetLook().z } },
+			{"Right", { m_Camera->GetRight().x, m_Camera->GetRight().y, m_Camera->GetRight().z } },
+			{"Up", { m_Camera->GetUp().x, m_Camera->GetUp().y, m_Camera->GetUp().z } },
+		};
+
 		nlohmann::json settings =
 		{
 			{"TessellationParams", tessellationJson},
@@ -93,6 +103,7 @@ namespace AsyncComputeTessellation
 			{"ChromaticAberration", chromaJson},
 			{"MotionBlur", motionBlurJson},
 			{"Bloom", bloomJson},
+			{"Camera", cameraJson},
 		};
 
 		outFile << settings.dump(4);
@@ -176,6 +187,19 @@ namespace AsyncComputeTessellation
 		m_BloomRendering->SetIntensity(bloomJson.at("Intensity").get<float>());
 		m_BloomRendering->SetScatter(bloomJson.at("Scatter").get<float>());
 		m_BloomRendering->SetTint(bloomJson.at("Tint").get<std::vector<float>>().data());
+
+		nlohmann::json cameraJson = settings.at("Camera");
+		auto pos = cameraJson.at("Position").get<std::vector<float>>();
+		auto look = cameraJson.at("Look").get<std::vector<float>>();
+		auto right = cameraJson.at("Right").get<std::vector<float>>();
+		auto up = cameraJson.at("Up").get<std::vector<float>>();
+
+		m_Camera->Setup(
+			{ pos[0], pos[1], pos[2] },
+			{ look[0], look[1], look[2] },
+			{ right[0], right[1], right[2] },
+			{ up[0], up[1], up[2] }
+		);
 
 		inFile.close();
 
