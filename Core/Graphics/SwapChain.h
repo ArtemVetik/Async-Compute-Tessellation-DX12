@@ -26,7 +26,7 @@ namespace EduEngine
 		int GetHeight() const { return m_Height; }
 		
 	private:
-		static const int SwapChainBufferCount = 3;
+		static const int SwapChainBufferCount = 2;
 
 		EduEngine::DescriptorHeapAllocation mAllocation;
 		Microsoft::WRL::ComPtr<IDXGIFactory4> mDXGIFactory;
