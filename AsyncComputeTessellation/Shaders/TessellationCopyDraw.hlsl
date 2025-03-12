@@ -24,6 +24,7 @@ void main(uint3 id : SV_DispatchThreadID)
     //DrawArgs[11] = 0; // BaseVertexLocation
     //DrawArgs[12] = 0; // StartInstanceLocation
     
+    SubdCounter[3] = SubdCounter[2];
     SubdCounter[0] = SubdCounter[1];
     SubdCounter[1] = 0;
     SubdCounter[2] = 0;

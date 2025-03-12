@@ -18,6 +18,7 @@ namespace AsyncComputeTessellation
 		m_Mesh(device),
 		m_PingPongCounter(0),
 		m_SubdCulledBuffIdx(0),
+		m_CopySubdCount(false),
 		m_ObjectCB(m_Device, m_ComputeQueue ? QueueID::Both : QueueID::Direct),
 		m_FrameCB(m_Device, m_ComputeQueue ? QueueID::Both : QueueID::Direct)
 	{
@@ -92,6 +93,9 @@ namespace AsyncComputeTessellation
 #endif
 
 			commandList->Dispatch(m_Params.Dispatch1Count, 1, 1); // TODO: figure out how many threads group to run
+
+			if (m_CopySubdCount)
+				commandList->CopyBufferRegion(m_SubdCounterCpu->GetD3D12Resource(), 0, m_SubdCounter->GetD3D12Resource(), sizeof(UINT) * 3, sizeof(UINT));
 
 			commandContext.ResourceBarrier(CD3DX12_RESOURCE_BARRIER::UAV(m_SubdCounter->GetD3D12Resource()));
 #ifdef USE_STANDART_TESSELLATION
@@ -230,9 +234,12 @@ namespace AsyncComputeTessellation
 		CREATE_UAV_BUFFER(m_VSPrepassOutIdx[0], sizeof(UINT), subdSize, L"VSPrepassOutIdx0", false);
 		CREATE_UAV_BUFFER(m_VSPrepassOutIdx[1], sizeof(UINT), subdSize, L"VSPrepassOutIdx1", false);
 #endif
-		CREATE_UAV_BUFFER(m_SubdCounter, sizeof(UINT), 3, L"SubdCounter", false);
+		CREATE_UAV_BUFFER(m_SubdCounter, sizeof(UINT), 4, L"SubdCounter", false);
 
 #undef CREATE_UAV_BUFFER
+
+		m_SubdCounterCpu = std::make_unique<ReadBackBufferD3D12>(m_Device, 1, QueueID::Direct);
+		m_SubdCounterCpu->SetName(L"SubdCounterCpu");
 	}
 
 	void AdaptiveTessellationCompute::ResetBuffers()
@@ -254,7 +261,7 @@ namespace AsyncComputeTessellation
 
 		delete[] subdData;
 
-		UINT counterData[3] = { m_Mesh.GetMeshData().Indices32.size() / 3, 0, 0 };
+		UINT counterData[4] = { m_Mesh.GetMeshData().Indices32.size() / 3, 0, 0, 0 };
 		m_SubdCounter->LoadData(counterData);
 
 		m_PingPongCounter = 0;

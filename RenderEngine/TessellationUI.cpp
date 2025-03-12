@@ -19,7 +19,7 @@ namespace AsyncComputeTessellation
 
 		static bool open = false;
 
-		if (!open) 
+		if (!open)
 		{
 			if (ImGui::Button("Tessellation"))
 				open = true;
@@ -44,8 +44,8 @@ namespace AsyncComputeTessellation
 				initTessData = true;
 			}
 
-			ImGui::DragInt("Dispatch 1 Count", (int*)& m_Parent->m_Params.Dispatch1Count, 10.0f);
-			ImGui::DragInt("Dispatch 2 Count", (int*)& m_Parent->m_Params.Dispatch2Count, 100.0f);
+			ImGui::DragInt("Dispatch 1 Count", (int*)&m_Parent->m_Params.Dispatch1Count, 10.0f);
+			ImGui::DragInt("Dispatch 2 Count", (int*)&m_Parent->m_Params.Dispatch2Count, 100.0f);
 
 			if (ImGui::Checkbox("Wireframe Mode", &m_Parent->m_Params.WireframeMode))
 				buildPso = true;
@@ -106,9 +106,21 @@ namespace AsyncComputeTessellation
 
 			ImGui::SeparatorText("Compute Settings");
 			ImGui::Checkbox("Freeze", &m_Parent->m_Params.Freeze);
-			
+
 			if (ImGui::Checkbox("Use FP16 in shader", &m_Parent->m_Params.UseFP16InShader))
 				buildPso = true;
+
+			ImGui::Checkbox("Read SubdCount", &m_Parent->m_CopySubdCount);
+
+			if (m_Parent->m_CopySubdCount)
+			{
+
+				UINT subdCount = 0;
+				m_Parent->m_SubdCounterCpu->ReadData(0, subdCount);
+				ImGui::Text("%u triangles", subdCount * m_Parent->m_Params.CB.IndicesCount);
+				ImGui::SameLine();
+				ImGui::Text("(%u keys x %u indices)", subdCount, m_Parent->m_Params.CB.IndicesCount);
+			}
 		}
 		ImGui::End();
 

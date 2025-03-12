@@ -80,11 +80,13 @@ namespace AsyncComputeTessellation
 		std::unique_ptr<BufferD3D12> m_VSPrepassOutIdx[2];
 #endif
 		std::unique_ptr<BufferD3D12> m_SubdCounter;
+		std::unique_ptr<ReadBackBufferD3D12> m_SubdCounterCpu;
 		std::unique_ptr<BufferD3D12> m_TessellationData;
 
 		int m_PingPongCounter;
 		int m_SubdCulledBuffIdx;
 		bool m_ComputeQueue;
+		bool m_CopySubdCount;
 		
 		TessellationParams m_Params;
 
