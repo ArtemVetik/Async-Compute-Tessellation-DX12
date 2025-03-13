@@ -76,6 +76,8 @@ namespace AsyncComputeTessellation
 			return false;
 		}
 
+		device->SetStablePowerState(true);
+
 		pAdapter->GetDesc1(&m_DeviceDesc);
 
 		pAdapter->Release();
