@@ -1,10 +1,8 @@
 # Asynchronous Software Tessellation
 
 > **Master’s Thesis Project — ITMO University**
-> 
-> [📄 Read the full thesis (PDF)]() *(will be available soon)*
 
-A research prototype for **Asynchronous Software Tessellation**, developed as part of a Master’s thesis at [ITMO University](https://itmo.ru/). It demonstrates a GPU-based procedural tessellation algorithm integrated with asynchronous compute to overlap tessellation workloads with other rendering tasks (shadow mapping, post-processing, etc.) in DirectX 12.
+A research prototype for **Asynchronous Software Tessellation**, developed as part of a Master’s thesis at [ITMO University](https://itmo.ru/). It demonstrates a GPU-based procedural tessellation algorithm integrated with [asynchronous compute](https://developer.nvidia.com/blog/advanced-api-performance-async-compute-and-overlap/) to overlap tessellation workloads with other rendering tasks (shadow mapping, post-processing, etc.) in DirectX 12.
 
 [Watch Demo Video](https://youtu.be/GGQwWtlLwLY)
 
@@ -98,6 +96,20 @@ Simplifying the pixel shader reduced G‑buffer costs, shifting the bottleneck t
 
 ---
 
+## ❓ FAQ / Questions & Answers
+
+**Q: Why were mesh shaders not considered in this work and what impact could they have on the proposed approach?**  
+**A:** I did not consider mesh shaders because my main hypothesis was focused on using asynchronous compute. I aimed to optimize software tessellation algorithms executed in compute shaders. If mesh shaders were used, tessellation would have to run in the mesh stage (which executes in the graphics queue, not the compute queue), invalidating my hypothesis about asynchronous compute. Additionally, there is already an implementation of software tessellation in three variants—using compute shaders, using mesh shaders, and using hardware tessellation—allowing a performance comparison of these three approaches.
+
+**Q: Why were GPU-Driven Pipeline techniques and the reasons for their adoption not examined and analyzed in this work? I would also like to evaluate these techniques in the context of a GPU-Driven Pipeline.**  
+**A:** I did not detail GPU-Driven Pipeline techniques in the thesis (though I indirectly mentioned them in the document and presentation) because the tessellation algorithm itself inherently uses GPU-Driven Pipeline methods: for example, frustum culling runs entirely on the GPU without CPU interaction, and I use Indirect Draw, which also offloads rendering tasks from the CPU. Overall, the entire algorithm can run independently on the GPU. The only data transferred from CPU to GPU is the camera’s position; otherwise, the algorithm uses GPU-Driven Pipeline methods. It is also important that when testing the algorithm, I measured GPU time using special GPU counters (as shown in the charts), so time spent synchronizing with the CPU was not included and would not affect the results.
+
+**Q: Why was DirectX 12 chosen instead of Vulkan?**  
+**A:** I chose DirectX 12 because Windows is currently the most popular gaming OS, and DirectX 12 is the best graphics API for Windows.
+
+**Q: How are the GPU blocks loaded when running the tessellation algorithm in synchronous and asynchronous modes?**  
+**A:** On NVIDIA Turing architecture, a pixel shader runs on an SM and requests SRV/UAV resources via the L1Tex (texture cache and texture pipeline). A miss in L1 sends the request to L2, and then to VRAM if needed. Finally, the pixel shader writes color using the CROP (Color Raster Operation) block. In my tessellation implementation, mathematical operations heavily utilize SM cores, so it makes sense to overlap tessellation with work that mainly uses rasterization modules (CROP, PROP, RASTER, etc.). In asynchronous mode, VRAM load also increases due to cache misses, which is a potential area for improvement. Thus, the main goal in asynchronous mode was to reduce the number of idle warps and balance load across GPU modules without conflicts. Here’s a great talk on optimizing GPU workloads: [https://www.gdcvault.com/play/1026202/Optimizing-DX12-DXR-GPU-Workloads](https://www.gdcvault.com/play/1026202/Optimizing-DX12-DXR-GPU-Workloads)
+
 ## 🔧 Prerequisites & Build
 
 - **Windows 10/11**  
@@ -118,3 +130,14 @@ All dependencies are included. Just:
 - [Assimp 5.4.3](http://www.assimp.org)
 - [ImGui](https://github.com/ocornut/imgui)
 - [DirectXShaderCompiler (DXC)](https://github.com/microsoft/DirectXShaderCompiler)
+
+## 🔗 Some Important Links
+* [Direct3D12 User-Mode Heap Synchronization (Microsoft)](https://learn.microsoft.com/en-us/windows/win32/direct3d12/user-mode-heap-synchronization)
+* [Advanced API Performance: Async Compute and Overlap (NVIDIA)](https://developer.nvidia.com/blog/advanced-api-performance-async-compute-and-overlap/)
+* [Khoury J. et al. Adaptive GPU tessellation with compute shaders](https://www.onrendering.com/data/papers/isubd/isubd.pdf)
+* [Khoury, J. GPU Tessellation with Compute Shaders: Master Thesis. EPFL, 2018. 57 pp.](https://jadkhoury.github.io/files/MasterThesisFinal.pdf)
+* [Optimizing DX12/DXR GPU Workloads (GDC)](https://www.gdcvault.com/play/1026202/Optimizing-DX12-DXR-GPU-Workloads)
+* [AMD Dives Deep on Asynchronous Shading (AnandTech)](https://www.anandtech.com/show/9124/amd-dives-deep-on-asynchronous-shading)
+* [Life in the Triangle: NVIDIA’s Logical Pipeline](https://developer.nvidia.com/content/life-triangle-nvidias-logical-pipeline)
+* [Concurrent Execution & Asynchronous Queues (GPUOpen)](https://gpuopen.com/learn/concurrent-execution-asynchronous-queues/)
+* [Harness Powerful Shader Insights Using Shader Debug Info with NVIDIA Nsight Graphics](https://developer.nvidia.com/blog/harness-powerful-shader-insights-using-shader-debug-info-with-nvidia-nsight-graphics)
