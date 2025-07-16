@@ -1,0 +1,18 @@
+https://developer.nvidia.com/blog/advanced-api-performance-setstablepowerstate/
+
+1. Run application and execute:
+	nvidia-smi -q -d CLOCK
+
+2. Lock clocks:
+	nvidia-smi --lock-gpu-clocks=<core_clock_rate>
+	nvidia-smi --lock-memory-clocks=<memory_clock_rate>
+
+3. Reset clocks:
+	nvidia-smi --reset-gpu-clocks
+	nvidia-smi --reset-memory-clocks
+	
+
+
+
+To query supported clock rates:
+	nvidia-smi --query-supported-clocks=timestamp,gpu_name,gpu_uuid,memory,graphics --format=csv
