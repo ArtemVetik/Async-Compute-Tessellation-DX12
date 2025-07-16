@@ -58,6 +58,9 @@ The implementation was evaluated across eight GPU configurations (GTX 1050 Ti,
 
 Each scenario included cascaded shadow maps, multiple colored point lights, full post‑processing effects, and a rotating camera.
 
+- 📊 [Download Full Results (Excel)](./docs/Experiments.xlsx)  
+- 📄 [How to lock clocks (TXT)](./docs/lock-clocks-checklist.txt)
+
 ### 
 
 ### Config 1 Results (RTX 4070 Ti)
